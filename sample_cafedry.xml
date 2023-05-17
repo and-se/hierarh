@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<idPkg:Story xmlns:idPkg="http://ns.adobe.com/AdobeInDesign/idml/1.0/packaging" DOMVersion="16.1">
+	<Story Self="u5d80" AppliedTOCStyle="n" UserText="true" IsEndnoteStory="false" TrackChanges="false" StoryTitle="$ID/" AppliedNamedGrid="n">
+		<StoryPreference OpticalMarginAlignment="false" OpticalMarginSize="12" FrameType="TextFrameType" StoryOrientation="Horizontal" StoryDirection="LeftToRightDirection" />
+		<InCopyExportOption IncludeGraphicProxies="true" IncludeAllResources="false" />
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Кафедра">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>АБАКАНСКАЯ</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Текст">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>А. и Кызылская.</Content>
+				<Br />
+				<Content>Осн. 04(17)07.1995 на терр. респ. Хакасия и Тыва из приходов Новосиб. и Красноярск. епархий.</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Разделитель">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Таблица">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>		04(17)07.1995	–	06(19)07.1999	–	Викентий Морарь</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>1</Content>
+				<Br />
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>		16(29)12.1999	–		–	Ионафан Цветков</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>2</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" HorizontalScale="100" Position="Superscript">
+				<Properties>
+					<AppliedFont type="string">$ID/FreeSetDemiBold</AppliedFont>
+				</Properties>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Сноска с лин">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>1</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content> Архиеп. с 12(25)02.1998.</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Сноска">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>2</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content> Архиеп. с 19.01(01.02)2010.</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/КАФЕДРА ОБН.">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>АБАКАНСКАЯ, обн.</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/ТЕКСТ ОБН.">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>Осн. в 1927 г. Упразд. в 1929 г.</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Разделитель">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/ТАБЛ ОБН">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>		12.1927	–	02.1929	–	Сергий (Алексий) Лавров</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/СНОСКА с лин. ОБН">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" FontStyle="Regular" Position="Superscript">
+				<Content>1</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content> По требованию обн. «митр. Сибир.» Петра Блинова носил мирское имя Алексий. II дата – увольн. за штат. 07.1929 снял сан. «Владел 13-ю языками и, сняв сан, стал препод. иностранных языков в разных ВУЗах». В 1931 г. арестован, приговорен к 5 годам ссылки на Сев. Урал. Расстр. 28.10(10.11)1937.</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Кафедра">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>АБХАЗСКАЯ (см. Сухумская)</Content>
+				<Br />
+				<Content>АЗОВСКАЯ</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Текст">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>Осн. в 1700 г., по рекомендации Патр. Иерусалимск. Досифея в целях возвышения г. Азова. Митрополия. Упразд. в 1703–1704 гг.</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>1</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content> Возобн. в 1927</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content> г. Рост. (Дон.) вик-во. Возобн. 28.03(10.04)1989.</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Разделитель">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Таблица">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>		1700	–	1700	–	в/у Св. Митрофан</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>2</Content>
+				<Br />
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>		1700	–	1701	–	Досифей (Хореско?)</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>3</Content>
+				<Br />
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>		21.06.1701	–	03.12.1703	–	Парфений Небоза Грек</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>4</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Таблица" SpaceBefore="8.503937007874017">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>		30.06(13.07)1927	–	27.10(09.11)1927	–	Серафим Силичев</Content>
+				<Br />
+				<Content>		22.04(05.05)1989	–	10(23)02.1993	–	Сергий Полеткин</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>5</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" HorizontalScale="100" Position="Superscript">
+				<Properties>
+					<Leading type="enumeration">Auto</Leading>
+					<AppliedFont type="string">$ID/FreeSetDemiBold</AppliedFont>
+				</Properties>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Сноска с лин">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>1</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content> Покровский И. М. Рус. епархии в XVI–XIX вв., их открытие, состав и пределы. Опыт церковно-историческ., статистическ. и географическ. исследования. Т. 1–2. Казань, 1897–1913. Т. 2. С. 50–51.</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Сноска">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>2</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content> </Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Tracking="-11">
+				<Content>Еп. Воронежск. В 1696–1700 гг. Воронежская епархия имен. «Воронежск. и Азовск.», поэтому можно предположить, что первоначально, в процессе организации Азовск. епархии, Св. Митрофану было поручено архипастырск. попечение о ней. Однако, по мнению И. М. Покровского, «относительно титула </Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Tracking="-22">
+				<Content>«Азовский», приписываемого Св. Митрофану, нужно заметить, что он не документальный. Власть Св. Митрофана не простира</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Tracking="-11">
+				<Content>лась на Азов. По справедливому объяснению исследователя по церк. истории Воронежск. края П. В. Никольского, такой титул приписывали воронежскому (святителю. – </Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" FontStyle="Italic" Tracking="-11">
+				<Content>Сост.</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Tracking="-11">
+				<Content>) потому, что Св. Митрофан считал завоевателей Азова своими пасомыми и молился как об их здравии, так и об упокоении душ убитых там воинов... Таким образом, места по нижнему бассейну Дона и сев. побережью Азовского моря, где кипела жизнь вследствие азовских походов, не будучи официально подчинены Св. Митрофану, пока не имели определенной епарх. подведомственности…» (Покровский И. М. Указ. соч. Т. 2. С. 36–37).</Content>
+				<Br />
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>3</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content> Родом из славян, митр. б. Сочавск. и Молдовлахийск., прибыл в Россию из польск. плена в 1696 г. «Назн. на Азовск. кафедру в 1700 г., едва ли не по рекомендации Досифея (Патр. Иерусалимск. – </Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" FontStyle="Italic">
+				<Content>Сост.</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>), он однако не был на ней, скончавшись в Москве в 1701 г.» (Там же. С. 50–51). Однако там же отмечено, что фамилия митр. Досифея неизвестна, а существовал др. Досифей с фамилией Хореско, кот. был еп. Радоуцк. (Радовецк.) в Буковине в 1770–1789 г. (Там же. С. 396).</Content>
+				<Br />
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>4</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content> «Парфений (Небоза) родом грек, из митр. Лаодикийских, в Кизическ. митрополии; но и он, не побывав в Азове, 03.12.1703 переведен в Холмогоры, на место архиеп. Афанасия († 06.09.1702). Отправившись в Холмогоры, Парфений сконч. на пути, в г. Ярославле – 02.01.1704. После него на Азовск. кафедру, просуществовавшую, номинально, ок. 4 лет, уже никого не назначали» (Покровский И. М. Указ. соч. Т. 2. С. 51, 52,примеч. 1).</Content>
+				<Br />
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]" Position="Superscript">
+				<Content>5</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content> До хир. – архим.; зав. канц. МП. Избр. на кафедру 28.03(10.04)1989.</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+<!-- end of sample -->
+	</Story>
+</idPkg:Story>
