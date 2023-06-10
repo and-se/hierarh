@@ -3,83 +3,7 @@ from typing import Union, List, Dict
 from dataclasses import dataclass
 import inspect
 
-class Chain:
-    def __init__(self, first: 'ChainLink'):
-        self.links = [first]
-
-    def add(self, chain_link: 'ChainLink'):
-        if inspect.isclass(chain_link):            
-            raise ValueError('May be you forgot emtpy brackets () after class name')
-            
-        self.links[-1].set_next(chain_link)
-        self.links.append(chain_link)
-        return self
-
-    def process(self, data):
-        first = self.links[0]
-        first.process(data)
-
-        for l in self.links:
-            l.finish()
-        
-
-class ChainLink:
-    """
-    process data item from previous chain link
-    """
-    def process(self, data) -> None:
-        raise NotImplementedError()
-
-    """
-    do work on finish chain processing
-    """
-    def finish(self) -> None: pass
-
-    def set_next(self, link: 'ChainLink'):
-        self.next_ = link
-
-    def get_next(self) -> 'ChainLink':
-        r = getattr(self, 'next_')
-        if not r:
-            raise Exception('no next chain link')
-        return r
-
-    def send(self, data):
-        self.get_next().process(data)
-
-@dataclass
-class SaxItem:
-    event: str  # start, text, end
-    name: str  # tag ...
-    data: Union[dict, str]  # dict for start event attrs, str for text event
-    level: int
-    
-
-class XmlSax(ChainLink, sax.ContentHandler):
-    def __init__(self, ignore_whitespace_text = True):
-        self.no_white_text = ignore_whitespace_text
-        
-    def process(self, xml):
-        if isinstance(xml, str):
-            sax.parseString(xml, self)
-        else:
-            sax.parse(xml, self)
-
-    def startDocument(self):
-        self.level = 0
-
-    def startElement(self, name, attrs):
-        self.send(SaxItem('start', name, dict(attrs.copy()), self.level))
-        self.level += 1
-
-    def characters(self, text):
-        if self.no_white_text==False or text.strip() != '':
-            self.send(SaxItem('text', None, text, self.level))
-
-    def endElement(self, name):
-        self.level -= 1
-        self.send(SaxItem('end', name, None, self.level))
-        
+from chain import Chain, ChainLink, XmlSax, SaxItem, Printer
 
 class CafedraCounter(ChainLink):
     def __init__(self):
@@ -101,6 +25,8 @@ class CafedraCounter(ChainLink):
 class Signal:
     name: str
     data: str
+    line: str
+    
                 
 class CafedraSignaller(ChainLink):
     def __init__(self):
@@ -131,7 +57,7 @@ class CafedraSignaller(ChainLink):
             self._item_text_skipped = True
             getattr(self, 'tag_' + self.cur_tag)(item)
             if item.event == 'text' and self._item_text_skipped and item.data.strip():
-                self.send(Signal("skipped_text", item.data))
+                self.send(Signal("skipped_text", item.data, item.line))
                 
 
     def tag_init(self, item: SaxItem):
@@ -152,22 +78,18 @@ class CafedraSignaller(ChainLink):
         if item.event == 'start' and item.name == 'Content':
             self.set_state(self.signal_type, item)
         elif item.event == 'start' and item.name == 'Br':
-            self.send(Signal('br', None))
+            self.send(Signal('br', None, item.line))
     
 
     def tag_Content(self, item: SaxItem):                
         if item.event == 'text':
             self._item_text_skipped = False
-            self.send(Signal(self.signal_type, item.data))
+            self.send(Signal(self.signal_type, item.data, item.line))
         
 
     def finish(self):
         ...
         
-class Printer(ChainLink):
-    def process(self, data):
-        print(data)
-    
 
 if __name__ == '__main__':
     import sys
