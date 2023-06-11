@@ -2,24 +2,9 @@ from xml import sax
 from typing import Union, List, Dict
 from dataclasses import dataclass
 import inspect
+import re
 
 from chain import Chain, ChainLink, XmlSax, SaxItem, Printer
-
-class CafedraCounter(ChainLink):
-    def __init__(self):
-        self.counts = {}
-    
-    def process(self, item: SaxItem):
-        if item.event == 'start' \
-           and item.name == 'ParagraphStyleRange' \
-           and 'кафедра' in (k:=item.data.get('AppliedParagraphStyle').lower()):
-                if k not in self.counts:
-                    self.counts[k] = 1
-                else:
-                    self.counts[k] += 1
-
-    def finish(self):
-        print(self.counts)
 
 @dataclass
 class Signal:
@@ -31,6 +16,22 @@ class Signal:
 class SignalPrinter(ChainLink):
     def process(self, s: Signal):
         print(f"{s.name:15} {s.line:5} {s.data}")
+        self.send(s)
+
+
+class SignalCounter(ChainLink):
+    def __init__(self):
+        self.counts = {}
+
+    def process(self, s: Signal):
+        if s.name not in self.counts:
+            self.counts[s.name] = 1
+        else:
+            self.counts[s.name] += 1
+
+    def finish(self):
+        print(self.counts)
+
                 
 class CafedraSignaller(ChainLink):
     def __init__(self):
@@ -130,15 +131,66 @@ class CafedraSignaller(ChainLink):
         pass
 
 
+class CafedraNameBuilder(ChainLink):
+    def __init__(self):
+        self._cur_name = None
+        self._start_signal = None
+
+    def process(self, s: Signal):
+        is_header = s.name.startswith('header')
+                
+        if self.has_name() and is_header:
+            self.append_name(s)            
+        elif self.has_name() and not is_header:
+            self.send_name()
+        elif not self.has_name() and is_header:
+            self.start_name(s)
+            
+    def finish(self):
+        if self._cur_name:
+            self.send_name()
+
+    def has_name(self):
+        return bool(self._cur_name)
+
+    def start_name(self, s: Signal):
+        self._cur_name = s.data
+        self._start_signal = s
+
+    def append_name(self, s: Signal):
+        assert s.name == self._start_signal.name
+        self._cur_name += s.data
+
+    def send_name(self):
+        if self._start_signal.name == 'header':
+            sname = 'name'
+        elif self._start_signal.name == 'header_obn':
+            sname = 'name_obn'
+        else:
+            raise ValueError('expected header or header_obn signal')
+        
+        is_link = '(см.' in self._cur_name
+        if is_link:
+            sname += '_link'
+        
+        self.send(Signal(sname, self._cur_name, self._start_signal.line))
+        self._cur_name = None
+        self._start_signal = None
+
+
+
 if __name__ == '__main__':
     import sys
     #texter = TextBuilder()
     #chain = Chain(XmlSax()).add(CafedraSignaller()).add(CafedraBuilder()).add(texter)
     
-    # chain = Chain(XmlSax()).add(CafedraCounter())
+    chain = Chain(XmlSax()).add(CafedraSignaller())
+    
+    chain.add(CafedraNameBuilder())
 
-    chain = Chain(XmlSax()).add(CafedraSignaller()).add(SignalPrinter())
-
+    chain.add(SignalPrinter())
+    chain.add(SignalCounter())
+    
     filename = 'sample_cafedry.xml'
     if len(sys.argv) > 1:
         filename = sys.argv[1]

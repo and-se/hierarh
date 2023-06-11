@@ -47,16 +47,18 @@ class ChainLink:
         self.next_ = link
 
     def get_next(self) -> 'ChainLink':
-        r = getattr(self, 'next_')
-        if not r:
-            raise Exception('no next chain link')
+        r = getattr(self, 'next_', None)
+        # if not r:
+        #    raise Exception('no next chain link')
         return r
 
     """
     sends data to next chain link
     """
     def send(self, data):        
-        self.get_next().process(data)
+        n = self.get_next()
+        if n:
+            n.process(data)
 
 @dataclass
 class SaxItem:
