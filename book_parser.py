@@ -28,29 +28,30 @@ class SignalCounter(ChainLink):
             self.counts[s.name] = 1
         else:
             self.counts[s.name] += 1
+        self.send(s)
 
     def finish(self):
         print(self.counts)
 
-def replace_u2028(s):
-    """
-    replaces \\u2028 (UNICODE LINE SEPARATOR) with space or nothing.
-    \\u2028 not recognized by text editors and browser as \n
-    """
-    res = []
-    for i in range(len(s)):
-        if s[i] == '\u2028':
-            if i-1 > 0 and s[i-1] == '-':
-                continue  # replace with nothing in Бобрикович-Копоть-\u2028\t\t\t\t\t\tАнехожский
-            else:
-                res.append(' ')  # replace with space
-        else:
-            res.append(s[i])
-    return ''.join(res)
-
-
 
 class CafedraSignaller(ChainLink):
+    """
+    Reads book xml and generates signals as objects of type Signal with filed 'name':
+    * header - заголовок статьи о кафедре
+    * text - текст статьи о кафедре
+    * episkop - строка таблицы епископов, содержит сведения об управлении кафедрой епископом в конкретный период
+    * episkops-header - подзаголовок внутри таблицы епископов. Примеры: В Смоленске; Архиепископы и митрополиты Московские;    
+    * note_num - номер сноски при ссылке из текста
+    * note_start - номер сноски в начале текста сноски
+    * note - текст сноски
+
+    * header_obn, text_obn, episkop_obn, note_obn - то же для раскольничьих кафедр
+    * text_? - текст статьи о кафедре (настоящей или раскольничьей - надо разбираться из контекста).
+
+    * props - техническая информация о шрифтах и прочем, которую можно игнрорировать
+    * skipped - куски текста, не отнесённые ни к одному из предыдущих типов (таких быть не должно)
+    
+    """
     def __init__(self):
         self.signal_type = None
         self.cur_tag = 'init'
@@ -59,13 +60,6 @@ class CafedraSignaller(ChainLink):
 
         self._item_text_skipped = None
 
-    def send(self, sig: Signal):
-        if sig.data and '\u2028' in sig.data:
-            # print("!!!!!", sig)
-            sig.data = replace_u2028(sig.data)
-
-        ChainLink.send(self, sig)
-       
     def set_state(self, signal_type, item: SaxItem):
         old = self.signal_type, self.cur_tag, self.tag_level
         self._state_stack.append(old)
@@ -155,6 +149,45 @@ class CafedraSignaller(ChainLink):
         pass
 
 
+class SkippedTextCatcher(ChainLink):
+    def __init__(self, fail_on_skipped = True):
+        self.fail_on_skipped = fail_on_skipped
+
+    def process(self, s: Signal):
+        if s.name == 'skipped':
+            if self.fail_on_skipped:
+                raise ValueError('Skipped text detected: ' + str(s))
+            else:
+                print('!!!! SKIPPED', s)
+        self.send(s)
+
+
+def replace_u2028(s):
+    """
+    replaces \\u2028 (UNICODE LINE SEPARATOR) with space or nothing.
+    \\u2028 not recognized by text editors and browser as \n
+    """
+    res = []
+    for i in range(len(s)):
+        if s[i] == '\u2028':
+            if i-1 > 0 and s[i-1] == '-':
+                continue  # replace with nothing in Бобрикович-Копоть-\u2028\t\t\t\t\t\tАнехожский
+            else:
+                res.append(' ')  # replace with space
+        else:
+            res.append(s[i])
+    return ''.join(res)
+
+
+class TextCleaner(ChainLink):
+    def process(self, sig: Signal):
+        if sig.data and '\u2028' in sig.data:
+            # print("!!!!!", sig)
+            sig.data = replace_u2028(sig.data)
+
+        self.send(sig)
+
+
 class CafedraNameBuilder(ChainLink):
     def __init__(self):
         self._cur_name = None
@@ -208,7 +241,8 @@ if __name__ == '__main__':
     #texter = TextBuilder()
     #chain = Chain(XmlSax()).add(CafedraSignaller()).add(CafedraBuilder()).add(texter)
     
-    chain = Chain(XmlSax()).add(CafedraSignaller())
+    chain = Chain(XmlSax()).add(CafedraSignaller())\
+                .add(SkippedTextCatcher()).add(TextCleaner())
     
     chain.add(CafedraNameBuilder())
 
