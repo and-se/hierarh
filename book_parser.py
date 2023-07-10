@@ -5,6 +5,7 @@ import inspect
 import re
 
 from chain import Chain, ChainLink, XmlSax, SaxItem, Printer
+from state_machine import StateMachine, State
 
 @dataclass
 class Signal:
@@ -40,7 +41,7 @@ class CafedraSignaller(ChainLink):
     * header - заголовок статьи о кафедре
     * text - текст статьи о кафедре
     * episkop - строка таблицы епископов, содержит сведения об управлении кафедрой епископом в конкретный период
-    * episkops-header - подзаголовок внутри таблицы епископов. Примеры: В Смоленске; Архиепископы и митрополиты Московские;    
+    * episkops_header - подзаголовок внутри таблицы епископов. Примеры: В Смоленске; Архиепископы и митрополиты Московские;    
     * note_num - номер сноски при ссылке из текста
     * note_start - номер сноски в начале текста сноски
     * note - текст сноски
@@ -92,9 +93,12 @@ class CafedraSignaller(ChainLink):
                     case 'ParagraphStyle/Текст' | 'ParagraphStyle/Текст1':
                         self.set_state('text', item)
                     case 'ParagraphStyle/Таблица Заголовок':
-                        self.set_state('episkops-header', item)
+                        self.set_state('episkops_header', item)
                     case 'ParagraphStyle/Таблица' | 'ParagraphStyle/Таблица сжатая':
-                        self.set_state('episkop', item)
+                        if item.data.get('Justification') == 'CenterAlign':
+                            self.set_state('episkops_header', item)
+                        else:
+                            self.set_state('episkop', item)
                     case 'ParagraphStyle/Сноска с лин' | 'ParagraphStyle/Сноска' | 'ParagraphStyle/Footnote text':
                         self.set_state('note', item)
 
@@ -236,6 +240,49 @@ class CafedraNameBuilder(ChainLink):
 
 
 
+class CafedraArticleBuilder(ChainLink):
+    states = [
+        State('header', cycle=['header', 'br'], next_state = 'text'),
+        State('text', cycle=['text', 'br', 'note_num'], next_state=['episkop', 'episkops_header']),
+        State('episkop', cycle=['episkop', 'note_num'], next_state=[('br', 'expect_episkop_or_epheader_or_note'), 'episkop', 'note_start']),
+        State('expect_episkop_or_epheader_or_note', cycle='br', next_state=['episkop', 'episkops_header', 'note_start']),
+        
+        State('episkops_header', cycle='episkops_header', next_state=[('br', 'expect_episkop'), 'note_start']),
+        State('expect_episkop', cycle='br', next_state='episkop'),
+
+        State('note_start', cycle = [], next_state='note'),
+        State('note', cycle='note', next_state=[('br', 'expect_note_start_or_header')]),
+        State('expect_note_start_or_header', cycle='br', next_state=['note_start', 'header', 'header_obn']),
+
+        # раскольничьи кафедры - в общем-то копия, но для надёжности обрабатываем их отдельно
+        State('header_obn', cycle=['header_obn', 'br'], next_state = 'text_obn'),
+        State('text_obn', cycle=['text_obn', 'br', 'note_num'], next_state='episkop_obn'),
+        State('episkop_obn', cycle=['episkop_obn', 'note_num'], next_state=[
+            ('br', 'expect_episkop_obn_or_note'), 'episkop_obn', ('note_start', 'note_start_obn')
+        ]),
+        State('expect_episkop_obn_or_note', cycle='br', next_state=['episkop_obn', ('note_start', 'note_start_obn')]),
+        State('note_start_obn', cycle=[], next_state='note_obn'),
+        State('note_obn', cycle='note_obn', next_state=[('br', 'expect_note_start_obn_or_header')]),
+        State('expect_note_start_obn_or_header', cycle='br', next_state=[('note_start', 'note_start_obn'), 'header', 'header_obn'])
+    ]
+    #* header_obn, text_obn, episkop_obn, note_obn - то же для раскольничьих кафедр
+
+    def __init__(self):
+        self.machine = StateMachine(self.states, 'header', self)
+
+    def on_header_enter(self, s: str, signal:Signal, machine):
+        print("HEADER", signal)
+        
+    def process(self, s: Signal):
+        if s.name not in ['props']:
+            self.machine.signal(s.name, s)
+        self.send(s)
+
+    def finish(self):
+        if self.machine.state.name not in ('expect_note_start_or_header', 'expect_note_start_obn_or_header'):
+            raise Exception('Wrong finish state of machine state: {self.machine.state.name}')
+
+
 if __name__ == '__main__':
     import sys
     #texter = TextBuilder()
@@ -243,18 +290,24 @@ if __name__ == '__main__':
     
     chain = Chain(XmlSax()).add(CafedraSignaller())\
                 .add(SkippedTextCatcher()).add(TextCleaner())
-    
-    chain.add(CafedraNameBuilder())
 
-    chain.add(SignalPrinter())
-    chain.add(SignalCounter())
+    if 'names' in sys.argv:    
+        chain.add(CafedraNameBuilder())
+    elif 'articles' in sys.argv:
+        chain.add(CafedraArticleBuilder())
+
+    if not('no' in sys.argv and 'print' in sys.argv and sys.argv.index('print') - sys.argv.index('no') == 1):
+        chain.add(SignalPrinter())
+
+    if 'count' in sys.argv:
+        chain.add(SignalCounter())
     
     filename = 'sample_cafedry.xml'
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 1 and sys.argv[1].endswith('.xml'):
         filename = sys.argv[1]
-    
-    f = open(filename, encoding='utf8')
-    chain.process(f)
+
+    with open(filename, encoding='utf8') as f:
+        chain.process(f)
 
     #print(texter.get_text())
     
