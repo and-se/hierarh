@@ -32,7 +32,24 @@ class SignalCounter(ChainLink):
     def finish(self):
         print(self.counts)
 
-                
+def replace_u2028(s):
+    """
+    replaces \\u2028 (UNICODE LINE SEPARATOR) with space or nothing.
+    \\u2028 not recognized by text editors and browser as \n
+    """
+    res = []
+    for i in range(len(s)):
+        if s[i] == '\u2028':
+            if i-1 > 0 and s[i-1] == '-':
+                continue  # replace with nothing in Бобрикович-Копоть-\u2028\t\t\t\t\t\tАнехожский
+            else:
+                res.append(' ')  # replace with space
+        else:
+            res.append(s[i])
+    return ''.join(res)
+
+
+
 class CafedraSignaller(ChainLink):
     def __init__(self):
         self.signal_type = None
@@ -41,6 +58,13 @@ class CafedraSignaller(ChainLink):
         self._state_stack = []
 
         self._item_text_skipped = None
+
+    def send(self, sig: Signal):
+        if sig.data and '\u2028' in sig.data:
+            # print("!!!!!", sig)
+            sig.data = replace_u2028(sig.data)
+
+        ChainLink.send(self, sig)
        
     def set_state(self, signal_type, item: SaxItem):
         old = self.signal_type, self.cur_tag, self.tag_level
