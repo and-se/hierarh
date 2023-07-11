@@ -27,7 +27,7 @@ class State:
 
 
 class StateMachine:
-    def __init__(self, states = List[State], init_state: str = None, callback_receiver = None):
+    def __init__(self, states = List[State], init_state: str = None, event_handler = None):
         if not states:
             raise ValueError('Expected at less one state')
         
@@ -39,7 +39,7 @@ class StateMachine:
         
         self.state = self._states[init_state]
 
-        self.receiver = callback_receiver
+        self.receiver = event_handler
 
     def add_state(name, cycle, next_state):
         self._states[name] = State(name, cycle, next_state)
@@ -54,7 +54,7 @@ class StateMachine:
         else:
             repaired_state = self._callback('fail', signal, data)
             if not repaired_state: 
-                raise ValueError(f"Can't process {signal} at state {self.state}")
+                raise WrongSignalException(f"Can't process signal '{signal}' at state {self.state}")
             else:
                 self._set_state(repaired_state, signal, data)
 
@@ -65,11 +65,20 @@ class StateMachine:
         self._callback('enter', signal, data)
 
     def _callback(self, event, signal: str, data):
+        """
+        state types: enter cycle exit fail
+        """
         if not self.receiver:
             return
         callback_name = 'on_' + self.state.name + '_' + event
-        callback = getattr(self.receiver, callback_name, None)
-        if callback:
-            callback(signal, data, self)
+        # any state handler
+        callback1 = getattr(self.receiver, 'on_' + event + '_state', None)
+        # exact state handler
+        callback2 = getattr(self.receiver, callback_name, None)
+        res = None     
+        for f in (callback1, callback2):
+            if f:
+                res = f(signal, data, self)
+        return res
         
-        
+class WrongSignalException(Exception): pass

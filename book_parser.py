@@ -5,7 +5,7 @@ import inspect
 import re
 
 from chain import Chain, ChainLink, XmlSax, SaxItem, Printer
-from state_machine import StateMachine, State
+from state_machine import StateMachine, State, WrongSignalException
 
 @dataclass
 class Signal:
@@ -239,10 +239,36 @@ class CafedraNameBuilder(ChainLink):
         self._start_signal = None
 
 
+class SignalTool(ChainLink):
+    def __init__(self, cur_name, prev_name=None, prev_prev_name=None):
+        prev_name = prev_name if prev_name else cur_name        
+        self.prefix1 = cur_name
+        self.prefix2 = prev_name
+        self.prefix3 = prev_prev_name
+        self._prev = None
+        self._prev_prev = None
+        
+    def process(self, s: Signal):
+        cond1 = s.name.startswith(self.prefix1) and self._prev and self._prev.name.startswith(self.prefix2)        
+        if self.prefix3:
+            if cond1 and self._prev_prev and self._prev_prev.name.startswith(self.prefix3):
+                self.send(Signal('tool', (self._prev_prev, self._prev, s), s.line))
+        elif cond1:
+            self.send(Signal('tool', (self._prev, s), s.line))
+            
+        self._prev_prev = self._prev
+        self._prev = s
+        
+@dataclass
+class CafedraArticle:
+    header: str
+    text: str
+    episkops: List[str]
 
 class CafedraArticleBuilder(ChainLink):
     states = [
-        State('header', cycle=['header', 'br'], next_state = 'text'),
+        State('header', cycle='header', next_state = ['text', ('br', 'expect_text_or_header')]),
+        State('expect_text_or_header', cycle='br', next_state = ['text', 'header', 'header_obn']),
         State('text', cycle=['text', 'br', 'note_num'], next_state=['episkop', 'episkops_header']),
         State('episkop', cycle=['episkop', 'note_num'], next_state=[('br', 'expect_episkop_or_epheader_or_note'), 'episkop', 'note_start']),
         State('expect_episkop_or_epheader_or_note', cycle='br', next_state=['episkop', 'episkops_header', 'note_start']),
@@ -255,7 +281,7 @@ class CafedraArticleBuilder(ChainLink):
         State('expect_note_start_or_header', cycle='br', next_state=['note_start', 'header', 'header_obn']),
 
         # раскольничьи кафедры - в общем-то копия, но для надёжности обрабатываем их отдельно
-        State('header_obn', cycle=['header_obn', 'br'], next_state = 'text_obn'),
+        State('header_obn', cycle=['header_obn'], next_state = ['text_obn', ('text', 'text_obn'), ('br', 'text_obn')]),        
         State('text_obn', cycle=['text_obn', 'br', 'note_num'], next_state='episkop_obn'),
         State('episkop_obn', cycle=['episkop_obn', 'note_num'], next_state=[
             ('br', 'expect_episkop_obn_or_note'), 'episkop_obn', ('note_start', 'note_start_obn')
@@ -265,22 +291,82 @@ class CafedraArticleBuilder(ChainLink):
         State('note_obn', cycle='note_obn', next_state=[('br', 'expect_note_start_obn_or_header')]),
         State('expect_note_start_obn_or_header', cycle='br', next_state=[('note_start', 'note_start_obn'), 'header', 'header_obn'])
     ]
-    #* header_obn, text_obn, episkop_obn, note_obn - то же для раскольничьих кафедр
 
     def __init__(self):
         self.machine = StateMachine(self.states, 'header', self)
+        self.state_data = []
 
-    def on_header_enter(self, s: str, signal:Signal, machine):
-        print("HEADER", signal)
+        self.header = None
+        self.header_prefix = None
+
+    def add_state_data(self, data):
+        self.state_data.append(data)
+
+    def clear_state_data(self):
+        self.state_data.clear()
+
+    def get_state_line(self):
+        assert len(self.state_data) > 0
+        return self.state_data[0].line
         
     def process(self, s: Signal):
         if s.name not in ['props']:
-            self.machine.signal(s.name, s)
-        self.send(s)
+            try:         
+                self.machine.signal(s.name, s)
+            except WrongSignalException as ex:
+                raise ValueError(f'Error in state machine, line={s.line} state_data={self.state_data}', ex)
 
+    def on_enter_state(self, sig: str, signal: Signal, machine):
+        self.clear_state_data()
+        if sig != 'br':
+            self.add_state_data(signal)
+
+    def on_cycle_state(self, sig: str, signal: Signal, machine):
+        self.add_state_data(signal)
+
+    def on_exit_state(self, sig: str, signal: Signal, machine):        
+        self.add_state_data(signal)
+
+    def on_header_exit(self, sig: str, signal: Signal, machine):
+        assert len(self.state_data) > 0
+        self.header = (self.header_prefix or '') + join_signals(self.state_data).strip()
+        self.header_prefix = None
+
+    def on_expect_text_or_header_exit(self, sig: str, signal: Signal, machine):
+        if sig == 'header':
+            if '(см.' in self.header:
+                self.send(Signal('name_link', self.header, self.get_state_line()))
+            else:                
+                self.header_prefix = self.header
+        elif sig == 'text':
+            self.send(Signal('name', self.header, self.get_state_line()))
+
+    def on_header_obn_exit(self, sig: str, signal: Signal, machine):
+        assert len(self.state_data) > 0
+        self.header = (self.header_prefix or '') + join_signals(self.state_data).strip()
+        if '(см.' in self.header:
+            self.send(Signal('name_obn_link', self.header, self.get_state_line()))
+        else:                
+            self.send(Signal('name_obn', self.header, self.get_state_line()))
+        
+
+    
+
+        
+def join_signals(signals: List[Signal]):
+    r = []
+    for s in signals:
+        if s.name != 'br':
+            r.append(s.data)
+        else:
+            r.append('\n')
+    return ''.join(r)
+    
+    
+    
     def finish(self):
         if self.machine.state.name not in ('expect_note_start_or_header', 'expect_note_start_obn_or_header'):
-            raise Exception('Wrong finish state of machine state: {self.machine.state.name}')
+            raise Exception('Wrong finish state of state machine: {self.machine.state.name}')
 
 
 if __name__ == '__main__':
@@ -295,6 +381,8 @@ if __name__ == '__main__':
         chain.add(CafedraNameBuilder())
     elif 'articles' in sys.argv:
         chain.add(CafedraArticleBuilder())
+    elif 'tool' in sys.argv:
+        chain.add(SignalTool('header', 'br', 'header'))
 
     if not('no' in sys.argv and 'print' in sys.argv and sys.argv.index('print') - sys.argv.index('no') == 1):
         chain.add(SignalPrinter())
