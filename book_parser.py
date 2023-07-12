@@ -192,53 +192,6 @@ class TextCleaner(ChainLink):
         self.send(sig)
 
 
-class CafedraNameBuilder(ChainLink):
-    def __init__(self):
-        self._cur_name = None
-        self._start_signal = None
-
-    def process(self, s: Signal):
-        is_header = s.name.startswith('header')
-                
-        if self.has_name() and is_header:
-            self.append_name(s)            
-        elif self.has_name() and not is_header:
-            self.send_name()
-        elif not self.has_name() and is_header:
-            self.start_name(s)
-            
-    def finish(self):
-        if self._cur_name:
-            self.send_name()
-
-    def has_name(self):
-        return bool(self._cur_name)
-
-    def start_name(self, s: Signal):
-        self._cur_name = s.data
-        self._start_signal = s
-
-    def append_name(self, s: Signal):
-        assert s.name == self._start_signal.name
-        self._cur_name += s.data
-
-    def send_name(self):
-        if self._start_signal.name == 'header':
-            sname = 'name'
-        elif self._start_signal.name == 'header_obn':
-            sname = 'name_obn'
-        else:
-            raise ValueError('expected header or header_obn signal')
-        
-        is_link = '(см.' in self._cur_name
-        if is_link:
-            sname += '_link'
-        
-        self.send(Signal(sname, self._cur_name, self._start_signal.line))
-        self._cur_name = None
-        self._start_signal = None
-
-
 class SignalTool(ChainLink):
     def __init__(self, cur_name, prev_name=None, prev_prev_name=None):
         prev_name = prev_name if prev_name else cur_name        
@@ -258,6 +211,53 @@ class SignalTool(ChainLink):
             
         self._prev_prev = self._prev
         self._prev = s
+
+
+class SignalNamePatcher(ChainLink):
+    def __init__(self, patches: Dict[int, tuple]):
+        """
+        patches - dict with key = signal line field,
+        value = tuple (signal data for check, new signal name)
+        """
+        self.patches = patches
+        
+    def process(self, s: Signal):
+        patch = self.patches.get(s.line)
+        if patch:
+            expected_data, new_signal_name = patch
+            if not s.data.strip().startswith(expected_data.strip()):
+                raise Exception(f"Signal and patch different: expected '{expected_data}' for signal {s}")
+            s.name = new_signal_name
+
+        self.send(s)
+
+cafedra_signals_patch = """
+text_obn              232 Осн. и упразд. в 1929 г. Имен. – по г. Азову (Северо-Кавк. край, ныне – Рост. обл.). Рост. (Дон.) вик-во.
+header_obn            398 АКМОЛИНСКАЯ, обн.
+header_obn            680 АКТЮБИНСКАЯ, обн.
+text_obn              686 Осн. в 1925 г. Оренб. вик-во. Упразд. в 1925 
+text_obn              689 г.
+episkop       790 		(09.1917	–	15(28)04.1922	–	Пирр Окропиридзе
+episkop       796 )
+episkop       802 		(25.02(09.03)1924	–	18.10(01.11)1924	–	Давид Качахидзе)
+episkop       804 		(1925	–	04(17)10.1927	–	Мелхиседек Пхаладзе)
+episkop       808 		(1927	–	13(26)03.1928	–	Ефрем Сидамонидзе)
+episkop       810 		(1928	–	1929	–	Стефан Карбелашвили)
+"""
+
+def parse_text_patch(text_patch):
+    res = {}
+    for l in text_patch.split('\n'):
+        l = l.strip()
+        if not l or l.startswith('#'):
+            continue
+
+        new_type, line_num, expected_data = l.split(maxsplit=2)
+        res[int(line_num)] = (expected_data, new_type)
+
+    return res
+
+
         
 @dataclass
 class CafedraArticle:
@@ -267,13 +267,16 @@ class CafedraArticle:
 
 class CafedraArticleBuilder(ChainLink):
     states = [
-        State('header', cycle='header', next_state = ['text', ('br', 'expect_text_or_header')]),
-        State('expect_text_or_header', cycle='br', next_state = ['text', 'header', 'header_obn']),
-        State('text', cycle=['text', 'br', 'note_num'], next_state=['episkop', 'episkops_header']),
-        State('episkop', cycle=['episkop', 'note_num'], next_state=[('br', 'expect_episkop_or_epheader_or_note'), 'episkop', 'note_start']),
-        State('expect_episkop_or_epheader_or_note', cycle='br', next_state=['episkop', 'episkops_header', 'note_start']),
+        State('expect_header', cycle=[], next_state=['header', 'header_obn']),
         
-        State('episkops_header', cycle='episkops_header', next_state=[('br', 'expect_episkop'), 'note_start']),
+        State('header', cycle='header', next_state = ['text', ('br', 'text')]),        
+        State('text', cycle=['text', 'br', 'note_num'], next_state=['episkop', 'episkops_header']),
+        State('episkop', cycle=['episkop', 'note_num'], next_state=[
+            ('br', 'expect_ep_note_head'), 'note_start', 'header', 'header_obn'
+        ]),
+        State('expect_ep_note_head', cycle='br', next_state=['episkop', 'episkops_header', 'note_start', 'header', 'header_obn']),
+        
+        State('episkops_header', cycle='episkops_header', next_state=['episkop', ('br', 'expect_episkop')]),
         State('expect_episkop', cycle='br', next_state='episkop'),
 
         State('note_start', cycle = [], next_state='note'),
@@ -281,24 +284,24 @@ class CafedraArticleBuilder(ChainLink):
         State('expect_note_start_or_header', cycle='br', next_state=['note_start', 'header', 'header_obn']),
 
         # раскольничьи кафедры - в общем-то копия, но для надёжности обрабатываем их отдельно
-        State('header_obn', cycle=['header_obn'], next_state = ['text_obn', ('text', 'text_obn'), ('br', 'text_obn')]),        
+        State('header_obn', cycle=['header_obn'], next_state = ['text_obn', ('br', 'text_obn')]),        
         State('text_obn', cycle=['text_obn', 'br', 'note_num'], next_state='episkop_obn'),
         State('episkop_obn', cycle=['episkop_obn', 'note_num'], next_state=[
-            ('br', 'expect_episkop_obn_or_note'), 'episkop_obn', ('note_start', 'note_start_obn')
+            ('br', 'expect_ep_obn_note_head'), ('note_start', 'note_start_obn'), 'header', 'header_obn'
         ]),
-        State('expect_episkop_obn_or_note', cycle='br', next_state=['episkop_obn', ('note_start', 'note_start_obn')]),
+        State('expect_ep_obn_note_head', cycle='br', next_state=['episkop_obn', ('note_start', 'note_start_obn'), 'header', 'header_obn']),
         State('note_start_obn', cycle=[], next_state='note_obn'),
         State('note_obn', cycle='note_obn', next_state=[('br', 'expect_note_start_obn_or_header')]),
         State('expect_note_start_obn_or_header', cycle='br', next_state=[('note_start', 'note_start_obn'), 'header', 'header_obn'])
     ]
 
     def __init__(self):
-        self.machine = StateMachine(self.states, 'header', self)
+        self.machine = StateMachine(self.states, 'expect_header', self)
         self.state_data = []
 
         self.header = None
-        self.header_prefix = None
-
+        self._was_link = None
+        
     def add_state_data(self, data):
         self.state_data.append(data)
 
@@ -314,7 +317,7 @@ class CafedraArticleBuilder(ChainLink):
             try:         
                 self.machine.signal(s.name, s)
             except WrongSignalException as ex:
-                raise ValueError(f'Error in state machine, line={s.line} state_data={self.state_data}', ex)
+                raise ValueError(f"Error in state machine state={self.machine.state.name}, signal '{s.name}' at line {s.line} state_data={self.state_data}", ex)
 
     def on_enter_state(self, sig: str, signal: Signal, machine):
         self.clear_state_data()
@@ -327,30 +330,35 @@ class CafedraArticleBuilder(ChainLink):
     def on_exit_state(self, sig: str, signal: Signal, machine):        
         self.add_state_data(signal)
 
-    def on_header_exit(self, sig: str, signal: Signal, machine):
-        assert len(self.state_data) > 0
-        self.header = (self.header_prefix or '') + join_signals(self.state_data).strip()
-        self.header_prefix = None
-
-    def on_expect_text_or_header_exit(self, sig: str, signal: Signal, machine):
-        if sig == 'header':
-            if '(см.' in self.header:
-                self.send(Signal('name_link', self.header, self.get_state_line()))
-            else:                
-                self.header_prefix = self.header
-        elif sig == 'text':
-            self.send(Signal('name', self.header, self.get_state_line()))
-
-    def on_header_obn_exit(self, sig: str, signal: Signal, machine):
-        assert len(self.state_data) > 0
-        self.header = (self.header_prefix or '') + join_signals(self.state_data).strip()
-        if '(см.' in self.header:
-            self.send(Signal('name_obn_link', self.header, self.get_state_line()))
-        else:                
-            self.send(Signal('name_obn', self.header, self.get_state_line()))
-        
-
+    obn_header_re = re.compile('.*\sобн\.')
     
+    def _common_on_header_exit(self, sig, signal: Signal, machine, is_obn):
+        pref = '_obn' if is_obn else ''
+        
+        assert len(self.state_data) > 0
+        self.header = join_signals(self.state_data).strip()
+
+        is_obn_re = self.obn_header_re.match(self.header)
+
+        if bool(is_obn) != bool(is_obn_re):
+            raise Exception(f'Настоящая или раскольничья кафедра? {self.header} {self.state_data}')
+        
+        if sig=='br' and '(см.' in self.header:
+            self.send(Signal(f'name{pref}_link', self.header, self.get_state_line()))
+            self.clear_state_data()
+            # manual set next state - wait new header
+            machine.set_state('expect_header', run_callbacks=False)
+            # and cancel go to state, defined by State.next_state            
+            return True
+        else:                
+            self.send(Signal(f'name{pref}', self.header, self.get_state_line()))
+        
+    
+    def on_header_exit(self, sig: str, signal: Signal, machine):
+        return self._common_on_header_exit(sig, signal, machine, False)
+        
+    def on_header_obn_exit(self, sig: str, signal: Signal, machine):
+        return self._common_on_header_exit(sig, signal, machine, True)
 
         
 def join_signals(signals: List[Signal]):
@@ -375,7 +383,8 @@ if __name__ == '__main__':
     #chain = Chain(XmlSax()).add(CafedraSignaller()).add(CafedraBuilder()).add(texter)
     
     chain = Chain(XmlSax()).add(CafedraSignaller())\
-                .add(SkippedTextCatcher()).add(TextCleaner())
+                .add(SkippedTextCatcher()).add(TextCleaner())\
+                .add(SignalNamePatcher(parse_text_patch(cafedra_signals_patch)))
 
     if 'names' in sys.argv:    
         chain.add(CafedraNameBuilder())
