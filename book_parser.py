@@ -13,10 +13,19 @@ class Signal:
     data: str
     line: str
 
+    def serialize(self):
+        return f"{self.name:15} {self.line:5} {self.data if self.data else '##NONE##'}"
+
+    @staticmethod
+    def deserialize(s):
+        name, line_num, data = s.split(maxsplit=2)
+        data = data if data != '##NONE##' else None             
+        return Signal(name, data, int(line_num))
+
 
 class SignalPrinter(ChainLink):
     def process(self, s: Signal):
-        print(f"{s.name:15} {s.line:5} {s.data}")
+        print(s.serialize())
         self.send(s)
 
 
@@ -225,25 +234,15 @@ class SignalNamePatcher(ChainLink):
         patch = self.patches.get(s.line)
         if patch:
             expected_data, new_signal_name = patch
-            if not s.data.strip().startswith(expected_data.strip()):
+            if new_signal_name == 'SKIP!':
+                return
+            if not (s.data == expected_data or s.data.strip().startswith(expected_data.strip())):
                 raise Exception(f"Signal and patch different: expected '{expected_data}' for signal {s}")
             s.name = new_signal_name
-
+        
         self.send(s)
 
-cafedra_signals_patch = """
-text_obn              232 Осн. и упразд. в 1929 г. Имен. – по г. Азову (Северо-Кавк. край, ныне – Рост. обл.). Рост. (Дон.) вик-во.
-header_obn            398 АКМОЛИНСКАЯ, обн.
-header_obn            680 АКТЮБИНСКАЯ, обн.
-text_obn              686 Осн. в 1925 г. Оренб. вик-во. Упразд. в 1925 
-text_obn              689 г.
-episkop       790 		(09.1917	–	15(28)04.1922	–	Пирр Окропиридзе
-episkop       796 )
-episkop       802 		(25.02(09.03)1924	–	18.10(01.11)1924	–	Давид Качахидзе)
-episkop       804 		(1925	–	04(17)10.1927	–	Мелхиседек Пхаладзе)
-episkop       808 		(1927	–	13(26)03.1928	–	Ефрем Сидамонидзе)
-episkop       810 		(1928	–	1929	–	Стефан Карбелашвили)
-"""
+cafedra_signals_patch = open('signal_patch.txt', encoding='utf8').read()
 
 def parse_text_patch(text_patch):
     res = {}
@@ -252,8 +251,10 @@ def parse_text_patch(text_patch):
         if not l or l.startswith('#'):
             continue
 
-        new_type, line_num, expected_data = l.split(maxsplit=2)
-        res[int(line_num)] = (expected_data, new_type)
+        s = Signal.deserialize(l)
+        res[s.line] = (s.data, s.name)
+        #new_type, line_num, expected_data = l.split(maxsplit=2)
+        #res[int(line_num)] = (expected_data, new_type)
 
     return res
 
@@ -266,33 +267,33 @@ class CafedraArticle:
     episkops: List[str]
 
 class CafedraArticleBuilder(ChainLink):
+    # При составлении правил надо иметь ввиду, что пока мы находимся в рамках одного состояния
+    # сигналы складируются в self.state_data с целью сбора итогового текста при выходе из состояния.
     states = [
         State('expect_header', cycle=[], next_state=['header', 'header_obn']),
         
         State('header', cycle='header', next_state = ['text', ('br', 'text')]),        
-        State('text', cycle=['text', 'br', 'note_num'], next_state=['episkop', 'episkops_header']),
+        State('text', cycle=['text', 'br', 'note_num'], next_state=['episkop', 'episkops_header', 'header', 'header_obn', 'note_start']),
         State('episkop', cycle=['episkop', 'note_num'], next_state=[
             ('br', 'expect_ep_note_head'), 'note_start', 'header', 'header_obn'
         ]),
         State('expect_ep_note_head', cycle='br', next_state=['episkop', 'episkops_header', 'note_start', 'header', 'header_obn']),
         
-        State('episkops_header', cycle='episkops_header', next_state=['episkop', ('br', 'expect_episkop')]),
+        State('episkops_header', cycle=['episkops_header', 'note_num'], next_state=['episkop', ('br', 'expect_episkop')]),
         State('expect_episkop', cycle='br', next_state='episkop'),
 
         State('note_start', cycle = [], next_state='note'),
-        State('note', cycle='note', next_state=[('br', 'expect_note_start_or_header')]),
-        State('expect_note_start_or_header', cycle='br', next_state=['note_start', 'header', 'header_obn']),
+        State('note', cycle=['note', 'br'], next_state=['note_start', 'header', 'header_obn']),
 
         # раскольничьи кафедры - в общем-то копия, но для надёжности обрабатываем их отдельно
         State('header_obn', cycle=['header_obn'], next_state = ['text_obn', ('br', 'text_obn')]),        
-        State('text_obn', cycle=['text_obn', 'br', 'note_num'], next_state='episkop_obn'),
+        State('text_obn', cycle=['text_obn', 'br', 'note_num'], next_state=['episkop_obn', 'header', 'header_obn']),
         State('episkop_obn', cycle=['episkop_obn', 'note_num'], next_state=[
             ('br', 'expect_ep_obn_note_head'), ('note_start', 'note_start_obn'), 'header', 'header_obn'
         ]),
         State('expect_ep_obn_note_head', cycle='br', next_state=['episkop_obn', ('note_start', 'note_start_obn'), 'header', 'header_obn']),
-        State('note_start_obn', cycle=[], next_state='note_obn'),
-        State('note_obn', cycle='note_obn', next_state=[('br', 'expect_note_start_obn_or_header')]),
-        State('expect_note_start_obn_or_header', cycle='br', next_state=[('note_start', 'note_start_obn'), 'header', 'header_obn'])
+        State('note_start_obn', cycle=[], next_state=['note_obn', ('note', 'note_obn')]),
+        State('note_obn', cycle=['note_obn', 'note', 'br'], next_state=[('note_start', 'note_start_obn'), 'header', 'header_obn']),
     ]
 
     def __init__(self):
@@ -330,7 +331,8 @@ class CafedraArticleBuilder(ChainLink):
     def on_exit_state(self, sig: str, signal: Signal, machine):        
         self.add_state_data(signal)
 
-    obn_header_re = re.compile('.*\sобн\.')
+    obn_header_re = re.compile(r'.* ((\s(обн\.|григ\.|самозв\.|укр\.)) | \(ПАПЦ\))', re.X)
+    link_re = re.compile(r'.*(\(|\s)см\.')
     
     def _common_on_header_exit(self, sig, signal: Signal, machine, is_obn):
         pref = '_obn' if is_obn else ''
@@ -341,9 +343,9 @@ class CafedraArticleBuilder(ChainLink):
         is_obn_re = self.obn_header_re.match(self.header)
 
         if bool(is_obn) != bool(is_obn_re):
-            raise Exception(f'Настоящая или раскольничья кафедра? {self.header} {self.state_data}')
+            raise Exception(f'Настоящая или раскольничья кафедра? {self.header} {self.state_data}\n{self.state_data[0].serialize()}')
         
-        if sig=='br' and '(см.' in self.header:
+        if sig=='br' and self.link_re.match(self.header):
             self.send(Signal(f'name{pref}_link', self.header, self.get_state_line()))
             self.clear_state_data()
             # manual set next state - wait new header
@@ -404,7 +406,11 @@ if __name__ == '__main__':
         filename = sys.argv[1]
 
     with open(filename, encoding='utf8') as f:
-        chain.process(f)
+        try:
+            chain.process(f)
+        except ValueError as ex:
+            print(ex)
+        
 
     #print(texter.get_text())
     
