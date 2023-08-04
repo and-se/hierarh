@@ -3,8 +3,12 @@ from typing import List, Dict
 
 @dataclass
 class State:
+    # state name
     name: str
+    # One or more signals that processed by this state without transition into other state
     cycle: str | List[str]
+    # pairs (signal->new_state) for transition into other state.
+    # ["sig_as_state", ("sig2", "state2")] is equal to pairs: sig_as_state->sig_as_state, sig2->state2
     next_state: str | List[str|tuple] | Dict[str, str]
 
     def __post_init__(self):
