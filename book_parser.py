@@ -1,6 +1,6 @@
 from xml import sax
-from typing import Union, List, Dict
-from dataclasses import dataclass
+from typing import Union, List, Dict, Tuple
+from dataclasses import dataclass, field
 import inspect
 import re
 
@@ -262,9 +262,15 @@ def parse_text_patch(text_patch):
         
 @dataclass
 class CafedraArticle:
-    header: str
-    text: str
-    episkops: List[str]
+    header: str = None
+    is_obn: bool = False
+    is_link: bool = False
+    start_line: int = None
+    
+    text: str = None
+    episkops: List[str] = field(default_factory = list)
+    notes: List[Tuple[int, str]] = field(default_factory = list)
+    
 
 class CafedraArticleBuilder(ChainLink):
     # При составлении правил надо иметь ввиду, что пока мы находимся в рамках одного состояния
@@ -300,18 +306,30 @@ class CafedraArticleBuilder(ChainLink):
         self.machine = StateMachine(self.states, 'expect_header', self)
         self.state_data = []
 
-        self.header = None
-        self._was_link = None
+        self.caf = None 
         
     def add_state_data(self, data):
         self.state_data.append(data)
 
     def clear_state_data(self):
         self.state_data.clear()
-
+        
     def get_state_line(self):
         assert len(self.state_data) > 0
         return self.state_data[0].line
+
+    def send_cafedra_and_create_new(self):
+        if self.caf:
+            assert self.caf.header, 'Empty cafedra!!!'
+            sig_name = 'cafedra'
+            if self.caf.is_obn:
+                sig_name += '_obn'
+            if self.caf.is_link:
+                sig_name += '_link'
+            self.send(Signal(sig_name, self.caf, self.caf.start_line))
+
+        self.caf = CafedraArticle()
+
         
     def process(self, s: Signal):
         if s.name not in ['props']:
@@ -329,16 +347,20 @@ class CafedraArticleBuilder(ChainLink):
         self.add_state_data(signal)
 
     def on_exit_state(self, sig: str, signal: Signal, machine):        
-        self.add_state_data(signal)
+        pass
+        #self.add_state_data(signal)
 
     obn_header_re = re.compile(r'.* ((\s(обн\.|григ\.|самозв\.|укр\.)) | \(ПАПЦ\))', re.X)
     link_re = re.compile(r'.*(\(|\s)см\.')
+
+    @property
+    def header(self):
+        return self.caf.header
     
-    def _common_on_header_exit(self, sig, signal: Signal, machine, is_obn):
-        pref = '_obn' if is_obn else ''
-        
+    def _build_header(self, sig: str, machine, is_obn):
         assert len(self.state_data) > 0
-        self.header = join_signals(self.state_data).strip()
+        self.caf.header = join_signals(self.state_data)
+        self.caf.is_obn = is_obn
 
         is_obn_re = self.obn_header_re.match(self.header)
 
@@ -346,21 +368,45 @@ class CafedraArticleBuilder(ChainLink):
             raise Exception(f'Настоящая или раскольничья кафедра? {self.header} {self.state_data}\n{self.state_data[0].serialize()}')
         
         if sig=='br' and self.link_re.match(self.header):
-            self.send(Signal(f'name{pref}_link', self.header, self.get_state_line()))
+            self.caf.is_link = True            
             self.clear_state_data()
             # manual set next state - wait new header
             machine.set_state('expect_header', run_callbacks=False)
             # and cancel go to state, defined by State.next_state            
             return True
         else:                
-            self.send(Signal(f'name{pref}', self.header, self.get_state_line()))
-        
+            #self.send(Signal(f'name{"_obn" if is_obn else ""}', self.header, self.get_state_line()))
+            pass
+
+    def _build_text(self):
+        self.caf.text = join_signals_html(self.state_data)
+
+    def on_header_enter(self, sig: str, signal: Signal, machine):
+        self.send_cafedra_and_create_new()
+        self.caf.start_line = signal.line
+
+    def on_header_obn_enter(self, sig: str, signal: Signal, machine):
+        self.send_cafedra_and_create_new()
+        self.caf.start_line = signal.line
     
     def on_header_exit(self, sig: str, signal: Signal, machine):
-        return self._common_on_header_exit(sig, signal, machine, False)
+        return self._build_header(sig, machine, False)
         
     def on_header_obn_exit(self, sig: str, signal: Signal, machine):
-        return self._common_on_header_exit(sig, signal, machine, True)
+        return self._build_header(sig, machine, True)
+
+    def on_text_exit(self, sig: str, signal: Signal, machine):
+        self._build_text()
+
+    def on_text_obn_exit(self, sig: str, signal: Signal, machine):
+        self._build_text()
+
+    
+
+    def finish(self):
+        if self.machine.state.name not in ('note', 'note_obn'):
+            raise Exception(f'Wrong finish state of state machine: {self.machine.state.name}')
+        self.send_cafedra_and_create_new()
 
         
 def join_signals(signals: List[Signal]):
@@ -370,14 +416,27 @@ def join_signals(signals: List[Signal]):
             r.append(s.data)
         else:
             r.append('\n')
-    return ''.join(r)
-    
-    
-    
-    def finish(self):
-        if self.machine.state.name not in ('expect_note_start_or_header', 'expect_note_start_obn_or_header'):
-            raise Exception('Wrong finish state of state machine: {self.machine.state.name}')
+    return ''.join(r).strip()
 
+    
+def join_signals_html(signals: List[Signal]):
+    import html
+    r = []
+    for s in signals:
+        if s.name == 'br':
+            r.append('<br>\n')
+        elif s.name == 'note_num':
+            note_num = int(s.data)
+            r.append(f'<span class="note" data-note="{note_num}">{note_num}</span>')
+        else:            
+            r.append(html.escape(s.data))
+
+    while r and r[-1] == '<br>\n':
+        del r[-1]
+            
+    return ''.join(r).strip()
+    
+    
 
 if __name__ == '__main__':
     import sys

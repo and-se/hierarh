@@ -101,7 +101,7 @@ class StateMachine:
 
     def _callback(self, event):
         """
-        event types: enter cycle exit fail
+        event types: enter, cycle, exit, fail
         """
         if not self.receiver:
             return
