@@ -275,31 +275,8 @@ def parse_text_patch(text_patch):
     return res
 
 
+from models import CafedraArticle, EpiskopInCafedra, ArticleNote
         
-@dataclass
-class CafedraArticle:
-    header: str = None
-    is_obn: bool = False
-    is_link: bool = False
-    start_line: int = None
-    
-    text: str = None
-    # episkop in cafedra info header as str - fro ex. 'Архиепископы и митрополиты Московские;'
-    episkops: List[Union['EpiskopInCafedra', str]] = field(default_factory = list)
-    notes: List['ArticleNote'] = field(default_factory = list)
-
-@dataclass
-class EpiskopInCafedra:
-    begin_dating: str = None
-    end_dating: str = None
-    who: str = None
-    unparsed_data: str = None
-
-@dataclass
-class ArticleNote:
-    num: int
-    text: str
-    
 
 class CafedraArticleBuilder(ChainLink):
     # При составлении правил надо иметь ввиду, что пока мы находимся в рамках одного состояния

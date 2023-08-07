@@ -1,0 +1,39 @@
+
+
+.cafedras, .notes {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 0;
+}
+
+.cafedras li {
+    margin-bottom: 10px;
+}
+
+.note {
+    vertical-align: super;
+    font-size: small;
+    cursor: pointer
+}
+
+.note_start {
+    font-weight: bold;
+    padding-right: 10px;
+    cursor: pointer
+}
+
+/*.cafedras a {
+    text-decoration: none;
+    color: inherit;
+}*/
+
+
+
+.episkops {
+    border: 1px solid black;
+    width: 100%;
+}
+
+.episkops_header {
+ font-size: x-large;
+}
