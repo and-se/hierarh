@@ -23,8 +23,7 @@ class SimpleCafedraDb:
 
 class QueryExecutor:
     def __init__(self, query):
-        self.q = tuple(x.lower() for x in query.split())
-        print(self.q)
+        self.q = tuple(x.lower() for x in query.split())        
 
     def match(self, data: str):
         data = data.lower()
