@@ -1,6 +1,6 @@
 from xml import sax
 from typing import Union, List, Dict, Tuple, Union
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 import inspect
 import re
 
@@ -14,13 +14,14 @@ class Signal:
     line: str
 
     def serialize(self):
-        return f"{self.name:15} {self.line:5} {self.data if self.data else '##NONE##'}"
+        return f"{self.name:15} {self.line or '##NONE##':5} {self.data if self.data else '##NONE##'}"
 
     @staticmethod
     def deserialize(s):
         name, line_num, data = s.split(maxsplit=2)
-        data = data if data != '##NONE##' else None             
-        return Signal(name, data, int(line_num))
+        data = data if data != '##NONE##' else None
+        line_num =  int(line_num) if line_num != '##NONE##' else None
+        return Signal(name, data, line_num)
 
 
 class SignalPrinter(ChainLink):
@@ -222,11 +223,16 @@ class SignalTool(ChainLink):
         self._prev = s
 
 
-class SignalNamePatcher(ChainLink):
+class SignalPatcher(ChainLink):
     def __init__(self, patches: Dict[int, tuple]):
         """
         patches - dict with key = signal line field,
         value = tuple (signal data for check, new signal name)
+
+        special keys:
+        * SKIP! - delete this signal for data flow
+        * BR! - insert Signal(name='br') before this signal
+        * EDIT! - edit signal text. Signal data for check should be 'check data===>full new data'
         """
         self.patches = patches
         
@@ -236,12 +242,17 @@ class SignalNamePatcher(ChainLink):
             expected_data, new_signal_name = patch
             if new_signal_name == 'SKIP!':
                 return
+            elif new_signal_name == 'EDIT!':
+                expected_data, new_signal_data = expected_data.split('===>')
+            
             if not (s.data == expected_data or s.data.strip().startswith(expected_data.strip())):
                 raise Exception(f"Signal and patch different: expected '{expected_data}' for signal {s}")
 
             if new_signal_name == 'BR!':
                 # add BR before signal
                 self.send(Signal('br', None, s.line))
+            elif new_signal_name == 'EDIT!':
+                s.data = new_signal_data
             else:
                 s.name = new_signal_name
         
@@ -275,7 +286,7 @@ class CafedraArticle:
     text: str = None
     # episkop in cafedra info header as str - fro ex. 'Архиепископы и митрополиты Московские;'
     episkops: List[Union['EpiskopInCafedra', str]] = field(default_factory = list)
-    notes: List[Tuple[int, str]] = field(default_factory = list)
+    notes: List['ArticleNote'] = field(default_factory = list)
 
 @dataclass
 class EpiskopInCafedra:
@@ -283,6 +294,12 @@ class EpiskopInCafedra:
     end_dating: str = None
     who: str = None
     unparsed_data: str = None
+
+@dataclass
+class ArticleNote:
+    num: int
+    text: str
+    
 
 class CafedraArticleBuilder(ChainLink):
     # При составлении правил надо иметь ввиду, что пока мы находимся в рамках одного состояния
@@ -330,7 +347,8 @@ class CafedraArticleBuilder(ChainLink):
         self.machine = StateMachine(self.states, 'expect_header', self)
         self.state_data = []
 
-        self.caf = None 
+        self.caf = None
+        self._cur_note_number = None
         
     def add_state_data(self, data):
         self.state_data.append(data)
@@ -350,7 +368,8 @@ class CafedraArticleBuilder(ChainLink):
                 sig_name += '_obn'
             if self.caf.is_link:
                 sig_name += '_link'
-            self.send(Signal(sig_name, self.caf, self.caf.start_line))
+            assert self._cur_note_number is None
+            self.send(Signal(sig_name, self.caf, self.caf.start_line))            
 
         self.caf = CafedraArticle()
 
@@ -360,7 +379,9 @@ class CafedraArticleBuilder(ChainLink):
             try:         
                 self.machine.signal(s.name, s)
             except WrongSignalException as ex:
-                raise ValueError(f"Error in state machine state={self.machine.state.name}, signal '{s.name}' at line {s.line} state_data={self.state_data}", ex)
+                raise ValueError(f"{s.line}: Error in state machine state={self.machine.state.name}, signal '{s.name}' at line {s.line} state_data={self.state_data}", ex)
+            #except Exception as ex:     - this makes system exceptions unreadable
+            #    raise Exception(f"{s.line}: {ex}")
 
     def on_enter_state(self, sig: str, signal: Signal, machine):
         self.clear_state_data()
@@ -413,17 +434,32 @@ class CafedraArticleBuilder(ChainLink):
     def on_episkops_header_exit(self, sig: str, signal: Signal, machine):
         self._build_episkops_header()
 
+    def on_note_start_exit(self, sig: str, signal: Signal, machine):
+        self._build_note_start()
+
+    def on_note_start_obn_exit(self, sig: str, signal: Signal, machine):
+        self._build_note_start()
+
+    def on_note_exit(self, sig: str, signal: Signal, machine):
+        self._build_note()
+
+    def on_note_obn_exit(self, sig: str, signal: Signal, machine):
+        self._build_note()
+
     def finish(self):
         if self.machine.state.name not in ('note', 'note_obn'):
             raise Exception(f'Wrong finish state of state machine: {self.machine.state.name}')
+
+        # save last article last note info
+        self.machine.set_state('expect_header', run_callbacks=True)
         self.send_cafedra_and_create_new()
+        
+    @property
+    def header(self):
+        return self.caf.header    
 
     obn_header_re = re.compile(r'.* ((\s(обн\.|григ\.|самозв\.|укр\.)) | \(ПАПЦ\))', re.X)
     link_re = re.compile(r'.*(\(|\s)см\.')
-
-    @property
-    def header(self):
-        return self.caf.header
     
     def _build_header(self, sig: str, machine, is_obn):
         assert len(self.state_data) > 0
@@ -470,7 +506,16 @@ class CafedraArticleBuilder(ChainLink):
         header = join_signals_html(self.state_data)
         self.caf.episkops.append(header)        
 
-    
+    def _build_note_start(self):
+        assert self._cur_note_number is None
+        self._cur_note_number = int(join_signals(self.state_data))
+        
+    def _build_note(self):
+        assert self._cur_note_number is not None
+        note = join_signals_html(self.state_data)
+        assert len(note) > 0
+        self.caf.notes.append(ArticleNote(self._cur_note_number, note))
+        self._cur_note_number = None
 
         
 def join_signals(signals: List[Signal]):
@@ -502,8 +547,35 @@ def join_signals_html(signals: List[Signal], strip=True):
     if strip:
         res = res.strip()
     return res
+
+
+class CafedraArticlesToJsonFile(ChainLink):
+    def __init__(self, path):
+        self.path = path
+        self.out = open(path, 'w', encoding='utf8')
+        self.out.write('[\n')
+        self._first = True
     
-    
+    def process(self, s: Signal):
+        import json
+        if not isinstance(s.data, CafedraArticle):
+            raise ValueError('Expected Signal with CafedraArticle object in data field')
+
+        json_data = json.dumps(asdict(s.data), ensure_ascii=False, indent=4)
+        if not self._first:
+            self.out.write(',\n')
+        else:
+            self._first = False
+        self.out.write(json_data)
+
+        self.send(Signal(s.name, f'{s.data.header} | {len(json_data)/1024: .1f} kb', s.line))
+
+    def finish(self):
+        self.out.write('\n]\n')
+        size = self.out.tell() + 1
+        self.out.close()
+        self.send(Signal('json_file', self.path, None))
+        self.send(Signal('json_file_size', size , None))
 
 if __name__ == '__main__':
     import sys
@@ -512,12 +584,13 @@ if __name__ == '__main__':
     
     chain = Chain(XmlSax()).add(CafedraSignaller())\
                 .add(SkippedTextCatcher()).add(TextCleaner())\
-                .add(SignalNamePatcher(parse_text_patch(cafedra_signals_patch)))
+                .add(SignalPatcher(parse_text_patch(cafedra_signals_patch)))
 
     if 'names' in sys.argv:    
         chain.add(CafedraNameBuilder())
     elif 'articles' in sys.argv:
-        chain.add(CafedraArticleBuilder())
+        chain.add(CafedraArticleBuilder())\
+             .add(CafedraArticlesToJsonFile('articles.json'))
     elif 'tool' in sys.argv:
         chain.add(SignalTool('header', 'br', 'header'))
 
