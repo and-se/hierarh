@@ -53,13 +53,20 @@ def get_db(db_name: str):
         #'synchronous': 0
     })
 
-    @db.func('LOWER_PY')
+    @db.func('LOWER_PY') #, deterministic=True)
     def lower(s):
-        return s.lower()
+        return s.lower() if s else None
 
     return db
 
 DbName = 'hierarh.sqlite3'
+Db = get_db(DbName)
+Db.bind(models.AllDbModels)
+
+# FIXME peewee now doesn't support DETERMINISTIC flag for sqlite functions, so we can't use thim in index on expression.
+# But it already fixed on trunk - see https://github.com/coleifer/peewee/issues/2782
+# Db.execute_sql('create index if not exists EpiskopsLowerPy on episkop(lower_py(name))')
+
 
 def build_db(parsed_book_json = 'articles.json', db_name = DbName, remove_if_exists=False):    
     book = load_parsed_book(parsed_book_json)
@@ -102,16 +109,17 @@ def write_cafedra_article_into_db(ar: CafedraArticle):
             print(f'SKIP EPISKOP {caf.id} {caf.header}:\t{aep.unparsed_data}')  # TODO
             continue
             
-        vy, who, paki = parse_episkop_str(aep.who)
+        vy, who, paki = parse_episkop_str(aep.who)        
         if not who:
             print(f'EMPTY EPISKOP {caf.id} {caf.header}:\t{aep.who}')  # TODO
-        
-        ep = Episkop.select(Episkop.id).where(Episkop.name == who).get_or_none()
+
+        ep = Episkop.select(Episkop.id).where(fn.LOWER_PY(Episkop.name) == who.lower()).get_or_none()
         if not ep:
             ep = Episkop.create(name=who)
 
         EpiskopCafedra.create(episkop=ep, cafedra=caf,
                               begin_dating=null_if_empty(aep.begin_dating),
+                              begin_year = try_extract_year(aep.begin_dating),
                               end_dating=null_if_empty(aep.end_dating),
                               temp_status = vy,
                               again_status = paki
@@ -143,11 +151,13 @@ def parse_episkop_str(s):
     return (vy, s.group('who').strip(), s.group('paki'))
     
     return s
-    
-    
 
-Db = get_db(DbName)
-Db.bind(models.AllDbModels)
+def try_extract_year(s):
+    m = re.match(r'.*\b(\d{3,4})$', s)
+    if m:
+        return int(m.group(1))
+
+
 
 class PeeweeCafedraDb:
     @staticmethod
@@ -191,7 +201,7 @@ class PeeweeCafedraDb:
         ep = Episkop.get(key)
 
         epv = EpiskopView(name=ep.name)
-        for caf in ep.cafedras:
+        for caf in ep.cafedras.order_by(EpiskopCafedra.begin_year):
             ecv = CafedraOfEpiskopView(
                 cafedra=caf.build_cafedra_of_episkop_title(),
                 cafedra_id = caf.cafedra.id,
@@ -206,5 +216,6 @@ class PeeweeCafedraDb:
 if __name__ == "__main__":
     build_db(db_name = DbName, remove_if_exists=True)
     print("Created cafedras:", models.Cafedra.select().count())
+    print("Created episkops:", models.Episkop.select().count())
     
     

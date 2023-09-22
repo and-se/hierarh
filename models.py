@@ -72,11 +72,13 @@ class EpiskopCafedra(Model):
     episkop = ForeignKeyField(Episkop, backref='cafedras', index=True)
     cafedra = ForeignKeyField(Cafedra, backref='episkops', index=True)
     
-    begin_dating = TextField(null=True)            
+    begin_dating = TextField(null=True)
+    begin_year = IntegerField(null=True)           
     end_dating = TextField(null=True)
 
     temp_status = TextField(null=True)  # в/у в/у?
     again_status = TextField(null=True)  # паки, в 3-й раз и т.д.
+    # TODO вообще говоря опираться здесь на текст смысла нет, т.к. там не всегда это корректно заполнено. Лучше считать самим.
 
     def build_cafedra_of_episkop_title(self):
         res = self.cafedra.header

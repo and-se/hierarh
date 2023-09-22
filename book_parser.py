@@ -463,12 +463,11 @@ class CafedraArticleBuilder(ChainLink):
         self.caf.text = join_signals_html(self.state_data)
 
     # 10(23)10.1926	–	08(21)04.1932	–	Петр Данилов, паки
-    episkop_parser = re.compile(r'^\t*(?P<begin>[^\t]*) (\t|–|—)+ (?P<end>[^\t]*) (\t|–|—)+ (?P<who>[^\t]+)\t*$', re.X)
+    episkop_parser = re.compile(r'^\t*(?P<begin>[^\t]*) (\t|–|—)+ (?P<end>[^\t]*) (\t|–|—)+ \s*(?P<who>\(?\s*[А-Яа-яЁёN][^\t]+)\t*$', re.X)
     
     def _build_episkop(self):
         line = join_signals_html(self.state_data, strip=False)
-
-        m = self.episkop_parser.match(line)
+        m = self.episkop_parser.match(line)        
         if not m:
             # FIXME uncomment line '!!!!' and fix unparsed data
             #print('!!!!', self.get_state_line(), repr(line))
