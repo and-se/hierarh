@@ -4,5 +4,7 @@
 init_book
 full_cafedry.xml
 
-articles.json
 signals*.txt
+articles.json*
+hierarh.sqlite3*
+

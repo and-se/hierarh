@@ -538,7 +538,7 @@ class CafedraArticlesToJsonFile(ChainLink):
         if not isinstance(s.data, CafedraArticle):
             raise ValueError('Expected Signal with CafedraArticle object in data field')
 
-        json_data = json.dumps(asdict(s.data), ensure_ascii=False, indent=4)
+        json_data = json.dumps(s.data.to_dict(), ensure_ascii=False, indent=4)
         if not self._first:
             self.out.write(',\n')
         else:

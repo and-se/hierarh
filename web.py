@@ -4,36 +4,10 @@ from models import CafedraArticle
 
 app = Flask(__name__, static_folder='flask/static', template_folder='flask/templates')
 
-class SimpleCafedraDb:
-    def __init__(self, json_file):
-        self.db = json.load(open(json_file))
-        assert isinstance(self.db, list)
-        
-        for i in range(len(self.db)):
-            self.db[i] = CafedraArticle.from_dict(self.db[i])            
+from db import SimpleCafedraDb, PeeweeCafedraDb
 
-    def get_cafedra_names(self, query:str=''):
-        q = QueryExecutor(query)            
-        for (key, caf) in enumerate(self.db, 1):
-            if q.match(caf.header):
-                yield (key, caf.header)
-
-    def get_article(self, key: int) -> CafedraArticle:
-        return self.db[key-1] if key-1 < len(self.db) else None
-
-class QueryExecutor:
-    def __init__(self, query):
-        self.q = tuple(x.lower() for x in query.split())        
-
-    def match(self, data: str):
-        data = data.lower()
-        for w in self.q:
-            if w not in data:
-                return False
-        return True
-                
-
-db = SimpleCafedraDb('articles.json')
+#db = SimpleCafedraDb('articles.json')
+db = PeeweeCafedraDb()
 
 @app.route('/')
 def index():

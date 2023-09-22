@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field, asdict
 from typing import Union, List, Dict, Tuple, Union
 
+# Models for book parser of chapter 'Списки иерархов по кафедрам'
+
 @dataclass
 class CafedraArticle:
     header: str = None
@@ -9,7 +11,8 @@ class CafedraArticle:
     start_line: int = None
     
     text: str = None
-    # episkop in cafedra info header as str - fro ex. 'Архиепископы и митрополиты Московские;'
+    # episkops in cafedra table - list of EpiskopInCafedra objects.
+    # subheaders like 'Архиепископы и митрополиты Московские;' stored as str.
     episkops: List[Union['EpiskopInCafedra', str]] = field(default_factory = list)
     notes: List['ArticleNote'] = field(default_factory = list)
 
@@ -27,6 +30,9 @@ class CafedraArticle:
                 res.notes[i] = ArticleNote(**nt)
 
         return res
+
+    def to_dict(self):
+        return asdict(self)
                 
 
 @dataclass
@@ -41,3 +47,51 @@ class EpiskopInCafedra:
 class ArticleNote:
     num: int
     text: str
+
+
+# Db models using Peewee ORM
+
+from peewee import Model, AutoField, TextField, BooleanField, ForeignKeyField, IntegerField
+
+class Cafedra(Model):
+    id = AutoField()    
+    header = TextField(index=True)
+    is_obn = BooleanField()
+    is_link = BooleanField()
+    text = TextField(null=True)  # ?? for links
+    article_json = TextField()
+
+
+class Episkop(Model):
+    id = AutoField()
+    name = TextField(index=True)
+
+
+class EpiskopCafedra(Model):
+    id = AutoField()
+    episkop = ForeignKeyField(Episkop, backref='cafedras', index=True)
+    cafedra = ForeignKeyField(Cafedra, backref='episkops', index=True)
+    
+    begin_dating = TextField(null=True)
+    end_dating = TextField(null=True)
+    index_in_article = IntegerField()
+
+
+class Note(Model):
+    """
+    Note linked to cafedra article
+    """    
+    id = AutoField()
+    text = TextField()
+
+    cafedra_id = ForeignKeyField(Cafedra, backref='text_notes', index=True)
+    text_position = IntegerField(null=True)
+    """Optional position of note in cafedra article text"""
+    
+    episkop_cafedra_id = ForeignKeyField(EpiskopCafedra, backref='notes', null=True, index=True)
+    """For notes linked to episkops table of cafedra article"""
+
+
+
+AllDbModels = (Cafedra, Episkop, EpiskopCafedra, Note)
+
