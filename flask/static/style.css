@@ -1,12 +1,16 @@
 
+.collections .current {
+    color: red;
+}
 
-.cafedras, .notes {
+
+.items, .notes {
     list-style-type: none;
     padding: 0;
     margin-top: 0;
 }
 
-.cafedras li {
+.items li  {
     margin-bottom: 10px;
 }
 
@@ -29,7 +33,7 @@
 
 
 
-.episkops {
+table.episkops {
     border: 1px solid black;
     width: 100%;
 }
@@ -37,3 +41,5 @@
 .episkops_header {
  font-size: x-large;
 }
+
+

@@ -12,8 +12,18 @@
 </head>
 
 <body>
+    <header>
+        <nav>
+          <ul class="collections">
+              <li><a class="{{'current' if item_type=='cafedra'}}" href="/cafedra">Кафедры</a></li>
+              <li><a class="{{'current' if item_type=='episkop'}}" href="/episkop">Епископы</a></li>        
+          </ul>
+        </nav>  
+    </header>
+    
+    <main>
     {% autoescape false %}  
-    <h1>{{article.header}}</h1>
+    <h1>{{article.header}}</h1>  
     {%if article.text %}
     <p>{{article.text}}</p>
     {% endif %}
@@ -46,7 +56,7 @@
     </ul>
     
     {% endautoescape %}
-    
+    </main>
     <script>
         var elements = document.getElementsByClassName("note");
 

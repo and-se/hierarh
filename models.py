@@ -58,7 +58,7 @@ class Cafedra(Model):
     header = TextField(index=True)
     is_obn = BooleanField()
     is_link = BooleanField()
-    text = TextField(null=True)  # ?? for links
+    # text = TextField(null=True)  # ?? for links
     article_json = TextField()
 
 
@@ -72,9 +72,21 @@ class EpiskopCafedra(Model):
     episkop = ForeignKeyField(Episkop, backref='cafedras', index=True)
     cafedra = ForeignKeyField(Cafedra, backref='episkops', index=True)
     
-    begin_dating = TextField(null=True)
+    begin_dating = TextField(null=True)            
     end_dating = TextField(null=True)
-    index_in_article = IntegerField()
+
+    temp_status = TextField(null=True)  # в/у в/у?
+    again_status = TextField(null=True)  # паки, в 3-й раз и т.д.
+
+    def build_cafedra_of_episkop_title(self):
+        res = self.cafedra.header
+        if self.temp_status:
+            res = self.temp_status + ' ' + res
+        if self.again_status:
+            res += ', ' + self.again_status
+
+        return res
+    
 
 
 class Note(Model):
@@ -94,4 +106,20 @@ class Note(Model):
 
 
 AllDbModels = (Cafedra, Episkop, EpiskopCafedra, Note)
+
+############ Presentation models for flask templates ########
+
+@dataclass
+class EpiskopView:
+    name: str
+    cafedras: List['CafedraOfEpiskopView'] = field(default_factory = list)
+
+@dataclass
+class CafedraOfEpiskopView:
+    cafedra: str
+    cafedra_id: int
+    
+    begin_dating: str
+    end_dating: str
+
 
