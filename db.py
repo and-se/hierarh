@@ -99,7 +99,7 @@ def write_cafedra_article_into_db(ar: CafedraArticle):
     caf = models.Cafedra.create(
         header=ar.header, is_obn=ar.is_obn,
         is_link=ar.is_link, # text=ar.text,
-        article_json=json.dumps(ar.to_dict(), ensure_ascii=False, indent=4))
+        article_json="TODO")
 
     for aep in ar.episkops:
         if isinstance(aep, str):
@@ -124,6 +124,11 @@ def write_cafedra_article_into_db(ar: CafedraArticle):
                               temp_status = vy,
                               again_status = paki
                              )
+        
+        aep.episkop_id = ep.id
+
+    caf.article_json = json.dumps(ar.to_dict(), ensure_ascii=False, indent=4)
+    caf.save()
 
         
         

@@ -36,11 +36,12 @@ class CafedraArticle:
                 
 
 @dataclass
-class EpiskopInCafedra:
+class EpiskopInCafedra:  # TODO save here only unparsed_data and parse fields on DB import?
     begin_dating: str = None
     end_dating: str = None
     who: str = None
     unparsed_data: str = None
+    episkop_id: int = None  # TODO remove! make view_model!
 
 
 @dataclass
