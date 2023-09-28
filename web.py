@@ -4,9 +4,8 @@ from models import CafedraArticle
 
 app = Flask(__name__, static_folder='flask/static', template_folder='flask/templates')
 
-from db import SimpleCafedraDb, PeeweeCafedraDb
+from db import PeeweeCafedraDb
 
-#db = SimpleCafedraDb('articles.json')
 db = PeeweeCafedraDb()
 
 @app.route('/')
@@ -30,5 +29,5 @@ def cafedra_article(key):
 
 @app.route('/episkop/<int:key>')
 def episkop_article(key):
-    d = db.get_episkop_view(key)
+    d = db.get_data(key)
     return render_template('episkop_article.html', data=d, item_type='episkop')
