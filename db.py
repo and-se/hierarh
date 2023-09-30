@@ -121,9 +121,9 @@ def write_cafedra_article_into_db(ar: CafedraArticle):
             print(f'SKIP EPISKOP {caf.id} {caf.header}:\t{aep.text}')  # TODO - we LOOSE this articles data!
             continue
 
-        begin_dating, end_dating, who = pp
+        begin_dating, end_dating, who, inexact = pp
 
-        vy, who, paki = parse_episkop_name(who)
+        vy, who, paki, notes = parse_episkop_name(who)
         if not who:
             print(f'\n##########\t\t\tEMPTY EPISKOP {caf.id} {caf.header}:\t{aep.text}\n')  # TODO
             who = '?'
@@ -139,10 +139,13 @@ def write_cafedra_article_into_db(ar: CafedraArticle):
                               begin_year = try_extract_year(begin_dating),
                               end_dating=null_if_empty(end_dating),
                               temp_status = vy,
-                              episkop_num = i
+                              episkop_num = i,
+                              inexact = inexact
                              )
 
-        epjson = EpiskopOfCafedraDto.from_db_model(epcaf, cnt[ep.id])
+        epjson: EpiskopOfCafedraDto = epcaf.to_episkop_of_cafedra_dto(cnt[ep.id])
+        if notes:
+            epjson.episkop += ' '.join(notes)
         cafjson.episkops.append(epjson)
 
     cafjson.notes = [x for x in ar.notes]  # TODO now no notes in db
@@ -155,17 +158,26 @@ def null_if_empty(s):
     return s if s else None
 
 # 10(23)10.1926	–	08(21)04.1932	–	Петр Данилов, паки
-episkop_row_parser = re.compile(r'^\t*(?P<begin>[^\t]*) (\t|–|—)+ (?P<end>[^\t]*) (\t|–|—)+ \s*(?P<who>\(?\s*[А-Яа-яЁёN][^\t]+)\t*$', re.X)
+episkop_row_parser = re.compile(r'^(?P<begin>[^\t]*) (\t|–|—)+ (?P<end>[^\t]*) (\t|–|—)+ \s*(?P<who>\(?\s*[А-Яа-яЁёN][^\t]+)$', re.X)
 
 def parse_episkop_row(row):
+    row = row.strip()
+    if row.startswith('(') and row.endswith(')'):
+        inexact = True
+        row = row[1:-1]
+    else:
+        inexact = False
     m = episkop_row_parser.match(row)
     if m:
-        return m.group('begin').strip(), m.group('end').strip(), m.group('who').strip()
+        return m.group('begin').strip(), m.group('end').strip(), m.group('who').strip(), inexact
 
 def parse_episkop_name(s):
     ss = s
     # remove note
-    s = re.sub(r'<span\s+class="note"[^>]*>\s*\d+\s*</span>', '', s)
+    note = re.compile(r'<span\s+class="note"[^>]*>\s*\d+\s*</span>')
+    all_notes = note.findall(s)
+    s = note.sub('', s)
+
     s = re.match(r'''^\s*(?P<vy> \(?\s* в\s*/\s*у \s* \(?\s*\??\s*\)? \s*\)? )?
                     (?P<who>.*?)
                     (,\s*  (?P<paki>(паки)|(в\s+\d-й\s+раз))   )?
@@ -179,7 +191,7 @@ def parse_episkop_name(s):
         else:
             vy = 'в/y'
 
-    return (vy, s.group('who').strip(), s.group('paki'))
+    return (vy, s.group('who').strip(), s.group('paki'), all_notes)
 
 def try_extract_year(s):
     m = re.match(r'.*\b(\d{3,4})$', s)
@@ -234,7 +246,7 @@ class PeeweeCafedraDb:
         cnt = Counter()
         for caf in ep.cafedras.order_by(EpiskopCafedra.begin_year):
             cnt.update([caf.cafedra.id])
-            ecv = CafedraOfEpiskopDto.from_db_model(caf, cnt[caf.cafedra.id])
+            ecv: CafedraOfEpiskopDto = caf.to_cafedra_of_episkop_dto(cnt[caf.cafedra.id])
             epv.cafedras.append(ecv)
 
         return epv

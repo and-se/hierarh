@@ -33,16 +33,22 @@
     <tr>
         {%if ep is string%}
         <th colspan="3" class="episkops_header">{{ep}}</th>
-        {%elif ep.unparsed_data %}
-        <td>{{ep.unparsed_data}}</td>
         {% else %}
-        <td>{{ep.begin_dating}}</td>
-        <td>{{ep.end_dating}}</td>
+        <td>
+            {% if ep.inexact %}
+                {{'('}}
+            {% endif %}
+            {{ep.begin_dating or ''}}
+        </td>
+        <td>{{ep.end_dating or ''}}</td>
         <td>
             {%if ep.episkop_id %}
                 <a href="/episkop/{{ep.episkop_id}}">{{ep.episkop}}</a>
             {% else %}
                 {{ep.who}}
+            {% endif %}
+            {% if ep.inexact %}
+                    {{')'}}
             {% endif %}
         </td>
         {% endif %}

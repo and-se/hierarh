@@ -16,25 +16,35 @@
         <nav>
           <ul class="collections">
               <li><a class="{{'current' if item_type=='cafedra'}}" href="/cafedra">Кафедры</a></li>
-              <li><a class="{{'current' if item_type=='episkop'}}" href="/episkop">Епископы</a></li>        
+              <li><a class="{{'current' if item_type=='episkop'}}" href="/episkop">Епископы</a></li>
           </ul>
-        </nav>  
+        </nav>
     </header>
 
     <main>
         <h1>{{data.name}}</h1>
-        
+
         <table class="cafedras">
         {% for caf in data.cafedras %}
-        <tr>        
-            <td><a href="/cafedra/{{caf.cafedra_id}}">{{caf.cafedra}}</a></td>
+        <tr>
+            <td>
+                {% if caf.inexact %}
+                    {{'('}}
+                {% endif %}
+                <a href="/cafedra/{{caf.cafedra_id}}">{{caf.cafedra}}</a>
+            </td>
             <td>{{caf.begin_dating or ''}}</td>
-            <td>{{caf.end_dating or ''}}</td>
+            <td>
+                {{caf.end_dating or ''}}
+                {% if caf.inexact %}
+                    {{')'}}
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
         </table>
 
         </ul>
     </body>
-    
+
 </body>

@@ -51,7 +51,7 @@ class ArticleNote:
 
 # Db models using Peewee ORM
 
-from peewee import Model, AutoField, TextField, BooleanField, ForeignKeyField, IntegerField
+from peewee import Model, AutoField, TextField, BooleanField, ForeignKeyField, IntegerField, BooleanField
 
 class Cafedra(Model):
     id = AutoField()
@@ -60,6 +60,8 @@ class Cafedra(Model):
     is_link = BooleanField()
     # text = TextField(null=True)  # ?? for links
     article_json = TextField()
+
+    go_to = ForeignKeyField('self', null=True, index=False)
 
 
 class Episkop(Model):
@@ -86,6 +88,27 @@ class EpiskopCafedra(Model):
     end_dating = TextField(null=True)
 
     temp_status = TextField(null=True)  # в/у в/у?
+
+    inexact = BooleanField(default=False)
+
+
+    def to_episkop_of_cafedra_dto(self, again_num: int = None):
+        return EpiskopOfCafedraDto(
+                episkop = build_title(self.episkop.name, self.temp_status, again_num),
+                episkop_id = self.episkop.id,
+                begin_dating = self.begin_dating,
+                end_dating = self.end_dating,
+                inexact = self.inexact
+            )
+
+    def to_cafedra_of_episkop_dto(self, again_num: int = None):
+        return CafedraOfEpiskopDto(
+                cafedra = build_title(self.cafedra.header, self.temp_status, again_num),
+                cafedra_id = self.cafedra.id,
+                begin_dating = self.begin_dating,
+                end_dating = self.end_dating,
+                inexact = self.inexact
+            )
 
 class Note(Model):
     """
@@ -151,14 +174,7 @@ class CafedraOfEpiskopDto:
     begin_dating: str
     end_dating: str
 
-    @staticmethod
-    def from_db_model(data: EpiskopCafedra, again_num: int = None):
-        return CafedraOfEpiskopDto(
-                cafedra = build_title(data.cafedra.header, data.temp_status, again_num),
-                cafedra_id = data.cafedra.id,
-                begin_dating = data.begin_dating,
-                end_dating = data.end_dating
-            )
+    inexact: bool = False
 
 
 @dataclass
@@ -169,14 +185,7 @@ class EpiskopOfCafedraDto:
     begin_dating: str
     end_dating: str
 
-    @staticmethod
-    def from_db_model(data: EpiskopCafedra, again_num: int = None):
-        return EpiskopOfCafedraDto(
-                episkop = build_title(data.episkop.name, data.temp_status, again_num),
-                episkop_id = data.episkop.id,
-                begin_dating = data.begin_dating,
-                end_dating = data.end_dating
-            )
+    inexact: bool = False
 
 
 def build_title(header, temp_status: str, again_num: int):
