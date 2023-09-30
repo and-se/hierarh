@@ -11,9 +11,9 @@ class CafedraArticle:
     start_line: int = None
 
     text: str = None
-    # episkops in cafedra table - list of EpiskopInCafedra objects.
+    # episkops in cafedra table - list of ArticleEpiskopRow objects.
     # subheaders like 'Архиепископы и митрополиты Московские;' stored as str.
-    episkops: List[Union['EpiskopInCafedra', str]] = field(default_factory = list)
+    episkops: List[Union['ArticleEpiskopRow', str]] = field(default_factory = list)
     notes: List['ArticleNote'] = field(default_factory = list)
 
     @staticmethod
@@ -22,7 +22,7 @@ class CafedraArticle:
         for i in range(len(res.episkops)):
             ep = res.episkops[i]
             if isinstance(ep, dict):
-                res.episkops[i] = EpiskopInCafedra(**ep)
+                res.episkops[i] = ArticleEpiskopRow(**ep)
 
         for i in range(len(res.notes)):
             nt = res.notes[i]
@@ -36,12 +36,11 @@ class CafedraArticle:
 
 
 @dataclass
-class EpiskopInCafedra:  # TODO save here only unparsed_data and parse fields on DB import?
-    begin_dating: str = None
-    end_dating: str = None
-    who: str = None
-    unparsed_data: str = None
-    episkop_id: int = None  # TODO remove! make view_model!
+class ArticleEpiskopRow:  # TODO save here only unparsed_data and parse fields on DB import?
+    #begin_dating: str = None
+    #end_dating: str = None
+    #who: str = None
+    text: str = None
 
 
 @dataclass
@@ -76,30 +75,17 @@ class EpiskopCafedra(Model):
     episkop = ForeignKeyField(Episkop, backref='cafedras', index=True)
     cafedra = ForeignKeyField(Cafedra, backref='episkops', index=True)
 
-    # next episkop for self.cafedra
-    next_episkop = ForeignKeyField('self', column_name='next_episkop_by_cafedra_id', backref="prev_episkop", null=True, index=False)
+    # sequence number of episkop for self.cafedra
+    episkop_num = IntegerField()
 
-    # next cafedra for self.episkop TODO how to fill?
-    # next_cafedra = ForeignKeyField('self', column_name='next_cafedra_by_episkop_id', backref="prev_cafedra", null=True)
+    # sequence number of cafedra for self.episkop
+    # cafedra_num = IntegerField()
 
     begin_dating = TextField(null=True)
     begin_year = IntegerField(null=True)
     end_dating = TextField(null=True)
 
     temp_status = TextField(null=True)  # в/у в/у?
-    again_status = TextField(null=True)  # паки, в 3-й раз и т.д.
-    # TODO вообще говоря опираться здесь на текст смысла нет, т.к. там не всегда это корректно заполнено. Лучше считать самим.
-
-    def build_cafedra_of_episkop_title(self):
-        res = self.cafedra.header
-        if self.temp_status:
-            res = self.temp_status + ' ' + res
-        if self.again_status:
-            res += ', ' + self.again_status
-
-        return res
-
-
 
 class Note(Model):
     """
@@ -122,9 +108,40 @@ AllDbModels = (Cafedra, Episkop, EpiskopCafedra, Note)
 ############ Presentation models for flask templates ########
 
 @dataclass
+class CafedraDto:
+    header: str
+
+    is_obn: bool = False
+    is_link: bool = False
+
+    text: str = None
+
+    # subheaders like 'Архиепископы и митрополиты Московские;' stored as str.
+    episkops: List[Union['EpiskopCafedraDto', str]] = field(default_factory = list)
+    notes: List['ArticleNote'] = field(default_factory = list)
+
+    @staticmethod
+    def from_dict(d):
+        res = CafedraDto(**d)
+        for i in range(len(res.episkops)):
+            ep = res.episkops[i]
+            if isinstance(ep, dict):
+                res.episkops[i] = EpiskopOfCafedraDto(**ep)
+
+        for i in range(len(res.notes)):
+            nt = res.notes[i]
+            if isinstance(nt, dict):
+                res.notes[i] = ArticleNote(**nt)
+
+        return res
+
+    def to_dict(self):
+        return asdict(self)
+
+@dataclass
 class EpiskopDto:
     name: str
-    cafedras: List['CafedraOfEpiskopDto'] = field(default_factory = list)
+    cafedras: List['EpiskopOfCafedraDto'] = field(default_factory = list)
 
 @dataclass
 class CafedraOfEpiskopDto:
@@ -134,4 +151,41 @@ class CafedraOfEpiskopDto:
     begin_dating: str
     end_dating: str
 
+    @staticmethod
+    def from_db_model(data: EpiskopCafedra, again_num: int = None):
+        return CafedraOfEpiskopDto(
+                cafedra = build_title(data.cafedra.header, data.temp_status, again_num),
+                cafedra_id = data.cafedra.id,
+                begin_dating = data.begin_dating,
+                end_dating = data.end_dating
+            )
 
+
+@dataclass
+class EpiskopOfCafedraDto:
+    episkop: str
+    episkop_id: str
+
+    begin_dating: str
+    end_dating: str
+
+    @staticmethod
+    def from_db_model(data: EpiskopCafedra, again_num: int = None):
+        return EpiskopOfCafedraDto(
+                episkop = build_title(data.episkop.name, data.temp_status, again_num),
+                episkop_id = data.episkop.id,
+                begin_dating = data.begin_dating,
+                end_dating = data.end_dating
+            )
+
+
+def build_title(header, temp_status: str, again_num: int):
+    if temp_status:
+        header = temp_status + ' ' + header
+    if again_num is not None and again_num > 1:
+        if again_num == 2:
+            t = 'паки'
+        else:
+            t = f'в {again_num}-й раз'
+        header += ", " + t
+    return header

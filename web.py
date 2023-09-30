@@ -24,10 +24,14 @@ def episkop_list():
 
 @app.route('/cafedra/<int:key>')
 def cafedra_article(key):
-    d = db.get_cafedra_article(key)
+    d = db.get_cafedra_data(key)
     return render_template('cafedra_article.html', article=d, item_type='cafedra')
 
 @app.route('/episkop/<int:key>')
 def episkop_article(key):
-    d = db.get_data(key)
+    d = db.get_episkop_data(key)
     return render_template('episkop_article.html', data=d, item_type='episkop')
+
+
+if __name__ == '__main__':
+    app.run(debug=True)

@@ -1,10 +1,13 @@
 import json
 import models
-from models import CafedraArticle, Cafedra, Episkop, EpiskopCafedra, EpiskopDto, CafedraOfEpiskopDto
+from models import CafedraArticle
+from models import Cafedra, Episkop, EpiskopCafedra
+from models import  CafedraDto, EpiskopDto, EpiskopOfCafedraDto, CafedraOfEpiskopDto
 from typing import List
 
 import os
 import re
+from collections import Counter
 
 def load_parsed_book(json_file: str) -> List[CafedraArticle]:
     db = json.load(open(json_file))
@@ -53,7 +56,7 @@ def get_db(db_name: str):
         #'synchronous': 0
     })
 
-    @db.func('LOWER_PY') #, deterministic=True)
+    @db.func('LOWER_PY', deterministic=True)
     def lower(s):
         return s.lower() if s else None
 
@@ -94,53 +97,72 @@ def build_db(parsed_book_json = 'articles.json', db_name = DbName, remove_if_exi
                         print(f"{i} of {len(book)}")
     db.close()
 
+
 def write_cafedra_article_into_db(ar: CafedraArticle):
     caf = models.Cafedra.create(
         header=ar.header, is_obn=ar.is_obn,
         is_link=ar.is_link, # text=ar.text,
         article_json="TODO")
 
-    prev_epcaf = None
-    for aep in ar.episkops:
+    cafjson = models.CafedraDto(
+        header = ar.header,
+        is_obn = ar.is_obn, is_link = ar.is_link,
+        text = ar.text
+    )
+
+    cnt = Counter()
+    for i, aep in enumerate(ar.episkops, 1):
         if isinstance(aep, str):
+            cafjson.episkops.append(aep)
             continue  # TODO now table subheaders are skipped in db...
-        if not aep.who:
-            assert aep.unparsed_data is not None
-            print(f'SKIP EPISKOP {caf.id} {caf.header}:\t{aep.unparsed_data}')  # TODO
+
+        pp = parse_episkop_row(aep.text)
+        if not pp:
+            print(f'SKIP EPISKOP {caf.id} {caf.header}:\t{aep.text}')  # TODO - we LOOSE this articles data!
             continue
 
-        vy, who, paki = parse_episkop_str(aep.who)
-        if not who:
-            print(f'EMPTY EPISKOP {caf.id} {caf.header}:\t{aep.who}')  # TODO
+        begin_dating, end_dating, who = pp
 
-        ep = Episkop.select(Episkop.id).where(fn.LOWER_PY(Episkop.name) == who.lower()).get_or_none()
+        vy, who, paki = parse_episkop_name(who)
+        if not who:
+            print(f'\n##########\t\t\tEMPTY EPISKOP {caf.id} {caf.header}:\t{aep.text}\n')  # TODO
+            who = '?'
+
+        ep = Episkop.select(Episkop.id, Episkop.name).where(fn.LOWER_PY(Episkop.name) == who.lower()).get_or_none()
         if not ep:
             ep = Episkop.create(name=who)
 
+        cnt.update([ep.id])
+
         epcaf = EpiskopCafedra.create(episkop=ep, cafedra=caf,
-                              begin_dating=null_if_empty(aep.begin_dating),
-                              begin_year = try_extract_year(aep.begin_dating),
-                              end_dating=null_if_empty(aep.end_dating),
+                              begin_dating=null_if_empty(begin_dating),
+                              begin_year = try_extract_year(begin_dating),
+                              end_dating=null_if_empty(end_dating),
                               temp_status = vy,
-                              again_status = paki
+                              episkop_num = i
                              )
-        if prev_epcaf:
-            prev_epcaf.next_episkop = epcaf
-            prev_epcaf.save()
-        prev_epcaf = epcaf
 
-        aep.episkop_id = ep.id
+        epjson = EpiskopOfCafedraDto.from_db_model(epcaf, cnt[ep.id])
+        cafjson.episkops.append(epjson)
 
-    caf.article_json = json.dumps(ar.to_dict(), ensure_ascii=False, indent=4)
+    cafjson.notes = [x for x in ar.notes]  # TODO now no notes in db
+
+    caf.article_json = json.dumps(cafjson.to_dict(), ensure_ascii=False, indent=4)
     caf.save()
-
-
 
 
 def null_if_empty(s):
     return s if s else None
 
-def parse_episkop_str(s):
+# 10(23)10.1926	–	08(21)04.1932	–	Петр Данилов, паки
+episkop_row_parser = re.compile(r'^\t*(?P<begin>[^\t]*) (\t|–|—)+ (?P<end>[^\t]*) (\t|–|—)+ \s*(?P<who>\(?\s*[А-Яа-яЁёN][^\t]+)\t*$', re.X)
+
+def parse_episkop_row(row):
+    m = episkop_row_parser.match(row)
+    if m:
+        return m.group('begin').strip(), m.group('end').strip(), m.group('who').strip()
+
+def parse_episkop_name(s):
     ss = s
     # remove note
     s = re.sub(r'<span\s+class="note"[^>]*>\s*\d+\s*</span>', '', s)
@@ -158,8 +180,6 @@ def parse_episkop_str(s):
             vy = 'в/y'
 
     return (vy, s.group('who').strip(), s.group('paki'))
-
-    return s
 
 def try_extract_year(s):
     m = re.match(r'.*\b(\d{3,4})$', s)
@@ -201,22 +221,20 @@ class PeeweeCafedraDb:
         for r in Episkop.select(Episkop.id, Episkop.name).where(cond).order_by(Episkop.name).tuples():
             yield r
 
-    def get_cafedra_article(self, key: int) -> CafedraArticle:
+    def get_cafedra_data(self, key: int) -> CafedraDto:
         c = Cafedra.select(Cafedra.article_json).where(Cafedra.id==key).get_or_none()
         if c:
-            return CafedraArticle.from_dict(json.loads(c.article_json))
+            return CafedraDto.from_dict(json.loads(c.article_json))
 
     def get_episkop_data(self, key: int) -> EpiskopDto:
         ep = Episkop.get(key)
 
         epv = EpiskopDto(name=ep.name)
+
+        cnt = Counter()
         for caf in ep.cafedras.order_by(EpiskopCafedra.begin_year):
-            ecv = CafedraOfEpiskopView(
-                cafedra=caf.build_cafedra_of_episkop_title(),
-                cafedra_id = caf.cafedra.id,
-                begin_dating = caf.begin_dating,
-                end_dating = caf.end_dating
-            )
+            cnt.update([caf.cafedra.id])
+            ecv = CafedraOfEpiskopDto.from_db_model(caf, cnt[caf.cafedra.id])
             epv.cafedras.append(ecv)
 
         return epv

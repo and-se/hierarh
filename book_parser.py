@@ -51,7 +51,7 @@ class CafedraSignaller(ChainLink):
     * header - заголовок статьи о кафедре
     * text - текст статьи о кафедре
     * episkop - строка таблицы епископов, содержит сведения об управлении кафедрой епископом в конкретный период
-    * episkops_header - подзаголовок внутри таблицы епископов. Примеры: В Смоленске; Архиепископы и митрополиты Московские;    
+    * episkops_header - подзаголовок внутри таблицы епископов. Примеры: В Смоленске; Архиепископы и митрополиты Московские;
     * note_num - номер сноски при ссылке из текста
     * note_start - номер сноски в начале текста сноски
     * note - текст сноски
@@ -61,7 +61,7 @@ class CafedraSignaller(ChainLink):
 
     * props - техническая информация о шрифтах и прочем, которую можно игнрорировать
     * skipped - куски текста, не отнесённые ни к одному из предыдущих типов (таких быть не должно)
-    
+
     """
     def __init__(self):
         self.signal_type = None
@@ -83,7 +83,7 @@ class CafedraSignaller(ChainLink):
         st = self._state_stack.pop()
         self.signal_type, self.cur_tag, self.tag_level = st
         #print("POP", st)
-    
+
     def process(self, item: SaxItem):
         if item.event == 'end' and item.level == self.tag_level:
             self.pop_state()
@@ -92,12 +92,12 @@ class CafedraSignaller(ChainLink):
             getattr(self, 'tag_' + self.cur_tag)(item)
             if item.event == 'text' and self._item_text_skipped and item.data.strip():
                 self.send(Signal("skipped", item.data, item.line))
-                
+
 
     def tag_init(self, item: SaxItem):
         if item.event == 'start':
             if item.name == 'ParagraphStyleRange':
-                match item.data.get('AppliedParagraphStyle'): 
+                match item.data.get('AppliedParagraphStyle'):
                     case 'ParagraphStyle/Кафедра':
                         self.set_state('header', item)
                     case 'ParagraphStyle/Текст' | 'ParagraphStyle/Текст1':
@@ -113,7 +113,7 @@ class CafedraSignaller(ChainLink):
                         self.set_state('note', item)
 
                     case 'ParagraphStyle/КАФЕДРА ОБН.':
-                        self.set_state('header_obn', item)                
+                        self.set_state('header_obn', item)
                     case 'ParagraphStyle/ТЕКСТ ОБН.':
                         self.set_state('text_obn', item)
                     case 'ParagraphStyle/ТАБЛ ОБН' | 'ParagraphStyle/Таблица обн сжатая':
@@ -125,23 +125,23 @@ class CafedraSignaller(ChainLink):
                         self.set_state('text_?', item)
             elif item.name == 'Properties':
                 self.set_state('props', item)
-        
-    
-    def tag_ParagraphStyleRange(self, item: SaxItem):        
+
+
+    def tag_ParagraphStyleRange(self, item: SaxItem):
         if item.event == 'start':
             if item.name == 'CharacterStyleRange':
                 if item.data.get('Position') == 'Superscript':
                     st = 'note_num'
                     if self.signal_type in ('note', 'note_obn'):
-                        st = 'note_start'                
+                        st = 'note_start'
                     self.set_state(st, item)
                 else:
-                    self.set_state(self.signal_type, item)        
-            elif item.name == 'Properties':        
+                    self.set_state(self.signal_type, item)
+            elif item.name == 'Properties':
                 self.set_state('props', item)
 
-    def tag_CharacterStyleRange(self, item: SaxItem):        
-        if item.event == 'start':            
+    def tag_CharacterStyleRange(self, item: SaxItem):
+        if item.event == 'start':
             if item.name == 'Content':
                 self.set_state(self.signal_type, item)
             elif item.name == 'Br':
@@ -149,16 +149,16 @@ class CafedraSignaller(ChainLink):
             elif item.name == 'Properties':
                 self.set_state('props', item)
 
-    def tag_Content(self, item: SaxItem):                
+    def tag_Content(self, item: SaxItem):
         if item.event == 'text':
             self._item_text_skipped = False
             self.send(Signal(self.signal_type, item.data, item.line))
-        
-    def tag_Properties(self, item: SaxItem):            
+
+    def tag_Properties(self, item: SaxItem):
         if item.event == 'text':
             self._item_text_skipped = False
             self.send(Signal(self.signal_type, item.data, item.line))
-    
+
     def finish(self):
         pass
 
@@ -204,21 +204,21 @@ class TextCleaner(ChainLink):
 
 class SignalTool(ChainLink):
     def __init__(self, cur_name, prev_name=None, prev_prev_name=None):
-        prev_name = prev_name if prev_name else cur_name        
+        prev_name = prev_name if prev_name else cur_name
         self.prefix1 = cur_name
         self.prefix2 = prev_name
         self.prefix3 = prev_prev_name
         self._prev = None
         self._prev_prev = None
-        
+
     def process(self, s: Signal):
-        cond1 = s.name.startswith(self.prefix1) and self._prev and self._prev.name.startswith(self.prefix2)        
+        cond1 = s.name.startswith(self.prefix1) and self._prev and self._prev.name.startswith(self.prefix2)
         if self.prefix3:
             if cond1 and self._prev_prev and self._prev_prev.name.startswith(self.prefix3):
                 self.send(Signal('tool', (self._prev_prev, self._prev, s), s.line))
         elif cond1:
             self.send(Signal('tool', (self._prev, s), s.line))
-            
+
         self._prev_prev = self._prev
         self._prev = s
 
@@ -235,7 +235,7 @@ class SignalPatcher(ChainLink):
         * EDIT! - edit signal text. Signal data for check should be 'check data===>full new data'
         """
         self.patches = patches
-        
+
     def process(self, s: Signal):
         patch = self.patches.get(s.line)
         if patch:
@@ -244,7 +244,7 @@ class SignalPatcher(ChainLink):
                 return
             elif new_signal_name == 'EDIT!':
                 expected_data, new_signal_data = expected_data.split('===>')
-            
+
             if not (s.data == expected_data or s.data.strip().startswith(expected_data.strip())):
                 raise Exception(f"Signal and patch different: expected '{expected_data}' for signal {s}")
 
@@ -255,7 +255,7 @@ class SignalPatcher(ChainLink):
                 s.data = new_signal_data
             else:
                 s.name = new_signal_name
-        
+
         self.send(s)
 
 cafedra_signals_patch = open('signal_patch.txt', encoding='utf8').read()
@@ -275,15 +275,15 @@ def parse_text_patch(text_patch):
     return res
 
 
-from models import CafedraArticle, EpiskopInCafedra, ArticleNote
-        
+from models import CafedraArticle, ArticleEpiskopRow, ArticleNote
+
 
 class CafedraArticleBuilder(ChainLink):
     # При составлении правил надо иметь ввиду, что пока мы находимся в рамках одного состояния
     # сигналы складируются в self.state_data с целью сбора итогового текста при выходе из состояния.
     states = [
         State('expect_header', cycle=[], next_state=['header', 'header_obn']),
-        
+
         State('header', cycle='header', next_state = ['text', ('br', 'expect_text')]),
         State('expect_text', cycle='br', next_state='text'),
         State('text', cycle=['text', 'br', 'note_num'], next_state=['episkop', 'episkops_header', 'header', 'header_obn', 'note_start']),
@@ -291,7 +291,7 @@ class CafedraArticleBuilder(ChainLink):
             ('br', 'expect_ep_note_head'), 'note_start', 'header', 'header_obn'
         ]),
         State('expect_ep_note_head', cycle='br', next_state=['episkop', 'episkops_header', 'note_start', 'header', 'header_obn']),
-        
+
         State('episkops_header', cycle=['episkops_header', 'note_num'], next_state=['episkop', ('br', 'expect_episkop')]),
         State('expect_episkop', cycle='br', next_state='episkop'),
 
@@ -317,7 +317,7 @@ class CafedraArticleBuilder(ChainLink):
         'МОСКОВСКИЙ И ВСЕЯ РОССИИ ПАТРИАРХАТ, обн.',
         'САРАТОВСКАЯ, григ.',
         'ХАРЬКОВСКАЯ, григ.',
-        'ЯРОСЛАВСКАЯ, григ.'            
+        'ЯРОСЛАВСКАЯ, григ.'
     ]
 
     def __init__(self):
@@ -326,13 +326,13 @@ class CafedraArticleBuilder(ChainLink):
 
         self.caf = None
         self._cur_note_number = None
-        
+
     def add_state_data(self, data):
         self.state_data.append(data)
 
     def clear_state_data(self):
         self.state_data.clear()
-        
+
     def get_state_line(self):
         assert len(self.state_data) > 0
         return self.state_data[0].line
@@ -346,14 +346,14 @@ class CafedraArticleBuilder(ChainLink):
             if self.caf.is_link:
                 sig_name += '_link'
             assert self._cur_note_number is None
-            self.send(Signal(sig_name, self.caf, self.caf.start_line))            
+            self.send(Signal(sig_name, self.caf, self.caf.start_line))
 
         self.caf = CafedraArticle()
 
-        
+
     def process(self, s: Signal):
         if s.name not in ['props']:
-            try:         
+            try:
                 self.machine.signal(s.name, s)
             except WrongSignalException as ex:
                 raise ValueError(f"{s.line}: Error in state machine state={self.machine.state.name}, signal '{s.name}' at line {s.line} state_data={self.state_data}", ex)
@@ -368,15 +368,15 @@ class CafedraArticleBuilder(ChainLink):
     def on_cycle_state(self, sig: str, signal: Signal, machine):
         self.add_state_data(signal)
 
-    def on_exit_state(self, sig: str, signal: Signal, machine):        
+    def on_exit_state(self, sig: str, signal: Signal, machine):
         pass
         #self.add_state_data(signal)
 
-    def on_fail_state(self, sig: str, signal: Signal, machine):        
-        if self.caf.header in self.no_text_cafedras  and machine.state.name == 'expect_text' and sig == 'episkop':            
+    def on_fail_state(self, sig: str, signal: Signal, machine):
+        if self.caf.header in self.no_text_cafedras  and machine.state.name == 'expect_text' and sig == 'episkop':
             machine.set_state('text', run_callbacks = False)
             machine.signal(sig, signal)
-            return True        
+            return True
         elif self.caf.header in self.no_text_cafedras  and machine.state.name == 'expect_text_obn' and sig == 'episkop_obn':
             machine.set_state('text_obn', run_callbacks = False)
             machine.signal(sig, signal)
@@ -389,10 +389,10 @@ class CafedraArticleBuilder(ChainLink):
     def on_header_obn_enter(self, sig: str, signal: Signal, machine):
         self.send_cafedra_and_create_new()
         self.caf.start_line = signal.line
-    
+
     def on_header_exit(self, sig: str, signal: Signal, machine):
         return self._build_header(sig, machine, False)
-        
+
     def on_header_obn_exit(self, sig: str, signal: Signal, machine):
         return self._build_header(sig, machine, True)
 
@@ -430,14 +430,14 @@ class CafedraArticleBuilder(ChainLink):
         # save last article last note info
         self.machine.set_state('expect_header', run_callbacks=True)
         self.send_cafedra_and_create_new()
-        
+
     @property
     def header(self):
-        return self.caf.header    
+        return self.caf.header
 
     obn_header_re = re.compile(r'.* ((\s(обн\.|григ\.|самозв\.|укр\.)) | \(ПАПЦ\))', re.X)
     link_re = re.compile(r'.*(\(|\s)см\.')
-    
+
     def _build_header(self, sig: str, machine, is_obn):
         assert len(self.state_data) > 0
         self.caf.header = join_signals(self.state_data)
@@ -447,45 +447,34 @@ class CafedraArticleBuilder(ChainLink):
 
         if bool(is_obn) != bool(is_obn_re):
             raise Exception(f'Настоящая или раскольничья кафедра? {self.header} {self.state_data}\n{self.state_data[0].serialize()}')
-        
+
         if sig=='br' and self.link_re.match(self.header):
-            self.caf.is_link = True            
+            self.caf.is_link = True
             self.clear_state_data()
             # manual set next state - wait new header
             machine.set_state('expect_header', run_callbacks=False)
-            # and cancel go to state, defined by State.next_state            
+            # and cancel go to state, defined by State.next_state
             return True
-        else:                
+        else:
             #self.send(Signal(f'name{"_obn" if is_obn else ""}', self.header, self.get_state_line()))
             pass
 
     def _build_text(self):
         self.caf.text = join_signals_html(self.state_data)
 
-    # 10(23)10.1926	–	08(21)04.1932	–	Петр Данилов, паки
-    episkop_parser = re.compile(r'^\t*(?P<begin>[^\t]*) (\t|–|—)+ (?P<end>[^\t]*) (\t|–|—)+ \s*(?P<who>\(?\s*[А-Яа-яЁёN][^\t]+)\t*$', re.X)
-    
     def _build_episkop(self):
         line = join_signals_html(self.state_data, strip=False)
-        m = self.episkop_parser.match(line)        
-        if not m:
-            # FIXME uncomment line '!!!!' and fix unparsed data
-            #print('!!!!', self.get_state_line(), repr(line))
-            #return
-            item = EpiskopInCafedra(unparsed_data = line)
-        else:
-            item = EpiskopInCafedra(m.group('begin').strip(), m.group('end').strip(), m.group('who').strip())
-            
+        item = ArticleEpiskopRow(line)
         self.caf.episkops.append(item)
 
     def _build_episkops_header(self):
         header = join_signals_html(self.state_data)
-        self.caf.episkops.append(header)        
+        self.caf.episkops.append(header)
 
     def _build_note_start(self):
         assert self._cur_note_number is None
         self._cur_note_number = int(join_signals(self.state_data))
-        
+
     def _build_note(self):
         assert self._cur_note_number is not None
         note = join_signals_html(self.state_data)
@@ -493,7 +482,7 @@ class CafedraArticleBuilder(ChainLink):
         self.caf.notes.append(ArticleNote(self._cur_note_number, note))
         self._cur_note_number = None
 
-        
+
 def join_signals(signals: List[Signal]):
     r = []
     for s in signals:
@@ -503,7 +492,7 @@ def join_signals(signals: List[Signal]):
             r.append('\n')
     return ''.join(r).strip()
 
-    
+
 def join_signals_html(signals: List[Signal], strip=True):
     import html
     r = []
@@ -513,12 +502,12 @@ def join_signals_html(signals: List[Signal], strip=True):
         elif s.name == 'note_num':
             note_num = int(s.data)
             r.append(f'<span class="note" data-note="{note_num}">{note_num}</span>')
-        else:            
+        else:
             r.append(html.escape(s.data))
 
     while r and r[-1] == '<br>\n':
         del r[-1]
-            
+
     res = ''.join(r)
     if strip:
         res = res.strip()
@@ -531,7 +520,7 @@ class CafedraArticlesToJsonFile(ChainLink):
         self.out = open(path, 'w', encoding='utf8')
         self.out.write('[\n')
         self._first = True
-    
+
     def process(self, s: Signal):
         import json
         if not isinstance(s.data, CafedraArticle):
@@ -557,12 +546,12 @@ if __name__ == '__main__':
     import sys
     #texter = TextBuilder()
     #chain = Chain(XmlSax()).add(CafedraSignaller()).add(CafedraBuilder()).add(texter)
-    
+
     chain = Chain(XmlSax()).add(CafedraSignaller())\
                 .add(SkippedTextCatcher()).add(TextCleaner())\
                 .add(SignalPatcher(parse_text_patch(cafedra_signals_patch)))
 
-    if 'names' in sys.argv:    
+    if 'names' in sys.argv:
         chain.add(CafedraNameBuilder())
     elif 'articles' in sys.argv:
         chain.add(CafedraArticleBuilder())\
@@ -575,7 +564,7 @@ if __name__ == '__main__':
 
     if 'count' in sys.argv:
         chain.add(SignalCounter())
-    
+
     filename = 'sample_cafedry.xml'
     if len(sys.argv) > 1 and sys.argv[1].endswith('.xml'):
         filename = sys.argv[1]
@@ -585,7 +574,7 @@ if __name__ == '__main__':
             chain.process(f)
         except ValueError as ex:
             print(ex)
-        
+
 
     #print(texter.get_text())
-    
+
