@@ -1,12 +1,13 @@
 from flask import Flask, render_template, redirect, request
-import json
-from models import CafedraArticle
 
-app = Flask(__name__, static_folder='flask/static', template_folder='flask/templates')
+from db import PeeweeHistHierarhStorage
 
-from db import PeeweeCafedraDb
+app = Flask(__name__, static_folder='flask/static',
+            template_folder='flask/templates')
 
-db = PeeweeCafedraDb()
+
+
+db = PeeweeHistHierarhStorage()
 
 @app.route('/')
 def index():

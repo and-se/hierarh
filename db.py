@@ -1,59 +1,69 @@
-import json
-import models
-from models import CafedraArticle
-from models import Cafedra, Episkop, EpiskopCafedra
-from models import  CafedraDto, EpiskopDto, EpiskopOfCafedraDto, CafedraOfEpiskopDto
-from typing import List
+from chain import Chain, ChainLink
 
+from book_parser import CafedraArticlesFromJson
+from article_parser import CafedraArticleParser, ParsedCafedraFixer
+
+import models
+from models import CafedraOrm, EpiskopOrm, EpiskopCafedraOrm
+from models import Cafedra, ArticleNote
+from models import CafedraDto, EpiskopDto, \
+                   EpiskopOfCafedraDto, CafedraOfEpiskopDto
+
+
+import json
 import os
 import re
 from collections import Counter
-
-def load_parsed_book(json_file: str) -> List[CafedraArticle]:
-    db = json.load(open(json_file))
-    assert isinstance(db, list)
-
-    for i in range(len(db)):
-        db[i] = models.CafedraArticle.from_dict(db[i])
-
-    return db
+from typing import Tuple
 
 
-class SimpleCafedraDb:
-    def __init__(self, json_file):
-        self.db = load_parsed_book(json_file)
+class HistHierarhStorageBase:
+    def get_cafedra_names(self, query: str = '') -> Tuple[int, str]:
+        """
+        returns tuples (cafedra id, cafedra header)
+        """
+        raise NotImplementedError()
 
-    def get_cafedra_names(self, query:str=''):
-        q = QueryExecutor(query)
-        for (key, caf) in enumerate(self.db, 1):
-            if q.match(caf.header):
-                yield (key, caf.header)
+    def get_episkop_names(self, query: str = '') -> Tuple[int, str]:
+        """
+        return tuples (episkop id, episkop name)
+        """
+        raise NotImplementedError()
 
-    def get_cafedra_article(self, key: int) -> CafedraArticle:
-        return self.db[key-1] if key-1 < len(self.db) else None
+    def get_cafedra_data(self, key: int) -> CafedraDto:
+        raise NotImplementedError()
 
-class QueryExecutor:
-    def __init__(self, query):
-        self.q = tuple(x.lower() for x in query.split())
+    def get_episkop_data(self, key: int) -> EpiskopDto:
+        raise NotImplementedError()
 
-    def match(self, data: str):
-        data = data.lower()
-        for w in self.q:
-            if w not in data:
-                return False
-        return True
+    def count_cafedra(self, query: str = '') -> int:
+        raise NotImplementedError()
 
-##################### Peewee ORM Db ####################
+    def count_episkop(self, query: str = '') -> int:
+        raise NotImplementedError()
 
-from peewee import fn, SQL, SqliteDatabase
+    def begin_transaction(self):
+        raise NotImplementedError()
+
+    def commit(self):
+        raise NotImplementedError()
+
+    def rollback(self):
+        raise NotImplementedError()
+
+
+# ----------------- Peewee ORM Db ----------------
+
+from peewee import fn, SqliteDatabase  # noqa: E402
+
 
 def get_db(db_name: str):
     db = SqliteDatabase(db_name, {
         'journal_mode': 'wal',
         'cache_size': -1 * 10000,  # 10MB
         'foreign_keys': 1,
-        #'ignore_check_constraints': 0,
-        #'synchronous': 0
+        # 'ignore_check_constraints': 0,
+        # 'synchronous': 0
     })
 
     @db.func('LOWER_PY', deterministic=True)
@@ -62,149 +72,62 @@ def get_db(db_name: str):
 
     return db
 
+# Global db settings
+
+
 DbName = 'hierarh.sqlite3'
-Db = get_db(DbName)
-Db.bind(models.AllDbModels)
-
-def build_db(parsed_book_json = 'articles.json', db_name = DbName, remove_if_exists=False):
-    book = load_parsed_book(parsed_book_json)
-
-    if os.path.exists(db_name):
-        if remove_if_exists:
-            os.remove(db_name)
-        else:
-            raise Exception(f"Db {db_name} exists")
-
-    db = get_db(db_name)
-
-    with db.bind_ctx(models.AllDbModels):
-        db.create_tables(models.AllDbModels)
-        # FIXME peewee now doesn't support DETERMINISTIC flag for sqlite functions, so we can't use thim in index on expression.
-        # But it already fixed on trunk - see https://github.com/coleifer/peewee/issues/2782
-        Db.execute_sql('create index if not exists EpiskopsLowerPy on episkop(LOWER_PY(name))')
-
-        with db.atomic() as tr:
-            i=0
-            for ar in book:
-                try:
-                    write_cafedra_article_into_db(ar)
-                except Exception as ex:
-                    print(ar.header)
-                    raise
-                else:
-                    i+=1
-                    if i%100==0:
-                        print(f"{i} of {len(book)}")
-    db.close()
+_Db = get_db(DbName)
+_Db.bind(models.AllOrmModels)
 
 
-def write_cafedra_article_into_db(ar: CafedraArticle):
-    caf = models.Cafedra.create(
-        header=ar.header, is_obn=ar.is_obn,
-        is_link=ar.is_link, # text=ar.text,
-        article_json="TODO")
+class PeeweeHistHierarhStorage(HistHierarhStorageBase):
+    @staticmethod
+    def create_new_sqlite_db(remove_if_exists):
+        db_name = DbName
 
-    cafjson = models.CafedraDto(
-        header = ar.header,
-        is_obn = ar.is_obn, is_link = ar.is_link,
-        text = ar.text
-    )
+        if os.path.exists(db_name):
+            if remove_if_exists:
+                os.remove(db_name)
+            else:
+                raise Exception(f"Db {db_name} exists")
 
-    cnt = Counter()
-    for i, aep in enumerate(ar.episkops, 1):
-        if isinstance(aep, str):
-            cafjson.episkops.append(aep)
-            continue  # TODO now table subheaders are skipped in db...
+        db = _Db
 
-        pp = parse_episkop_row(aep.text)
-        if not pp:
-            print(f'SKIP EPISKOP {caf.id} {caf.header}:\t{aep.text}')  # TODO - we LOOSE this articles data!
-            continue
+        with db.bind_ctx(models.AllOrmModels):
+            db.create_tables(models.AllOrmModels)
+            # FIXME peewee now doesn't support DETERMINISTIC flag for sqlite functions, so we can't use thim in index on expression.  # noqa: E501
+            # But it already fixed on trunk - see https://github.com/coleifer/peewee/issues/2782  # noqa: E501
+            _Db.execute_sql('create index if not exists '
+                            'EpiskopsLowerPy on episkop(LOWER_PY(name))')
 
-        begin_dating, end_dating, who, inexact = pp
+        db.close()
 
-        vy, who, paki, notes = parse_episkop_name(who)
-        if not who:
-            print(f'\n##########\t\t\tEMPTY EPISKOP {caf.id} {caf.header}:\t{aep.text}\n')  # TODO
-            who = '?'
+    # Now we use global _Db object bound to AllOrmModels, so all
+    # PeeweeHistHierarhStorage objects are automatically connected
+    # to one sqlite Db named DbName.
+    # If you want manage db connection manually (and possible use
+    # different dbs), uncomment this code and use 'with self.ctx():'
+    # for all db operations in this class
+    # def __init__(self, db: peewee.Database):
+    #     self.db = db
+    # def ctx(self):
+    #     return self.db.bind_ctx(models.AllOrmModels)
 
-        ep = Episkop.select(Episkop.id, Episkop.name).where(fn.LOWER_PY(Episkop.name) == who.lower()).get_or_none()
-        if not ep:
-            ep = Episkop.create(name=who)
+    def begin_transaction(self):
+        _Db.begin()
 
-        cnt.update([ep.id])
+    def commit(self):
+        _Db.commit()
 
-        epcaf = EpiskopCafedra.create(episkop=ep, cafedra=caf,
-                              begin_dating=null_if_empty(begin_dating),
-                              begin_year = try_extract_year(begin_dating),
-                              end_dating=null_if_empty(end_dating),
-                              temp_status = vy,
-                              episkop_num = i,
-                              inexact = inexact
-                             )
+    def rollback(self):
+        _Db.rollback()
 
-        epjson: EpiskopOfCafedraDto = epcaf.to_episkop_of_cafedra_dto(cnt[ep.id])
-        if notes:
-            epjson.episkop += ' '.join(notes)
-        cafjson.episkops.append(epjson)
-
-    cafjson.notes = [x for x in ar.notes]  # TODO now no notes in db
-
-    caf.article_json = json.dumps(cafjson.to_dict(), ensure_ascii=False, indent=4)
-    caf.save()
-
-
-def null_if_empty(s):
-    return s if s else None
-
-# 10(23)10.1926	–	08(21)04.1932	–	Петр Данилов, паки
-episkop_row_parser = re.compile(r'^(?P<begin>[^\t]*) (\t|–|—)+ (?P<end>[^\t]*) (\t|–|—)+ \s*(?P<who>\(?\s*[А-Яа-яЁёN][^\t]+)$', re.X)
-
-def parse_episkop_row(row):
-    row = row.strip()
-    if row.startswith('(') and row.endswith(')'):
-        inexact = True
-        row = row[1:-1]
-    else:
-        inexact = False
-    m = episkop_row_parser.match(row)
-    if m:
-        return m.group('begin').strip(), m.group('end').strip(), m.group('who').strip(), inexact
-
-def parse_episkop_name(s):
-    ss = s
-    # remove note
-    note = re.compile(r'<span\s+class="note"[^>]*>\s*\d+\s*</span>')
-    all_notes = note.findall(s)
-    s = note.sub('', s)
-
-    s = re.match(r'''^\s*(?P<vy> \(?\s* в\s*/\s*у \s* \(?\s*\??\s*\)? \s*\)? )?
-                    (?P<who>.*?)
-                    (,\s*  (?P<paki>(паки)|(в\s+\d-й\s+раз))   )?
-                    \s*$
-                  ''', s, re.I | re.X)
-
-    vy = s.group('vy')
-    if vy:
-        if '?' in vy:
-            vy = 'в/y?'
-        else:
-            vy = 'в/y'
-
-    return (vy, s.group('who').strip(), s.group('paki'), all_notes)
-
-def try_extract_year(s):
-    m = re.match(r'.*\b(\d{3,4})$', s)
-    if m:
-        return int(m.group(1))
-
-
-
-class PeeweeCafedraDb:
     @staticmethod
     def _build_search_condition(query, column):
         words = tuple(x.lower() for x in query.split())
-        word_cond = lambda w: fn.INSTR(fn.LOWER_PY(column), w)
+
+        def word_cond(w):
+            return fn.INSTR(fn.LOWER_PY(column), w)
 
         if words:
             cond = word_cond(words[0])
@@ -215,46 +138,158 @@ class PeeweeCafedraDb:
 
         return cond
 
+    def _cafedra_q(self, query):
+        cond = self._build_search_condition(query, CafedraOrm.header)
+        # with self.ctx():
+        q = CafedraOrm.select(CafedraOrm.id, CafedraOrm.header)\
+            .where(cond).order_by(CafedraOrm.header)
+        # print(q, _Db.execute_sql(f'EXPLAIN QUERY PLAN {q}').fetchall())
+        return q
 
-    def get_cafedra_names(self, query: str=''):
-        cond = self._build_search_condition(query, Cafedra.header)
-
-        q = Cafedra.select(Cafedra.id, Cafedra.header)\
-            .where(cond).order_by(Cafedra.header).tuples()
-
-        # print(q, Db.execute_sql(f'EXPLAIN QUERY PLAN {q}').fetchall())
-
+    def get_cafedra_names(self, query: str = ''):
+        q = self._cafedra_q(query).tuples()
         for r in q:
             yield r
 
-    def get_episkop_names(self, query: str=''):
-        cond = self._build_search_condition(query, Episkop.name)
+    def count_cafedra(self, query: str = ''):
+        q = self._cafedra_q(query).count()
+        return q
 
-        for r in Episkop.select(Episkop.id, Episkop.name).where(cond).order_by(Episkop.name).tuples():
+    def _episkop_q(self, query):
+        cond = self._build_search_condition(query, EpiskopOrm.name)
+        q = EpiskopOrm.select(EpiskopOrm.id, EpiskopOrm.name) \
+                      .where(cond).order_by(EpiskopOrm.name)
+        return q
+
+    def get_episkop_names(self, query: str = ''):
+        q = self._episkop_q(query)
+        for r in q.tuples():
             yield r
 
+    def count_episkop(self, query: str = ''):
+        q = self._episkop_q(query)
+        return q.count()
+
     def get_cafedra_data(self, key: int) -> CafedraDto:
-        c = Cafedra.select(Cafedra.article_json).where(Cafedra.id==key).get_or_none()
+        c = CafedraOrm.select(CafedraOrm.article_json) \
+                      .where(CafedraOrm.id == key).get_or_none()
         if c:
             return CafedraDto.from_dict(json.loads(c.article_json))
 
     def get_episkop_data(self, key: int) -> EpiskopDto:
-        ep = Episkop.get(key)
+        ep = EpiskopOrm.get(key)
 
         epv = EpiskopDto(name=ep.name)
 
         cnt = Counter()
-        for caf in ep.cafedras.order_by(EpiskopCafedra.begin_year):
+        for caf in ep.cafedras.order_by(EpiskopCafedraOrm.begin_year):
             cnt.update([caf.cafedra.id])
-            ecv: CafedraOfEpiskopDto = caf.to_cafedra_of_episkop_dto(cnt[caf.cafedra.id])
+            ecv: CafedraOfEpiskopDto = caf.to_cafedra_of_episkop_dto(
+                                            cnt[caf.cafedra.id]
+                                       )
             epv.cafedras.append(ecv)
 
         return epv
 
+    def upsert_cafedra(self, caf: Cafedra):
+        caf_orm = CafedraOrm.create(
+            header=caf.header, is_obn=caf.is_obn,
+            is_link=caf.is_link,  # text=caf.text,
+            article_json="TODO")
+
+        # TODO use Cafedra object, don't use Dto
+        cafjson = models.CafedraDto(
+            header=caf.header,
+            is_obn=caf.is_obn, is_link=caf.is_link,
+            text=caf.text
+        )
+
+        cnt = Counter()
+        for i, ep in enumerate(caf.episkops, 1):
+            if isinstance(ep, str):
+                cafjson.episkops.append(ep)
+                continue  # TODO now table subheaders are skipped in db...
+
+            ep_orm = EpiskopOrm.select(EpiskopOrm.id, EpiskopOrm.name) \
+                               .where(
+                                     fn.LOWER_PY(EpiskopOrm.name) ==
+                                     ep.episkop.lower()
+                                ) \
+                               .get_or_none()
+            if not ep_orm:
+                ep_orm = EpiskopOrm.create(name=ep.episkop)
+
+            cnt.update([ep_orm.id])
+
+            epcaf = EpiskopCafedraOrm.create(
+                            episkop=ep_orm, cafedra=caf_orm,
+                            begin_dating=null_if_empty(ep.begin_dating),
+                            begin_year=try_extract_year(ep.begin_dating),
+                            end_dating=null_if_empty(ep.end_dating),
+                            temp_status=ep.temp_status,
+                            episkop_num=i,
+                            inexact=ep.inexact
+            )
+
+            epjson: EpiskopOfCafedraDto = \
+                epcaf.to_episkop_of_cafedra_dto(cnt[ep.episkop_id])
+
+            if ep.notes:
+                epjson.episkop += ' '.join([
+                        f'<span class="note" data-note="{i}">{i}</span>'
+                        for i in ep.notes
+                ])
+
+            cafjson.episkops.append(epjson)
+
+        cafjson.notes = [ArticleNote(num=x.num, text=x.text)
+                         for x in caf.notes]  # TODO now no notes in db
+
+        caf_orm.article_json = json.dumps(cafjson.to_dict(),
+                                          ensure_ascii=False, indent=4)
+        caf_orm.save()
+
+
+# -------------- End Peewee -------------
+
+
+class CafedraDbImporter(ChainLink):
+    def __init__(self, db: HistHierarhStorageBase):
+        self.db = db
+        self.db.begin_transaction()
+
+    def process(self, s: Cafedra):
+        self.db.upsert_cafedra(s)
+
+    def finish(self):
+        self.db.commit()
+
+
+def null_if_empty(s):
+    return s if s else None
+
+
+def try_extract_year(s):
+    if s:
+        m = re.match(r'.*\b(\d{3,4})$', s)
+        if m:
+            return int(m.group(1))
+
 
 if __name__ == "__main__":
-    build_db(db_name = DbName, remove_if_exists=True)
-    print("Created cafedras:", models.Cafedra.select().count())
-    print("Created episkops:", models.Episkop.select().count())
+    PeeweeHistHierarhStorage.create_new_sqlite_db(remove_if_exists=True)
+    db = PeeweeHistHierarhStorage()
 
+    ch = Chain(CafedraArticlesFromJson()) \
+        .add(CafedraArticleParser()) \
+        .add(ParsedCafedraFixer()) \
+        .add(CafedraDbImporter(db))
 
+    ch.process('articles.json')
+
+    print("Created cafedras:", db.count_cafedra())
+    print("Created episkops:", db.count_episkop())
+
+    # build_db(db_name = DbName, remove_if_exists=True)
+    # print("Created cafedras:", models.Cafedra.select().count())
+    # print("Created episkops:", models.Episkop.select().count())

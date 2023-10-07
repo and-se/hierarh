@@ -1,7 +1,16 @@
 from dataclasses import dataclass, field, asdict
-from typing import Union, List, Dict, Tuple, Union
+from typing import Union, List, Optional
 
-# Models for book parser of chapter 'Списки иерархов по кафедрам'
+import pydantic
+
+
+class _HHModel(pydantic.BaseModel):
+    class Config:
+        extra = 'forbid'  # options: allow | forbid | ignore
+        validate_assignment = True  # validate assignment of fields in code
+
+
+#   ------ Models for book parser of chapter 'Списки иерархов по кафедрам'
 
 @dataclass
 class CafedraArticle:
@@ -13,8 +22,9 @@ class CafedraArticle:
     text: str = None
     # episkops in cafedra table - list of ArticleEpiskopRow objects.
     # subheaders like 'Архиепископы и митрополиты Московские;' stored as str.
-    episkops: List[Union['ArticleEpiskopRow', str]] = field(default_factory = list)
-    notes: List['ArticleNote'] = field(default_factory = list)
+    episkops: List[Union['ArticleEpiskopRow', str]] = \
+        field(default_factory=list)
+    notes: List['ArticleNote'] = field(default_factory=list)
 
     @staticmethod
     def from_dict(d):
@@ -36,10 +46,7 @@ class CafedraArticle:
 
 
 @dataclass
-class ArticleEpiskopRow:  # TODO save here only unparsed_data and parse fields on DB import?
-    #begin_dating: str = None
-    #end_dating: str = None
-    #who: str = None
+class ArticleEpiskopRow:
     text: str = None
 
 
@@ -51,9 +58,14 @@ class ArticleNote:
 
 # Db models using Peewee ORM
 
-from peewee import Model, AutoField, TextField, BooleanField, ForeignKeyField, IntegerField, BooleanField
+from peewee import Model, AutoField, TextField, BooleanField, \
+                   ForeignKeyField, IntegerField  # noqa: E402
 
-class Cafedra(Model):
+
+class CafedraOrm(Model):
+    class Meta:
+        table_name = 'Cafedra'
+
     id = AutoField()
     header = TextField(index=True)
     is_obn = BooleanField()
@@ -64,18 +76,21 @@ class Cafedra(Model):
     go_to = ForeignKeyField('self', null=True, index=False)
 
 
-class Episkop(Model):
+class EpiskopOrm(Model):
+    class Meta:
+        table_name = 'Episkop'
+
     id = AutoField()
     name = TextField(index=True)
 
 
-class EpiskopCafedra(Model):
+class EpiskopCafedraOrm(Model):
     class Meta:
-        legacy_table_names = False
+        table_name = 'EpiskopCafedra'
 
     id = AutoField()
-    episkop = ForeignKeyField(Episkop, backref='cafedras', index=True)
-    cafedra = ForeignKeyField(Cafedra, backref='episkops', index=True)
+    episkop = ForeignKeyField(EpiskopOrm, backref='cafedras', index=True)
+    cafedra = ForeignKeyField(CafedraOrm, backref='episkops', index=True)
 
     # sequence number of episkop for self.cafedra
     episkop_num = IntegerField()
@@ -89,46 +104,101 @@ class EpiskopCafedra(Model):
 
     temp_status = TextField(null=True)  # в/у в/у?
 
-    inexact = BooleanField(default=False)
-
+    inexact = BooleanField(default=False)  # information is inexact
 
     def to_episkop_of_cafedra_dto(self, again_num: int = None):
         return EpiskopOfCafedraDto(
-                episkop = build_title(self.episkop.name, self.temp_status, again_num),
-                episkop_id = self.episkop.id,
-                begin_dating = self.begin_dating,
-                end_dating = self.end_dating,
-                inexact = self.inexact
+                episkop=build_title(self.episkop.name,
+                                    self.temp_status, again_num),
+                episkop_id=self.episkop.id,
+                begin_dating=self.begin_dating,
+                end_dating=self.end_dating,
+                inexact=self.inexact
             )
 
     def to_cafedra_of_episkop_dto(self, again_num: int = None):
         return CafedraOfEpiskopDto(
-                cafedra = build_title(self.cafedra.header, self.temp_status, again_num),
-                cafedra_id = self.cafedra.id,
-                begin_dating = self.begin_dating,
-                end_dating = self.end_dating,
-                inexact = self.inexact
+                cafedra=build_title(self.cafedra.header,
+                                    self.temp_status, again_num),
+                cafedra_id=self.cafedra.id,
+                begin_dating=self.begin_dating,
+                end_dating=self.end_dating,
+                inexact=self.inexact
             )
 
-class Note(Model):
+
+class NoteOrm(Model):
     """
     Note linked to cafedra article
     """
+
+    class Meta:
+        table_name = 'Note'
+
     id = AutoField()
     text = TextField()
 
-    cafedra_id = ForeignKeyField(Cafedra, backref='text_notes', index=True)
+    cafedra_id = ForeignKeyField(CafedraOrm, backref='text_notes', index=True)
     text_position = IntegerField(null=True)
     """Optional position of note in cafedra article text"""
 
-    episkop_cafedra_id = ForeignKeyField(EpiskopCafedra, backref='notes', null=True, index=True)
+    episkop_cafedra_id = ForeignKeyField(EpiskopCafedraOrm,
+                                         backref='notes', null=True,
+                                         index=True)
     """For notes linked to episkops table of cafedra article"""
 
 
+AllOrmModels = (CafedraOrm, EpiskopOrm, EpiskopCafedraOrm, NoteOrm)
 
-AllDbModels = (Cafedra, Episkop, EpiskopCafedra, Note)
+# ----------- Models for HistHierarchyStorage - these are main models
 
-############ Presentation models for flask templates ########
+
+class Cafedra(_HHModel):
+    id: Optional[int] = None
+    header: str
+    is_obn: bool = False
+    is_link: bool = False
+    text: str
+    # subheaders like 'Архиепископы и митрополиты Московские;' stored as str.
+    episkops: List[Union['EpiskopOfCafedra', str]] = []
+    notes: List['Note'] = []
+
+
+class _EpiskopCafedraBase(_HHModel):
+    begin_dating: Optional[str]
+    end_dating: Optional[str]
+
+    temp_status: Optional[str]
+    inexact: bool = False
+
+
+class EpiskopOfCafedra(_EpiskopCafedraBase):
+    episkop_id: Optional[int] = None
+    episkop: str
+
+    notes: List[int] = []
+
+
+class Note(_HHModel):
+    num: int
+    text: str
+
+
+class Episkop(_HHModel):
+    id: Optional[int] = None
+    name: str
+
+    cafedras: List['CafedraOfEpiskop'] = []
+
+
+class CafedraOfEpiskop(_EpiskopCafedraBase):
+    cafedra: str
+    cafedra_id: Optional[int]
+
+    notes: List[str] = []
+
+
+# ------------ Presentation models for flask templates
 
 @dataclass
 class CafedraDto:
@@ -140,8 +210,8 @@ class CafedraDto:
     text: str = None
 
     # subheaders like 'Архиепископы и митрополиты Московские;' stored as str.
-    episkops: List[Union['EpiskopCafedraDto', str]] = field(default_factory = list)
-    notes: List['ArticleNote'] = field(default_factory = list)
+    episkops: List[Union['EpiskopOfCafedraDto', str]] = field(default_factory=list)  # noqa: E501
+    notes: List['ArticleNote'] = field(default_factory=list)
 
     @staticmethod
     def from_dict(d):
@@ -161,10 +231,12 @@ class CafedraDto:
     def to_dict(self):
         return asdict(self)
 
+
 @dataclass
 class EpiskopDto:
     name: str
-    cafedras: List['EpiskopOfCafedraDto'] = field(default_factory = list)
+    cafedras: List['CafedraOfEpiskopDto'] = field(default_factory=list)
+
 
 @dataclass
 class CafedraOfEpiskopDto:
