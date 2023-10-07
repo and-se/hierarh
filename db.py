@@ -210,12 +210,15 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
                 cafjson.episkops.append(ep)
                 continue  # TODO now table subheaders are skipped in db...
 
-            ep_orm = EpiskopOrm.select(EpiskopOrm.id, EpiskopOrm.name) \
-                               .where(
+            ep_qq = EpiskopOrm.select(EpiskopOrm.id, EpiskopOrm.name) \
+                              .where(
                                      fn.LOWER_PY(EpiskopOrm.name) ==
                                      ep.episkop.lower()
-                                ) \
-                               .get_or_none()
+                              )
+            # print(ep_qq,
+            #       _Db.execute_sql(f'EXPLAIN QUERY PLAN {ep_qq}').fetchall())
+
+            ep_orm = ep_qq.get_or_none()
             if not ep_orm:
                 ep_orm = EpiskopOrm.create(name=ep.episkop)
 

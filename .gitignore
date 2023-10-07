@@ -6,5 +6,7 @@ full_cafedry.xml
 
 signals*.txt
 articles.json*
-hierarh.sqlite3*
+hierarh*.sqlite3*
+episkop_rows.txt
 
+env
