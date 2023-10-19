@@ -12,7 +12,6 @@ from models import CafedraDto, EpiskopDto, \
 
 import json
 import os
-import re
 from collections import Counter
 from typing import Tuple
 
@@ -95,10 +94,6 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
 
         with db.bind_ctx(models.AllOrmModels):
             db.create_tables(models.AllOrmModels)
-            # FIXME peewee now doesn't support DETERMINISTIC flag for sqlite functions, so we can't use thim in index on expression.  # noqa: E501
-            # But it already fixed on trunk - see https://github.com/coleifer/peewee/issues/2782  # noqa: E501
-            _Db.execute_sql('create index if not exists '
-                            'EpiskopsLowerPy on episkop(LOWER_PY(name))')
 
         db.close()
 
@@ -158,7 +153,8 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
     def _episkop_q(self, query):
         cond = self._build_search_condition(query, EpiskopOrm.name)
         q = EpiskopOrm.select(EpiskopOrm.id, EpiskopOrm.name) \
-                      .where(cond).order_by(EpiskopOrm.name)
+                      .where(cond) \
+                      .order_by(EpiskopOrm.name, EpiskopOrm.surname)
         return q
 
     def get_episkop_names(self, query: str = ''):
@@ -182,7 +178,8 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
         epv = EpiskopDto(name=ep.name)
 
         cnt = Counter()
-        for caf in ep.cafedras.order_by(EpiskopCafedraOrm.begin_year):
+        for caf in ep.cafedras.order_by(
+                            EpiskopCafedraOrm.estimated_begin_date):
             cnt.update([caf.cafedra.id])
             ecv: CafedraOfEpiskopDto = caf.to_cafedra_of_episkop_dto(
                                             cnt[caf.cafedra.id]
@@ -210,32 +207,31 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
                 cafjson.episkops.append(ep)
                 continue  # TODO now table subheaders are skipped in db...
 
-            ep_qq = EpiskopOrm.select(EpiskopOrm.id, EpiskopOrm.name) \
-                              .where(
-                                     fn.LOWER_PY(EpiskopOrm.name) ==
-                                     ep.episkop.lower()
-                              )
-            # print(ep_qq,
-            #       _Db.execute_sql(f'EXPLAIN QUERY PLAN {ep_qq}').fetchall())
-
-            ep_orm = ep_qq.get_or_none()
+            # fixme: now we merge people with same name+surname
+            ep_orm = self.find_episkop(ep.episkop.name, ep.episkop.surname)
             if not ep_orm:
-                ep_orm = EpiskopOrm.create(name=ep.episkop)
+                ep_orm = EpiskopOrm.create(name=ep.episkop.name,
+                                           surname=ep.episkop.surname,
+                                           saint_title=ep.episkop.saint_title)
 
             cnt.update([ep_orm.id])
 
+            beg = ep.begin_dating
+            end = ep.end_dating
+
             epcaf = EpiskopCafedraOrm.create(
                             episkop=ep_orm, cafedra=caf_orm,
-                            begin_dating=null_if_empty(ep.begin_dating),
-                            begin_year=try_extract_year(ep.begin_dating),
-                            end_dating=null_if_empty(ep.end_dating),
+                            begin_dating=beg.dating if beg else None,
+                            estimated_begin_date=beg.estimated_date if beg
+                            else None,
+                            end_dating=end.dating if end else None,
                             temp_status=ep.temp_status,
                             episkop_num=i,
                             inexact=ep.inexact
             )
 
             epjson: EpiskopOfCafedraDto = \
-                epcaf.to_episkop_of_cafedra_dto(cnt[ep.episkop_id])
+                epcaf.to_episkop_of_cafedra_dto(cnt[ep.episkop.id])
 
             if ep.notes:
                 epjson.episkop += ' '.join([
@@ -252,6 +248,24 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
                                           ensure_ascii=False, indent=4)
         caf_orm.save()
 
+    def find_episkop(self, name, surname=None) -> EpiskopOrm | None:
+        if not name:
+            raise ValueError('name must be not empty!')
+        cond = fn.LOWER_PY(EpiskopOrm.name) == name.lower()
+        if surname:
+            cond = cond & fn.LOWER_PY(EpiskopOrm.surname) == surname.lower()
+        else:
+            cond = cond & EpiskopOrm.surname.is_null()
+
+        ep_qq = EpiskopOrm.select(EpiskopOrm.id,
+                                  EpiskopOrm.name, EpiskopOrm.surname) \
+                          .where(cond)
+
+        # print(ep_qq,
+        #       _Db.execute_sql(f'EXPLAIN QUERY PLAN {ep_qq}').fetchall())
+
+        return ep_qq.get_or_none()
+
 
 # -------------- End Peewee -------------
 
@@ -266,17 +280,6 @@ class CafedraDbImporter(ChainLink):
 
     def finish(self):
         self.db.commit()
-
-
-def null_if_empty(s):
-    return s if s else None
-
-
-def try_extract_year(s):
-    if s:
-        m = re.match(r'.*\b(\d{3,4})$', s)
-        if m:
-            return int(m.group(1))
 
 
 if __name__ == "__main__":

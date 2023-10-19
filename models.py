@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field, asdict
 from typing import Union, List, Optional
+from datetime import date
+
 
 import pydantic
 
@@ -59,7 +61,7 @@ class ArticleNote:
 # Db models using Peewee ORM
 
 from peewee import Model, AutoField, TextField, BooleanField, \
-                   ForeignKeyField, IntegerField  # noqa: E402
+                   ForeignKeyField, IntegerField, DateField, SQL  # noqa: E402
 
 
 class CafedraOrm(Model):
@@ -81,7 +83,15 @@ class EpiskopOrm(Model):
         table_name = 'Episkop'
 
     id = AutoField()
-    name = TextField(index=True)
+    name = TextField()
+    surname = TextField(null=True)
+    saint_title = TextField(null=True, default=None)
+
+
+EpiskopOrm.add_index(
+    SQL('create index if not exists EpiskopsLowerPy '
+        'on episkop(LOWER_PY(name), LOWER_PY(surname))')
+)
 
 
 class EpiskopCafedraOrm(Model):
@@ -99,12 +109,16 @@ class EpiskopCafedraOrm(Model):
     # cafedra_num = IntegerField()
 
     begin_dating = TextField(null=True)
-    begin_year = IntegerField(null=True)
+    estimated_begin_date = DateField(null=True)
+
     end_dating = TextField(null=True)
 
     temp_status = TextField(null=True)  # в/у в/у?
 
     inexact = BooleanField(default=False)  # information is inexact
+
+    # Два епископа с одинковым именем без фамилии - второму припишут номер
+    namesake_num = IntegerField(null=True)
 
     def to_episkop_of_cafedra_dto(self, again_num: int = None):
         return EpiskopOfCafedraDto(
@@ -154,7 +168,7 @@ AllOrmModels = (CafedraOrm, EpiskopOrm, EpiskopCafedraOrm, NoteOrm)
 
 
 class Cafedra(_HHModel):
-    id: Optional[int] = None
+    id: int | None = None
     header: str
     is_obn: bool = False
     is_link: bool = False
@@ -164,17 +178,30 @@ class Cafedra(_HHModel):
     notes: List['Note'] = []
 
 
+class Dating(_HHModel):
+    dating: str
+    estimated_date: date | None
+
+
 class _EpiskopCafedraBase(_HHModel):
-    begin_dating: Optional[str]
-    end_dating: Optional[str]
+    begin_dating: Dating | None
+    end_dating: Dating | None
 
     temp_status: Optional[str]
     inexact: bool = False
 
 
+class EpiskopInfo(_HHModel):
+    id: Optional[int] = None
+    name: str
+    surname: str | None
+    saint_title: str | None = None
+
+
 class EpiskopOfCafedra(_EpiskopCafedraBase):
-    episkop_id: Optional[int] = None
-    episkop: str
+    episkop: EpiskopInfo
+    # Два епископа с одинковым именем без фамилии - второму припишут номер
+    namesake_num: int | None = None
 
     notes: List[int] = []
 
@@ -187,6 +214,8 @@ class Note(_HHModel):
 class Episkop(_HHModel):
     id: Optional[int] = None
     name: str
+    surname: Optional[str]
+    saint_title: str | None = None
 
     cafedras: List['CafedraOfEpiskop'] = []
 
