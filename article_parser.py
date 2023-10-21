@@ -4,9 +4,11 @@ from models import Cafedra, EpiskopOfCafedra, Note, EpiskopInfo, Dating
 
 from parsers.fail import ParseFail
 from parsers.dating import parse_dating, ParsedDating
-from parsers.episkop import parse_episkop_name_in_cafedra, ParsedEpiskopName
+from parsers.episkop import parse_episkop_name_in_cafedra, \
+                            ParsedEpiskopInCafedra
 
-from parsers.date_intervals_builder import DateIntervalsBuilder
+from lib.date_intervals_builder import DateIntervalsBuilder
+from lib.roman_num import from_roman
 
 import human
 
@@ -37,16 +39,23 @@ class CafedraArticleParser(ChainLink):
                 human.send("Can't parse this - skip data", aep.text, pp)
                 continue
             elif pp.error:
-                human.send(pp.error, aep.text, pp)
+                if isinstance(pp.who, ParseFail):
+                    human.send('Fail episkop!!!', aep.text, pp)
+                else:
+                    human.send('Fail dating', aep.text, pp)
 
-            if not pp.who.name:
-                human.send("Empty episkop name", aep.text, pp.who)
+            if not isinstance(pp.who, ParseFail):
+                if not pp.who.name or pp.who.name == '?':
+                    human.send("Empty episkop name", aep.text, pp.who)
+                temp_status = pp.who.temp_status
+            else:
+                temp_status = None
 
             epcaf = EpiskopOfCafedra(
                             episkop=to_episkop_info(pp.who),
                             begin_dating=to_dating(pp.begin),
                             end_dating=to_dating(pp.end),
-                            temp_status=pp.who.temp_status,
+                            temp_status=temp_status,
                             inexact=pp.inexact,
                             namesake_num=get_namesake_num(pp.who)
                     )
@@ -64,10 +73,22 @@ class CafedraArticleParser(ChainLink):
         self.send(pp)
 
 
-def to_episkop_info(parsed: ParsedEpiskopName) -> EpiskopInfo:
+def to_episkop_info(parsed: ParsedEpiskopInCafedra) -> EpiskopInfo:
+    if parsed is None:
+        raise ValueError("parsed episkop info can't be None")
+    if isinstance(parsed, ParseFail):
+        return EpiskopInfo(name=parsed.text, surname=None)  # fixme
+
+    surname = parsed.surname
+    # Глобальный номер для однофамильцев-одноимёнцев включаем в фамилию
+    if parsed.number_after_surname:
+        surname += ' ' + parsed.number_after_surname
+
     return EpiskopInfo(name=parsed.name,
-                       surname=parsed.surname,
-                       saint_title=parsed.saint_title)
+                       surname=surname,
+                       saint_title=parsed.saint_title,
+                       world_title=parsed.world_title,
+                       comment=parsed.brackets_content)
 
 
 def to_dating(parsed: ParsedDating) -> Dating:
@@ -83,7 +104,7 @@ def to_dating(parsed: ParsedDating) -> Dating:
         except ValueError as ex:
             if 'day is out of range' in str(ex):
                 human.send(str(ex), parsed)
-                items=[]
+                items = []
 
         if len(items) != 1:
             if len(items) == 0:
@@ -96,7 +117,12 @@ def to_dating(parsed: ParsedDating) -> Dating:
         return Dating(dating=parsed.dating, estimated_date=est)
 
 
-def get_namesake_num(pared: ParsedEpiskopName) -> int | None:
+def get_namesake_num(parsed: ParsedEpiskopInCafedra) -> int | None:
+    if not parsed or isinstance(parsed, ParseFail):
+        return None
+    if parsed.number_after_name and not parsed.surname:
+        return from_roman(parsed.number_after_name)
+
     ...  # TODO
 
 # ------------ Parser for Episkop row in table of cafedra article -------
@@ -106,7 +132,7 @@ def get_namesake_num(pared: ParsedEpiskopName) -> int | None:
 class ParsedEpiskopRow:
     begin: ParsedDating
     end: ParsedDating
-    who: ParsedEpiskopName
+    who: ParsedEpiskopInCafedra
     inexact: bool
     notes: List[int]
 
@@ -194,7 +220,7 @@ class ParsedCafedraFixer(ChainLink):
             self._stashed_caf = None
             self._moscow_done = True
         elif s.header == '«МИТРОПОЛИЯ РОССИИ» (см. Всероссийская)':
-            s.header="МИТРОПОЛИЯ РОССИИ (см. Всероссийская)"
+            s.header = "МИТРОПОЛИЯ РОССИИ (см. Всероссийская)"
             self._mitropol_done = True
 
         self.send(s)
@@ -259,7 +285,7 @@ if __name__ == '__main__':
 (15(28)11.1918	–	29.05(11.06)1921	–	Леонид Окропиридзе<span class="note" data-note="16">16</span>)
 06(19)10.1955	–	19.09(02.10)1961	–	Андрей Сухенко<span class="note" data-note="65">65</span>
 01.07.1912	–	09(22)02.1918	–	Назарий Андреев
-01.1928	–	09.1928	–	в/у Александр Чекановский<span class="note" data-note="3">3</span
+01.1928	–	09.1928	–	в/у Александр Чекановский<span class="note" data-note="3">3</span>
 03. 1968	–	15(28)11.1968	–	в/у Питирим Нечаев<span class="note" data-note="28">28</span>
 лето 1925	–	кон. 1925	–	Стефан Белопольский<span class="note" data-note="2">2</span>
 

@@ -5,9 +5,11 @@ from article_parser import CafedraArticleParser, ParsedCafedraFixer
 
 import models
 from models import CafedraOrm, EpiskopOrm, EpiskopCafedraOrm
-from models import Cafedra, ArticleNote
+from models import Cafedra, ArticleNote, EpiskopInfo
 from models import CafedraDto, EpiskopDto, \
                    EpiskopOfCafedraDto, CafedraOfEpiskopDto
+
+import human
 
 
 import json
@@ -151,8 +153,8 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
         return q
 
     def _episkop_q(self, query):
-        cond = self._build_search_condition(query, EpiskopOrm.name)
-        q = EpiskopOrm.select(EpiskopOrm.id, EpiskopOrm.name) \
+        cond = self._build_search_condition(query, EpiskopOrm.header)
+        q = EpiskopOrm.select(EpiskopOrm.id, EpiskopOrm.header) \
                       .where(cond) \
                       .order_by(EpiskopOrm.name, EpiskopOrm.surname)
         return q
@@ -175,7 +177,7 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
     def get_episkop_data(self, key: int) -> EpiskopDto:
         ep = EpiskopOrm.get(key)
 
-        epv = EpiskopDto(name=ep.name)
+        epv = EpiskopDto(header=ep.header)
 
         cnt = Counter()
         for caf in ep.cafedras.order_by(
@@ -207,31 +209,38 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
                 cafjson.episkops.append(ep)
                 continue  # TODO now table subheaders are skipped in db...
 
-            # fixme: now we merge people with same name+surname
+            ep.episkop: EpiskopInfo
+
+            # fixme: now we possibly merge people with same name+surname
             ep_orm = self.find_episkop(ep.episkop.name, ep.episkop.surname)
             if not ep_orm:
-                ep_orm = EpiskopOrm.create(name=ep.episkop.name,
+                ep_orm = EpiskopOrm.create(header=ep.episkop.get_header(),
+                                           name=ep.episkop.name,
                                            surname=ep.episkop.surname,
-                                           saint_title=ep.episkop.saint_title)
+                                           saint_title=ep.episkop.saint_title,
+                                           )
 
-            cnt.update([ep_orm.id])
+            ep.episkop.id = ep_orm.id
+            # Отдельно считаем количество раз для в/у и "настоящего"
+            cnt.update([ep_orm.id, bool(ep.temp_status)])
 
             beg = ep.begin_dating
             end = ep.end_dating
 
-            epcaf = EpiskopCafedraOrm.create(
-                            episkop=ep_orm, cafedra=caf_orm,
-                            begin_dating=beg.dating if beg else None,
-                            estimated_begin_date=beg.estimated_date if beg
-                            else None,
-                            end_dating=end.dating if end else None,
-                            temp_status=ep.temp_status,
-                            episkop_num=i,
-                            inexact=ep.inexact
+            EpiskopCafedraOrm.create(
+                episkop=ep_orm, cafedra=caf_orm,
+                begin_dating=beg.dating if beg else None,
+                estimated_begin_date=beg.estimated_date if beg
+                else None,
+                end_dating=end.dating if end else None,
+                temp_status=ep.temp_status,
+                episkop_num=i,
+                inexact=ep.inexact
             )
 
             epjson: EpiskopOfCafedraDto = \
-                epcaf.to_episkop_of_cafedra_dto(cnt[ep.episkop.id])
+                ep.to_episkop_of_cafedra_dto(cnt[ep.episkop.id,
+                                             bool(ep.temp_status)])
 
             if ep.notes:
                 epjson.episkop += ' '.join([
@@ -251,15 +260,15 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
     def find_episkop(self, name, surname=None) -> EpiskopOrm | None:
         if not name:
             raise ValueError('name must be not empty!')
+        if name == 'NN' and not surname:
+            return None  # NN is unknown man, so two NNs are different
         cond = fn.LOWER_PY(EpiskopOrm.name) == name.lower()
         if surname:
-            cond = cond & fn.LOWER_PY(EpiskopOrm.surname) == surname.lower()
+            cond = cond & (fn.LOWER_PY(EpiskopOrm.surname) == surname.lower())
         else:
             cond = cond & EpiskopOrm.surname.is_null()
 
-        ep_qq = EpiskopOrm.select(EpiskopOrm.id,
-                                  EpiskopOrm.name, EpiskopOrm.surname) \
-                          .where(cond)
+        ep_qq = EpiskopOrm.select().where(cond)
 
         # print(ep_qq,
         #       _Db.execute_sql(f'EXPLAIN QUERY PLAN {ep_qq}').fetchall())
@@ -275,6 +284,7 @@ class CafedraDbImporter(ChainLink):
         self.db = db
         self.db.begin_transaction()
 
+    @human.show_exception
     def process(self, s: Cafedra):
         self.db.upsert_cafedra(s)
 

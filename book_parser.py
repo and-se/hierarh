@@ -6,6 +6,7 @@ import re
 from chain import Chain, ChainLink, XmlSax, SaxItem  # , Printer
 from state_machine import StateMachine, State, WrongSignalException
 from models import CafedraArticle, ArticleEpiskopRow, ArticleNote
+from lib.rus_eng_letters_confusion import EngInRusWordsTextPreprocessor
 
 
 @dataclass
@@ -207,10 +208,25 @@ def replace_u2028(s):
 
 
 class TextCleaner(ChainLink):
+    def __init__(self):
+        self.fixer = EngInRusWordsTextPreprocessor().process
+
     def process(self, sig: Signal):
-        if sig.data and '\u2028' in sig.data:
-            # print("!!!!!", sig)
-            sig.data = replace_u2028(sig.data)
+        if sig.data:
+            if '\u2028' in sig.data:
+                # print("!!!!!", sig)
+                sig.data = replace_u2028(sig.data)
+
+            # TODO Сейчас заменяются английские буквы только внутри
+            # кириллических слов.
+            # Если сделать replace_single=True, то будут заменяться на
+            # русские и одиночные английские буквы.
+            # Это ломает английские источники, римские X и проч,
+            # но в некоторых случаях это надо сделать - встречается
+            # предлог 'с' и инициалы, записанные английскими буквами.
+            # Когда-нибудь надо запустить с True, сравнить articles.json
+            # и при помощи signal patch вручную поправить нужные места.
+            sig.data = self.fixer(sig.data, replace_single=False)
 
         self.send(sig)
 

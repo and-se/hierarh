@@ -1,49 +1,128 @@
 import re
 from dataclasses import dataclass
+from pyparsing import Regex, Opt, Word, Char, nested_expr, \
+                      ParseException, srange, Combine, original_text_for
 
-from parsers.fail import ParseFail
+try:
+    from parsers.fail import ParseFail
+except ImportError:
+    from fail import ParseFail
 
 
 @dataclass
-class ParsedEpiskopName:
+class ParsedEpiskopInCafedra:
     text: str
 
     name: str
-    number_after_name: str
-    surname: str
-    number_after_surname: str
-    saint_title: str
+    number_after_name: str = None
 
-    temp_status: str  # в/у
-    paki: str  # паки, в 3-й раз
+    surname: str = None
+    number_after_surname: str = None
 
-    dating_in_brackets: str
+    saint_title: str = None  # <Сщмч.> Вениамин Воскресенский
+    world_title: str = None  # Антоний <кн.> Туркестанов
+
+    temp_status: str = None  # в/у
+    paki: str = None  # паки, в 3-й раз
+
+    brackets_content: str = None
 
 
-def parse_episkop_name_in_cafedra(s) -> ParsedEpiskopName:
-    orig = s
-    s = re.match(r'''^\s*(?P<vy> \(?\s* в\s*/\s*у \s* \(?\s*\??\s*\)? \s*\)? )?
-                    (?P<who>.*?)
-                    (,\s*  (?P<paki>(паки)|(в\s+\d-й\s+раз))   )?
-                    \s*$
-                  ''', s, re.I | re.X)
+def parse_episkop_name_in_cafedra(s) -> ParsedEpiskopInCafedra:
+    try:
+        d = EpiskopInCafedra.parse_string(s, parse_all=True).as_dict()
+        if '?' in d.get('temp_status', ''):
+            d['temp_status'] = 'в/у?'
+        for k in d:
+            d[k] = d[k].strip()
+        return ParsedEpiskopInCafedra(text=s, **d)
+    except ParseException as ex:
+        return ParseFail(s, 'EpiskopNameFail', ex)
 
-    vy = s.group('vy')
-    if vy:
-        if '?' in vy:
-            vy = 'в/y?'
-        else:
-            vy = 'в/y'
 
-    return ParsedEpiskopName(
-        text=orig,
-        name=s.group('who').strip() or '?',
-        number_after_name=None,  # todo
-        surname=None,  # todo
-        number_after_surname=None,  # todo
-        saint_title=None,  # todo
+CapitalizedWord = Word(srange("[А-ЯЁ]"), srange("[а-яё]"), min=2)
+RimNumber = Regex(r'((I{1,3})|(I?VI?))\b')
+Question = Char("?") | nested_expr("(", ")", Char("?"))
+Brackets = Char('(') + Regex(r'[^)]+')('brackets_content') + ')'
 
-        temp_status=vy,
-        paki=s.group('paki'),
-        dating_in_brackets=None  # todo
-    )
+Name = CapitalizedWord + Opt(Char('(') + Regex(r'[^)0-9]+') + ')')
+Name = original_text_for(Name | 'NN')('name')
+
+Surname = Combine(CapitalizedWord + Opt('-' + CapitalizedWord))('surname')
+SaintTitle = Regex(r'(Св\.(\s+муч\.)?)|(Сщмч\.)|(Блаж\.)',
+                   flags=re.I)('saint_title')
+Temp = Char('в') + '/' + 'у' + Opt(Question)
+Temp |= Char('(') + Temp + ')'
+Temp = original_text_for(Temp)('temp_status')
+
+NumberAferName = RimNumber('number_after_name')
+NumberAferSurnname = RimNumber('number_after_surname')
+
+Paki = Char(',') + Regex(r'паки|(в\s+\d+-й\s+раз)')('paki')
+
+
+WorldTitle = Opt(Char(',')) + Regex(r'кн\.')('world_title')
+
+
+EpiskopInCafedra = Opt(Temp) + Opt(SaintTitle) + \
+                        Name + Opt(NumberAferName) + \
+                        Opt(WorldTitle) + \
+                        Opt(Surname + Opt(NumberAferSurnname)) + \
+                        Opt(Brackets) + Opt(Paki) + Opt(Brackets)
+
+
+if __name__ == '__main__':
+    tests = """
+Вассиан
+Ираклий Северицкий
+Св. Амвросий Хелая
+
+Сщмч. Кирион Садзегели
+в/у Мефодий Филимонович
+Иоанн II
+(в/у ?) Василий III
+Николай II Гиляровский
+Иоанн Соколов II
+
+Димитрий Поспелов, паки
+Феофилакт Лопатинский, в 3-й раз
+
+Трифон кн. Туркестанов
+
+Авраамий (1271)
+Андрей (1117 ?)
+
+Антоний Герасимов-Зыбелин (Забелин?)
+
+Евфимий (1447–1451)
+Вассиан III (02.1540)
+NN (I пол. XI в.)
+
+Евфимий (1447–1451)
+Вассиан III (02.1540)
+
+Иоаким (Иоанн, Иов)
+
+Серафим (в сх. Сергий)
+
+Антоний VI (?)
+
+Григорий, кн. Чиковани
+
+Сергий (Алексий) Лавров
+Дионисий (в сх. Димитрий) Ушаков
+Св. Феодор Грек, паки (1010–1014)
+
+Варсонофий IV Гриневич
+
+Св. муч. Ефрем I
+
+NN (кон. XII в.)
+    """.split('\n')
+    for t in tests:
+        if not t.strip():
+            continue
+        p = parse_episkop_name_in_cafedra(t)
+
+        warn = '!!!' if isinstance(p, ParseFail) else ''
+        print(warn, t, p)

@@ -8,6 +8,23 @@ except ImportError:
     from fail import ParseFail
 
 
+@dataclass
+class ParsedDating:
+    dating: str  # original dating text
+    year: int
+    month: int = None
+    day: int = None
+    prefix: str = None  # около, лето, не ранее и т.д.
+
+
+def parse_dating(s) -> ParsedDating | ParseFail:
+    try:
+        d = Dating.parse_string(s, parse_all=True).as_dict()
+        return ParsedDating(dating=s, **d)
+    except ParseException as ex:
+        return ParseFail(s, 'DatingFail', ex)
+
+
 brackets = (Literal('(') + ... + ')').suppress()
 dot_or_brackets = (Literal('.') | (brackets + Opt('.'))).suppress()
 
@@ -26,23 +43,6 @@ Dating = Opt(dating_prefix) + (\
              (Day + dot_or_brackets + Month + dot_or_brackets + Year) | \
              (Month + dot_or_brackets + Year) | Year
          ) + Opt(brackets).suppress()
-
-
-@dataclass
-class ParsedDating:
-    dating: str  # original dating text
-    year: int
-    month: int = None
-    day: int = None
-    prefix: str = None  # около, лето, не ранее и т.д.
-
-
-def parse_dating(s) -> ParsedDating | ParseFail:
-    try:
-        d = Dating.parse_string(s, parse_all=True).as_dict()
-        return ParsedDating(dating=s, **d)
-    except ParseException as ex:
-        return ParseFail(s, 'DatingFail', ex)
 
 
 if __name__ == '__main__':
