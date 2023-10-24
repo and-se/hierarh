@@ -232,7 +232,7 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
 
             ep.episkop.id = ep_orm.id
             # Отдельно считаем количество раз для в/у и "настоящего"
-            cnt.update([ep_orm.id, bool(ep.temp_status)])
+            cnt[(ep.episkop.id, bool(ep.temp_status))] += 1
 
             beg = ep.begin_dating
             end = ep.end_dating
@@ -249,8 +249,8 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
             )
 
             epjson: EpiskopOfCafedraDto = \
-                ep.to_episkop_of_cafedra_dto(cnt[ep.episkop.id,
-                                             bool(ep.temp_status)], is_obn)
+                ep.to_episkop_of_cafedra_dto(cnt[(ep.episkop.id,
+                                             bool(ep.temp_status))], is_obn)
 
             if ep.notes:
                 epjson.episkop += ' '.join([
