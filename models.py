@@ -48,14 +48,17 @@ class EpiskopInfo(_HHModel):
     world_title: str | None = None
     comment: str | None = None
 
-    def get_header(self):
+    def get_header(self, is_obn):
         r = self.name
         if self.saint_title:
             r = self.saint_title + ' ' + r
         if self.world_title:
             r = r + ' ' + self.world_title
         if self.surname:
-            r = r + ' ' + self.surname
+            if is_obn:
+                r = r + ' ' + self.surname
+            else:
+                r = r + ' (' + self.surname + ')'
         # if self.number_after_surname:
         #     r  += ' ' + self.number_after_surname
 
@@ -69,10 +72,10 @@ class EpiskopOfCafedra(_EpiskopCafedraBase):
 
     notes: List[int] = []
 
-    def to_episkop_of_cafedra_dto(self, again_num: int = None) \
+    def to_episkop_of_cafedra_dto(self, again_num: int = None, is_obn=False)\
             -> 'EpiskopOfCafedraDto':
 
-        episkop = build_title(self.episkop.get_header(),
+        episkop = build_title(self.episkop.get_header(is_obn),
                               self.temp_status, again_num,
                               namesake_num=self.namesake_num)
         if self.episkop.comment:
@@ -98,6 +101,7 @@ class Episkop(_HHModel):
     name: str
     surname: Optional[str]
     saint_title: str | None = None
+    is_obn: bool
 
     cafedras: List['CafedraOfEpiskop'] = []
 
@@ -192,6 +196,7 @@ class CafedraDto:
 @dataclass
 class EpiskopDto:
     header: str
+    is_obn: bool
     cafedras: List['CafedraOfEpiskopDto'] = field(default_factory=list)
 
 
@@ -261,6 +266,7 @@ class EpiskopOrm(Model):
     name = TextField()
     surname = TextField(null=True)
     saint_title = TextField(null=True, default=None)
+    is_obn = BooleanField(null=False)
 
 
 EpiskopOrm.add_index(

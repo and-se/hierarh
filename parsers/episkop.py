@@ -48,7 +48,9 @@ Brackets = Char('(') + Regex(r'[^)]+')('brackets_content') + ')'
 Name = CapitalizedWord + Opt(Char('(') + Regex(r'[^)0-9]+') + ')')
 Name = original_text_for(Name | 'NN')('name')
 
-Surname = Combine(CapitalizedWord + Opt('-' + CapitalizedWord))('surname')
+Surname = Combine(CapitalizedWord + Opt('-' + CapitalizedWord))
+Surname = original_text_for(Surname + Opt(CapitalizedWord))("surname")
+
 SaintTitle = Regex(r'(Св\.(\s+муч\.)?)|(Сщмч\.)|(Блаж\.)',
                    flags=re.I)('saint_title')
 Temp = Char('в') + '/' + 'у' + Opt(Question)
@@ -68,7 +70,8 @@ EpiskopInCafedra = Opt(Temp) + Opt(SaintTitle) + \
                         Name + Opt(NumberAferName) + \
                         Opt(WorldTitle) + \
                         Opt(Surname + Opt(NumberAferSurnname)) + \
-                        Opt(Brackets) + Opt(Paki) + Opt(Brackets)
+                        Opt(Brackets) + Opt(Paki) + Opt(Brackets) + \
+                        Opt('.')
 
 
 if __name__ == '__main__':
@@ -118,6 +121,10 @@ NN (I пол. XI в.)
 Св. муч. Ефрем I
 
 NN (кон. XII в.)
+
+Христофор Сулима Грек
+
+Харитон Обрынский-Угровецкий.
     """.split('\n')
     for t in tests:
         if not t.strip():

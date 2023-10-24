@@ -14,6 +14,10 @@
     margin-bottom: 10px;
 }
 
+.items li a {
+    text-decoration: none;
+}
+
 .note {
     vertical-align: super;
     font-size: small;
@@ -40,6 +44,14 @@ table.episkops {
 
 .episkops_header {
  font-size: x-large;
+}
+
+.obnovl {
+    font-style: italic;
+}
+
+li .obnovl {
+    font-size: 0.9em;
 }
 
 

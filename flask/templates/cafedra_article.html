@@ -23,7 +23,7 @@
 
     <main>
     {% autoescape false %}
-    <h1>{{article.header}}</h1>
+    <h1 class="{{'obnovl' if article.is_obn}}">{{article.header}}</h1>
     {%if article.text %}
     <p>{{article.text}}</p>
     {% endif %}

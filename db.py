@@ -15,19 +15,21 @@ import human
 import json
 import os
 from collections import Counter
-from typing import Tuple
+from typing import Tuple, Iterable
 
 
 class HistHierarhStorageBase:
-    def get_cafedra_names(self, query: str = '') -> Tuple[int, str]:
+    def get_cafedra_names(self, query: str = '') \
+                -> Iterable[Tuple[int, str, bool]]:
         """
-        returns tuples (cafedra id, cafedra header)
+        returns tuples (cafedra id, cafedra header, is obn)
         """
         raise NotImplementedError()
 
-    def get_episkop_names(self, query: str = '') -> Tuple[int, str]:
+    def get_episkop_names(self, query: str = '') \
+            -> Iterable[Tuple[int, str, bool]]:
         """
-        return tuples (episkop id, episkop name)
+        returns tuples (episkop id, episkop name, is obn)
         """
         raise NotImplementedError()
 
@@ -138,7 +140,9 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
     def _cafedra_q(self, query):
         cond = self._build_search_condition(query, CafedraOrm.header)
         # with self.ctx():
-        q = CafedraOrm.select(CafedraOrm.id, CafedraOrm.header)\
+        q = CafedraOrm.select(CafedraOrm.id,
+                              CafedraOrm.header,
+                              CafedraOrm.is_obn) \
             .where(cond).order_by(CafedraOrm.header)
         # print(q, _Db.execute_sql(f'EXPLAIN QUERY PLAN {q}').fetchall())
         return q
@@ -154,7 +158,9 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
 
     def _episkop_q(self, query):
         cond = self._build_search_condition(query, EpiskopOrm.header)
-        q = EpiskopOrm.select(EpiskopOrm.id, EpiskopOrm.header) \
+        q = EpiskopOrm.select(EpiskopOrm.id,
+                              EpiskopOrm.header,
+                              EpiskopOrm.is_obn) \
                       .where(cond) \
                       .order_by(EpiskopOrm.name, EpiskopOrm.surname)
         return q
@@ -177,7 +183,7 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
     def get_episkop_data(self, key: int) -> EpiskopDto:
         ep = EpiskopOrm.get(key)
 
-        epv = EpiskopDto(header=ep.header)
+        epv = EpiskopDto(header=ep.header, is_obn=ep.is_obn)
 
         cnt = Counter()
         for caf in ep.cafedras.order_by(
@@ -210,14 +216,18 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
                 continue  # TODO now table subheaders are skipped in db...
 
             ep.episkop: EpiskopInfo
+            is_obn = caf.is_obn
 
             # fixme: now we possibly merge people with same name+surname
             ep_orm = self.find_episkop(ep.episkop.name, ep.episkop.surname)
             if not ep_orm:
-                ep_orm = EpiskopOrm.create(header=ep.episkop.get_header(),
+                ep_orm = EpiskopOrm.create(header=ep.episkop
+                                           .get_header(is_obn),
                                            name=ep.episkop.name,
                                            surname=ep.episkop.surname,
                                            saint_title=ep.episkop.saint_title,
+                                           # todo check is it always correct?
+                                           is_obn=is_obn
                                            )
 
             ep.episkop.id = ep_orm.id
@@ -240,7 +250,7 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
 
             epjson: EpiskopOfCafedraDto = \
                 ep.to_episkop_of_cafedra_dto(cnt[ep.episkop.id,
-                                             bool(ep.temp_status)])
+                                             bool(ep.temp_status)], is_obn)
 
             if ep.notes:
                 epjson.episkop += ' '.join([
