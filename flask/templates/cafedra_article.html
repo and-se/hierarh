@@ -69,76 +69,24 @@
 
     {% endautoescape %}
     </main>
-    <!--<script>
-        var elements = document.getElementsByClassName("note");
-
-        var go_to_note = function(event) {
-            el = document.getElementById("note_" + this.dataset.note)
-            if (el) {
-                event.preventDefault();
-                el.scrollIntoView();
-                var back = this;
-                el.parentElement.setAttribute('title', "Нажмите на номер ссылки для возврата обратно");
-
-                var go_back = function() {
-                    el.parentElement.removeAttribute('title');
-                    back.scrollIntoView();
-                }
-
-                el.addEventListener('click', go_back, { once: true, capture: false});
-            }
-        }
-
-        for (var i = 0; i < elements.length; i++) {
-            elements[i].addEventListener('click', go_to_note, false);
-        }
-    </script>-->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Получаем все ссылки в таблице
-            var links = document.querySelectorAll('.episkops a');
+        var links = document.getElementsByClassName("note");
+        var notes = document.getElementsByClassName("note_row");
+        
+        var handleLinkClick = function(event, noteId) {
+            event.preventDefault();
+            var noteRow = notes[noteId];
 
-            // Функция для обработки клика по ссылке
-            var handleLinkClick = function(event) {
-                event.preventDefault();
+            if (noteRow.style.display == 'none') {
+                noteRow.style.display = 'table-row';
+            } else {
+                noteRow.style.display = 'none';
+            }
+        };
 
-                // Получаем ID сноски из href ссылки
-                var noteId = this.getAttribute('href').split('/').pop();
-                var noteElement = document.getElementById('note_' + noteId);
-
-                // Проверяем, существует ли сноска
-                if (noteElement) {
-                    // Проверяем, существует ли уже строка со сноской
-                    var existingRow = this.closest('tr').nextElementSibling;
-                    if (existingRow && existingRow.classList.contains('note-row')) {
-                        // Если строка со сноской уже существует, удаляем ее
-                        existingRow.remove();
-                    } else {
-                        // Если строки со сноской нет, создаем ее
-
-                        // Клонируем элемент сноски
-                        var clonedNote = noteElement.cloneNode(true);
-
-                        // Создаем новую строку и ячейку для сноски
-                        var newRow = document.createElement('tr');
-                        newRow.classList.add('note-row'); // Добавляем класс для идентификации
-                        var newCell = document.createElement('td');
-                        newCell.colSpan = 3; // Растягиваем ячейку на все колонки
-                        newCell.appendChild(clonedNote);
-
-                        newRow.appendChild(newCell);
-
-                        // Вставляем новую строку после текущей строки, в которой находится ссылка
-                        this.closest('tr').after(newRow);
-                    }
-                }
-            };
-
-            // Добавляем обработчик событий на каждую ссылку
-            links.forEach(function(link) {
-                link.addEventListener('click', handleLinkClick);
-            });
-        });
+        for (var i = 0; i < links.length; i++) {
+            links[i].addEventListener('click', (localI => event => handleLinkClick(event, localI))(i), false);
+            notes[i].style.display = 'none';
+        }
     </script>
-
 </body>
