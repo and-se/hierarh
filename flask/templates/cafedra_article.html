@@ -53,6 +53,16 @@
         </td>
         {% endif %}
     </tr>
+
+    {% for note in ep.notes%}
+    <tr class="note_row" id="note_row_{{note.num}}">
+        <td colspan="3">
+            <span class="note_start" id="note_{{note.num}}">{{note.num}}</span>
+            {{note.text}}
+        </td>
+    </tr>
+    {% endfor %}
+
     {% endfor %}
     </table>
 

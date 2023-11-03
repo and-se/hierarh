@@ -243,6 +243,10 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
                         for i in ep.notes
                 ])
 
+            epjson.notes = [ArticleNote(num=note.num, text=note.text) 
+                            for note in caf.notes 
+                            if note.num in ep.notes]
+
             cafjson.episkops.append(epjson)
 
         cafjson.notes = [ArticleNote(num=x.num, text=x.text)
