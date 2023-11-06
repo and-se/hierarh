@@ -55,9 +55,9 @@
     </tr>
 
     {% for note in ep.notes%}
-    <tr class="note_row" id="note_row_{{note.num}}">
+    <tr class="note_row" id="note_{{note.num}}">
         <td colspan="3">
-            <span class="note_start" id="note_{{note.num}}">{{note.num}}</span>
+            <span class="table_note">{{note.num}}</span>
             {{note.text}}
         </td>
     </tr>
@@ -70,7 +70,7 @@
     {%for note in article.notes%}
     <li>
         <p>
-            <span class="note_start" id="note_{{note.num}}">{{note.num}}</span>
+            <span class="footer_note" id="note_{{note.num}}">{{note.num}}</span>
             {{note.text}}
         </p>
     </li>
@@ -81,11 +81,29 @@
     </main>
     <script>
         var links = document.getElementsByClassName("note");
-        var notes = document.getElementsByClassName("note_row");
+        var footerNotes = document.getElementsByClassName("footer_note");
+        var tableNotes = document.getElementsByClassName("note_row");
         
-        var handleLinkClick = function(event, noteId) {
+        var goToNote = function(event) {
+            el = document.getElementById("note_" + this.dataset.note)
+            if (el) {
+                event.preventDefault();
+                el.scrollIntoView();
+                var back = this;
+                el.parentElement.setAttribute('title', "Нажмите на номер ссылки для возврата обратно");
+
+                var goBack = function() {
+                    el.parentElement.removeAttribute('title');
+                    back.scrollIntoView();
+                }
+
+                el.addEventListener('click', goBack, { once: true, capture: false});
+            }
+        }
+
+        var openInTable = function(event, noteId) {
             event.preventDefault();
-            var noteRow = notes[noteId];
+            var noteRow = tableNotes[noteId];
 
             if (noteRow.style.display == 'none') {
                 noteRow.style.display = 'table-row';
@@ -94,9 +112,15 @@
             }
         };
 
+        var footerNotesLen = footerNotes.length;
         for (var i = 0; i < links.length; i++) {
-            links[i].addEventListener('click', (localI => event => handleLinkClick(event, localI))(i), false);
-            notes[i].style.display = 'none';
+            if (i < footerNotesLen) {
+                links[i].addEventListener('click', goToNote, false);
+            } else {
+                links[i].addEventListener('click', 
+                    (localI => event => openInTable(event, localI))(i-footerNotesLen), false);
+                tableNotes[i - footerNotesLen].style.display = 'none';
+            }
         }
     </script>
 </body>
