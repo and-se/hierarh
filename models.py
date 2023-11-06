@@ -113,7 +113,8 @@ class EpiskopCafedraOrm(Model):
                 episkop_id=self.episkop.id,
                 begin_dating=self.begin_dating,
                 end_dating=self.end_dating,
-                inexact=self.inexact
+                inexact=self.inexact,
+                notes=self.notes
             )
 
     def to_cafedra_of_episkop_dto(self, again_num: int = None):
@@ -123,7 +124,8 @@ class EpiskopCafedraOrm(Model):
                 cafedra_id=self.cafedra.id,
                 begin_dating=self.begin_dating,
                 end_dating=self.end_dating,
-                inexact=self.inexact
+                inexact=self.inexact,
+                notes=self.notes
             )
 
 
@@ -248,6 +250,8 @@ class CafedraOfEpiskopDto:
 
     inexact: bool = False
 
+    notes: List['ArticleNote'] = field(default_factory=list)
+
 
 @dataclass
 class EpiskopOfCafedraDto:
@@ -258,6 +262,8 @@ class EpiskopOfCafedraDto:
     end_dating: str
 
     inexact: bool = False
+
+    notes: List['ArticleNote'] = field(default_factory=list)
 
 
 def build_title(header, temp_status: str, again_num: int):

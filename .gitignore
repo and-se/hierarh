@@ -10,3 +10,4 @@ hierarh*.sqlite3*
 episkop_rows.txt
 
 env
+venv

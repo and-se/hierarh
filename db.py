@@ -4,7 +4,7 @@ from book_parser import CafedraArticlesFromJson
 from article_parser import CafedraArticleParser, ParsedCafedraFixer
 
 import models
-from models import CafedraOrm, EpiskopOrm, EpiskopCafedraOrm
+from models import CafedraOrm, EpiskopOrm, EpiskopCafedraOrm, NoteOrm
 from models import Cafedra, ArticleNote
 from models import CafedraDto, EpiskopDto, \
                    EpiskopOfCafedraDto, CafedraOfEpiskopDto
@@ -256,6 +256,14 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
         caf_orm.article_json = json.dumps(cafjson.to_dict(),
                                           ensure_ascii=False, indent=4)
         caf_orm.save()
+
+        for note in caf.notes:
+            note_orm = NoteOrm.create(
+                text=note.text,
+                cafedra_id=caf_orm.id,
+                #TODO episkop_cafedra_id= 
+            )
+            note_orm.save()
 
 
 # -------------- End Peewee -------------
