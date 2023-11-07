@@ -15,20 +15,20 @@
         <nav>
           <ul class="collections">
               <li><a class="{{'current' if item_type=='cafedra'}}" href="/cafedra">Кафедры</a></li>
-              <li><a class="{{'current' if item_type=='episkop'}}" href="/episkop">Епископы</a></li>        
+              <li><a class="{{'current' if item_type=='episkop'}}" href="/episkop">Епископы</a></li>
           </ul>
         </nav>
     </header>
-    
+
     <main>
         <form class="search" method="get">
             <input name="query" value="{{query}}">
             <button type="submit">Поиск</button>
         </form>
-        
+
         <ul class="items">
         {% for item in items %}
-            <li><a href="/{{item_type}}/{{item[0]}}">{{item[1]}}</a></li>
+            <li><a href="/{{item_type}}/{{item[0]}}" class="{{'obnovl' if item[2]}}">{{item[1]}}</a></li>
         {% endfor %}
         </ul>
     </main>

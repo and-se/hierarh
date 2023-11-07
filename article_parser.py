@@ -1,15 +1,25 @@
 from chain import ChainLink, Chain
 from models import CafedraArticle
-from models import Cafedra, EpiskopOfCafedra, Note
+from models import Cafedra, EpiskopOfCafedra, Note, EpiskopInfo, Dating
+
+from parsers.fail import ParseFail
+from parsers.dating import parse_dating, ParsedDating
+from parsers.episkop import parse_episkop_name_in_cafedra, \
+                            ParsedEpiskopInCafedra
+
+from lib.date_intervals_builder import DateIntervalsBuilder
+from lib.roman_num import from_roman
+
+import human
 
 import re
 from dataclasses import dataclass
-from typing import Tuple
-from pyparsing import Literal, Regex, Opt, ParseException
+from typing import Tuple, List
 
 
 class CafedraArticleParser(ChainLink):
     @staticmethod
+    @human.show_exception
     def parse_article(art: CafedraArticle) -> Cafedra:
         caf = Cafedra(
                 header=art.header,
@@ -19,31 +29,39 @@ class CafedraArticleParser(ChainLink):
 
         for aep in art.episkops:
             if isinstance(aep, str):
+                # subheaders like 'Архиепископы и митрополиты Московские;'
                 caf.episkops.append(aep)
                 continue
 
-            pp = parse_episkop_row_old(aep.text)
-            if not pp:
-                # TODO - we LOOSE this articles data!
-                print(f'SKIP EPISKOP {caf.header}:\t{aep.text.strip()}')
+            pp: ParsedEpiskopRow = parse_episkop_row(aep.text)
+
+            if isinstance(pp, ParseFail):
+                human.send("Can't parse this - skip data", aep.text, pp)
                 continue
+            elif pp.error:
+                if isinstance(pp.who, ParseFail):
+                    human.send('Fail episkop!!!', aep.text, pp)
+                else:
+                    human.send('Fail dating', aep.text, pp)
 
-            begin_dating, end_dating, who, inexact = pp
-
-            vy, who, paki, notes = parse_episkop_name_old(who)
-            if not who:
-                print(f'\n##########\t\t\tEMPTY EPISKOP {caf.header}:\t{aep.text}\n')  # noqa: E501  TODO
-                who = '?'
+            if not isinstance(pp.who, ParseFail):
+                if not pp.who.name or pp.who.name == '?':
+                    human.send("Empty episkop name", aep.text, pp.who)
+                temp_status = pp.who.temp_status
+            else:
+                temp_status = None
 
             epcaf = EpiskopOfCafedra(
-                            episkop=who,
-                            begin_dating=null_if_empty(begin_dating),
-                            end_dating=null_if_empty(end_dating),
-                            temp_status=vy,
-                            inexact=inexact
+                            episkop=to_episkop_info(pp.who),
+                            begin_dating=to_dating(pp.begin),
+                            end_dating=to_dating(pp.end),
+                            temp_status=temp_status,
+                            inexact=pp.inexact,
+                            namesake_num=get_namesake_num(pp.who)
                     )
-            if notes:
-                epcaf.notes = [int(x) for x in notes]
+
+            if pp.notes:
+                epcaf.notes = [int(x) for x in pp.notes]
 
             caf.episkops.append(epcaf)
 
@@ -55,10 +73,122 @@ class CafedraArticleParser(ChainLink):
         self.send(pp)
 
 
+def to_episkop_info(parsed: ParsedEpiskopInCafedra) -> EpiskopInfo:
+    if parsed is None:
+        raise ValueError("parsed episkop info can't be None")
+    if isinstance(parsed, ParseFail):
+        return EpiskopInfo(name=parsed.text, surname=None)  # fixme
+
+    surname = parsed.surname
+    # Глобальный номер для однофамильцев-одноимёнцев включаем в фамилию
+    if parsed.number_after_surname:
+        surname += ' ' + parsed.number_after_surname
+
+    return EpiskopInfo(name=parsed.name,
+                       surname=surname,
+                       saint_title=parsed.saint_title,
+                       world_title=parsed.world_title,
+                       comment=parsed.brackets_content)
+
+
+def to_dating(parsed: ParsedDating) -> Dating:
+    if parsed is None:
+        return None
+    if isinstance(parsed, ParseFail):
+        return Dating(dating=parsed.text, estimated_date=None)
+    else:
+        b = DateIntervalsBuilder()
+        try:
+            b.add_date(parsed.year, parsed.month, parsed.day)
+            items = b.build()
+        except ValueError as ex:
+            if 'day is out of range' in str(ex):
+                human.send(str(ex), parsed)
+                items = []
+
+        if len(items) != 1:
+            if len(items) == 0:
+                msg = 'No date intervals for dating'
+            else:
+                msg = 'Many date intervals, expected single'
+            human.send(msg, parsed)
+
+        est = items[0].begin if len(items) else None
+        return Dating(dating=parsed.dating, estimated_date=est)
+
+
+def get_namesake_num(parsed: ParsedEpiskopInCafedra) -> int | None:
+    if not parsed or isinstance(parsed, ParseFail):
+        return None
+    if parsed.number_after_name and not parsed.surname:
+        return from_roman(parsed.number_after_name)
+
+    ...  # TODO
+
+# ------------ Parser for Episkop row in table of cafedra article -------
+
+
+@dataclass
+class ParsedEpiskopRow:
+    begin: ParsedDating
+    end: ParsedDating
+    who: ParsedEpiskopInCafedra
+    inexact: bool
+    notes: List[int]
+
+    @property
+    def error(self):
+        for x in [self.begin, self.end, self.who]:
+            if isinstance(x, ParseFail):
+                return x
+
+
+def parse_episkop_row(s) -> ParsedEpiskopRow | ParseFail:
+    s, notes = extract_notes(s)
+    div = divide_episkop_row(s)
+    if isinstance(div, ParseFail):
+        return div
+
+    begin, end, who, inexact = div
+
+    begin = parse_dating(begin) if begin else None
+    end = parse_dating(end) if end else None
+    who = parse_episkop_name_in_cafedra(who)
+
+    return ParsedEpiskopRow(begin, end, who, inexact, notes)
+
+
+def divide_episkop_row(s) -> Tuple[str, str, str, bool]:
+    # 10(23)10.1926	–	08(21)04.1932	–	Петр Данилов, паки
+    s = s.strip()
+    inexact = False
+    if s.startswith('(') and s.endswith(')'):
+        inexact = True
+        s = s[1:-1]
+    l = re.split(r'[–—]\s', s)  # noqa: E741
+
+    if len(l) != 3:
+        return ParseFail(s, 'DivideFail',
+                         f"Expected 3 items, but got {len(l)} for '{s}'")
+    return l[0].strip(), l[1].strip(), l[2].strip(), inexact
+
+
+note_re = re.compile(
+                r'<span\s+class="note"[^>]*>\s*(?P<note_num>\d+)\s*</span>')
+
+
+def extract_notes(s) -> Tuple[str, list]:
+    # remove note
+    all_notes = [x.group('note_num') for x in note_re.finditer(s)]
+    s = note_re.sub('', s)
+    return s, all_notes
+
+
 class ParsedCafedraFixer(ChainLink):
     def __init__(self):
         self._moscow_done = False
         self._stashed_caf = None
+        self._mitropol_done = False
 
     def process(self, s: Cafedra):
         # Список сносок общий для статей про Митрополию всея Руссии,
@@ -89,6 +219,9 @@ class ParsedCafedraFixer(ChainLink):
             s.notes = s.notes[i+1:]
             self._stashed_caf = None
             self._moscow_done = True
+        elif s.header == '«МИТРОПОЛИЯ РОССИИ» (см. Всероссийская)':
+            s.header = "МИТРОПОЛИЯ РОССИИ (см. Всероссийская)"
+            self._mitropol_done = True
 
         self.send(s)
 
@@ -96,167 +229,9 @@ class ParsedCafedraFixer(ChainLink):
         if not self._moscow_done:
             raise Exception('Не обработаны сноски двух статей про Московский '
                             'Патриархат (aka Митрополия Руссии)')
-
-
-# 10(23)10.1926	–	08(21)04.1932	–	Петр Данилов, паки
-episkop_row_parser = re.compile(r'''
-    ^(?P<begin>[^\t]*) (\t|–|—)+ (?P<end>[^\t]*) (\t|–|—)+ \s*
-    (?P<who>\(?\s*[А-Яа-яЁёN][^\t]+)$''', re.X)
-
-
-def parse_episkop_row_old(row):
-    row = row.strip()
-    if row.startswith('(') and row.endswith(')'):
-        inexact = True
-        row = row[1:-1]
-    else:
-        inexact = False
-    m = episkop_row_parser.match(row)
-    if m:
-        return m.group('begin').strip(), m.group('end').strip(), \
-               m.group('who').strip(), inexact
-
-
-def parse_episkop_name_old(s):
-    # remove note
-    note = re.compile(
-                r'<span\s+class="note"[^>]*>\s*(?P<note_num>\d+)\s*</span>')
-    all_notes = [x.group('note_num') for x in note.finditer(s)]
-    s = note.sub('', s)
-
-    s = re.match(r'''^\s*(?P<vy> \(?\s* в\s*/\s*у \s* \(?\s*\??\s*\)? \s*\)? )?
-                    (?P<who>.*?)
-                    (,\s*  (?P<paki>(паки)|(в\s+\d-й\s+раз))   )?
-                    \s*$
-                  ''', s, re.I | re.X)
-
-    vy = s.group('vy')
-    if vy:
-        if '?' in vy:
-            vy = 'в/y?'
-        else:
-            vy = 'в/y'
-
-    return (vy, s.group('who').strip(), s.group('paki'), all_notes)
-
-
-
-def null_if_empty(s):
-    return s if s else None
-
-
-# ------------ Parser for Episkop row in table of cafedra article -------
-
-
-@dataclass
-class ParsedDating:
-    dating: str
-    year: int
-    month: int = None
-    day: int = None
-    prefix: str = None
-
-
-@dataclass
-class ParsedEpiskopName:
-    text: str
-    name: str
-    number_after_name: str
-    surname: str
-    number_after_surname: str
-
-    dating_in_brackets: str
-
-
-@dataclass
-class ParseFail:
-    text: str
-    code: str
-    error: any
-
-
-@dataclass
-class ParsedEpiskopRow:
-    begin: ParsedDating
-    end: ParsedDating
-    who: ParsedEpiskopName
-    inexact: bool
-
-    def has_fails(self):
-        return True in map(lambda x: isinstance(x, ParseFail), [self.begin, self.end, self.who])
-
-
-def parse_episkop_row(s) -> ParsedEpiskopRow | ParseFail:
-    div = divide_episkop_row(s)
-    if isinstance(div, ParseFail):
-        return div
-
-    begin, end, who, inexact = div
-    who, notes = extract_notes(who)
-
-    begin = parse_dating(begin) if begin else None
-    end = parse_dating(end) if end else None
-    who = parse_episkop_name(who)
-
-    return ParsedEpiskopRow(begin, end, who, inexact)
-
-
-def divide_episkop_row(s) -> Tuple[str, str, str, bool]:
-    s = s.strip()
-    inexact = False
-    if s.startswith('(') and s.endswith(')'):
-        inexact = True
-        s = s[1:-1]
-    l = re.split(r'[–—]\s', s)  # noqa: E741
-
-    if len(l) != 3:
-        return ParseFail(s, 'DivideFail', f"Expected 3 items, but got {len(l)} for '{s}'")
-    return l[0].strip(), l[1].strip(), l[2].strip(), inexact
-
-
-note_re = re.compile(
-                r'<span\s+class="note"[^>]*>\s*(?P<note_num>\d+)\s*</span>')
-
-
-def extract_notes(s) -> Tuple[str, list]:
-    # remove note
-    all_notes = [x.group('note_num') for x in note_re.finditer(s)]
-    s = note_re.sub('', s)
-    return s, all_notes
-
-
-brackets = (Literal('(') + ... + ')').suppress()
-dot_or_brackets = (Literal('.') | (brackets + Opt('.'))).suppress()
-
-Day = Regex(r'30 | 31 | ([12]\d) | (0?[1-9])', flags=re.X)('day')
-Month = Regex(r'1[012] | (0?[1-9])', flags=re.X)('month')
-Year = Regex(r'(2[01]\d\d) | (1\d{3}) | \d{2,3} ', flags=re.X)('year')
-
-
-for t in (Day, Month, Year):
-    t.set_parse_action(lambda tok: int(tok[0]))
-
-dating_prefix = Regex(r'(не\s+)?[а-я]+(\.?)')('prefix')
-
-Dating = Opt(dating_prefix) + (\
-             # weird pyparsing Opt()!!!
-             (Day + dot_or_brackets + Month + dot_or_brackets + Year) | \
-             (Month + dot_or_brackets + Year) | Year
-         ) + Opt(brackets).suppress()
-
-
-def parse_dating(s) -> ParsedDating | ParseFail:
-    try:
-        d = Dating.parse_string(s, parse_all=True).as_dict()
-        return ParsedDating(dating=s, **d)
-    except ParseException as ex:
-        return ParseFail(s, 'DatingFail', ex)
-
-
-
-def parse_episkop_name(s) -> ParsedEpiskopName:
-    return None
-    ...
+        if not self._mitropol_done:
+            raise Exception('Не обработана «МИТРОПОЛИЯ РОССИИ» - '
+                            'надо убрать кавычки')
 
 
 # -------------- Test ---------------------------
@@ -310,7 +285,7 @@ if __name__ == '__main__':
 (15(28)11.1918	–	29.05(11.06)1921	–	Леонид Окропиридзе<span class="note" data-note="16">16</span>)
 06(19)10.1955	–	19.09(02.10)1961	–	Андрей Сухенко<span class="note" data-note="65">65</span>
 01.07.1912	–	09(22)02.1918	–	Назарий Андреев
-01.1928	–	09.1928	–	в/у Александр Чекановский<span class="note" data-note="3">3</span
+01.1928	–	09.1928	–	в/у Александр Чекановский<span class="note" data-note="3">3</span>
 03. 1968	–	15(28)11.1968	–	в/у Питирим Нечаев<span class="note" data-note="28">28</span>
 лето 1925	–	кон. 1925	–	Стефан Белопольский<span class="note" data-note="2">2</span>
 
@@ -323,7 +298,6 @@ if __name__ == '__main__':
     if 'bigtest' in sys.argv:
         test = open(f).read().split('\n')
         show_ok = False
-
 
     test = [x for x in test if x.strip()]
     fail_cnt = 0
@@ -343,7 +317,7 @@ if __name__ == '__main__':
                     print('------------\n')
                     fail_cnt += 1
             else:
-                if p.has_fails():
+                if p.error:
                     print('!!!', p)
                     fail_cnt += 1
                 else:
@@ -366,6 +340,4 @@ if __name__ == '__main__':
                 print('------------\n')
                 fail_cnt += 1
 
-
     print("Total", len(test), "Failed", fail_cnt, "Skipped", skip_cnt)
-

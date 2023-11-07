@@ -23,7 +23,7 @@
 
     <main>
     {% autoescape false %}
-    <h1>{{article.header}}</h1>
+    <h1 class="{{'obnovl' if article.is_obn}}">{{article.header}}</h1>
     {%if article.text %}
     <p>{{article.text}}</p>
     {% endif %}
@@ -45,7 +45,7 @@
             {%if ep.episkop_id %}
                 <a href="/episkop/{{ep.episkop_id}}">{{ep.episkop}}</a>
             {% else %}
-                {{ep.who}}
+                {{ep.episkop}}
             {% endif %}
             {% if ep.inexact %}
                     {{')'}}
