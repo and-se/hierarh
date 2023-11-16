@@ -1,6 +1,7 @@
 *~
 *.pyc
 
+SRC_DATA
 init_book
 full_cafedry.xml
 

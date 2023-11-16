@@ -55,10 +55,12 @@
     </tr>
 
     {% for note in ep.notes%}
-    <tr class="note_row" id="note_{{note.num}}">
+    <tr id="note_{{note.num}}" style="display: none;">
         <td colspan="3">
-            <span class="table_note">{{note.num}}</span>
+            <span class="table-note">{{note.num}}</span>
             {{note.text}}
+            <br>
+            <a href="#" style="cursor: pointer;">скрыть</a>
         </td>
     </tr>
     {% endfor %}
@@ -66,60 +68,76 @@
     {% endfor %}
     </table>
 
-    <ul class="notes">
-    {%for note in article.notes%}
-    <li>
-        <p>
-            <span class="footer_note" id="note_{{note.num}}">{{note.num}}</span>
-            {{note.text}}
-        </p>
-    </li>
-    {%endfor%}
-    </ul>
-
     {% endautoescape %}
     </main>
     <script>
-        var links = document.getElementsByClassName("note");
-        var footerNotes = document.getElementsByClassName("footer_note");
-        var tableNotes = document.getElementsByClassName("note_row");
-        
-        var goToNote = function(event) {
-            el = document.getElementById("note_" + this.dataset.note)
-            if (el) {
-                event.preventDefault();
-                el.scrollIntoView();
-                var back = this;
-                el.parentElement.setAttribute('title', "Нажмите на номер ссылки для возврата обратно");
+        var articleNotesJson = {{ article.notes | tojson }};
+        var articleNotes = articleNotesJson.reduce(function(acc, cur) {
+          acc[cur.num] = cur.text;
+          return acc;
+        }, {});
 
-                var goBack = function() {
-                    el.parentElement.removeAttribute('title');
-                    back.scrollIntoView();
-                }
+        var openArticleNote = function(event) {
+            event.preventDefault();
 
-                el.addEventListener('click', goBack, { once: true, capture: false});
+            var nextSibling = this.nextElementSibling;
+            if (nextSibling && nextSibling.classList.contains('atricle-note')) {
+                this.style.border = "none";
+                nextSibling.remove();
+                return;
+            }
+
+            var note = articleNotes[this.dataset.note];
+
+            if (note) {
+                this.style.border = "1px solid blue";
+
+                var div = document.createElement('div');
+                div.className = 'atricle-note';
+                div.textContent = note;
+                div.appendChild(document.createElement('br'));
+
+                var closeLink = document.createElement('a');
+                closeLink.href = '#';
+                closeLink.textContent = 'скрыть';
+                closeLink.style.cursor = 'pointer';
+                var this_ = this;
+                closeLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    this_.style.border = "none";
+                    div.remove();
+                });
+                div.appendChild(closeLink);
+
+                this.insertAdjacentElement('afterend', div);
             }
         }
 
-        var openInTable = function(event, noteId) {
+        var openTableNote = function(event, noteId) {
             event.preventDefault();
-            var noteRow = tableNotes[noteId];
+            var noteRow = document.getElementById("note_" + noteId);
 
-            if (noteRow.style.display == 'none') {
+            if (noteRow && noteRow.style.display == 'none') {
                 noteRow.style.display = 'table-row';
+
+                var closeLink = noteRow.querySelector('a');
+                closeLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    noteRow.style.display = 'none';
+                });
             } else {
                 noteRow.style.display = 'none';
             }
         };
 
-        var footerNotesLen = footerNotes.length;
-        for (var i = 0; i < links.length; i++) {
-            if (i < footerNotesLen) {
-                links[i].addEventListener('click', goToNote, false);
+        var links = document.getElementsByClassName("note");
+
+        for (var link of links) {
+            var noteId = link.dataset.note;
+            if (noteId in articleNotes) {
+                link.addEventListener('click', openArticleNote, false);
             } else {
-                links[i].addEventListener('click', 
-                    (localI => event => openInTable(event, localI))(i-footerNotesLen), false);
-                tableNotes[i - footerNotesLen].style.display = 'none';
+                link.addEventListener('click', (id => event => openTableNote(event, id))(noteId), false);
             }
         }
     </script>

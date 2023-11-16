@@ -21,13 +21,17 @@
 .note {
     vertical-align: super;
     font-size: small;
-    cursor: pointer
+    cursor: pointer;
 }
 
-.footer_note, .table_note {
+.table-note {
     font-weight: bold;
     padding-right: 10px;
-    cursor: pointer
+}
+
+.atricle-note {
+    margin-left: 20px;
+    font-style: italic;
 }
 
 /*.cafedras a {
