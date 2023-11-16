@@ -21,13 +21,17 @@
 .note {
     vertical-align: super;
     font-size: small;
-    cursor: pointer
+    cursor: pointer;
 }
 
-.note_start {
+.table-note {
     font-weight: bold;
     padding-right: 10px;
-    cursor: pointer
+}
+
+.atricle-note {
+    margin-left: 20px;
+    font-style: italic;
 }
 
 /*.cafedras a {
@@ -40,6 +44,7 @@
 table.episkops {
     border: 1px solid black;
     width: 100%;
+    table-layout: fixed;
 }
 
 .episkops_header {

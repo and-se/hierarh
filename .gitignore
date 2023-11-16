@@ -1,6 +1,7 @@
 *~
 *.pyc
 
+SRC_DATA
 init_book
 full_cafedry.xml
 
@@ -10,3 +11,4 @@ hierarh*.sqlite3*
 episkop_rows.txt
 
 env
+venv

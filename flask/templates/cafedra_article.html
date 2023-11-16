@@ -53,44 +53,92 @@
         </td>
         {% endif %}
     </tr>
+
+    {% for note in ep.notes%}
+    <tr id="note_{{note.num}}" style="display: none;">
+        <td colspan="3">
+            <span class="table-note">{{note.num}}</span>
+            {{note.text}}
+            <br>
+            <a href="#" style="cursor: pointer;">скрыть</a>
+        </td>
+    </tr>
+    {% endfor %}
+
     {% endfor %}
     </table>
-
-    <ul class="notes">
-    {%for note in article.notes%}
-    <li>
-        <p>
-            <span class="note_start" id="note_{{note.num}}">{{note.num}}</span>
-            {{note.text}}
-        </p>
-    </li>
-    {%endfor%}
-    </ul>
 
     {% endautoescape %}
     </main>
     <script>
-        var elements = document.getElementsByClassName("note");
+        var articleNotesJson = {{ article.notes | tojson }};
+        var articleNotes = articleNotesJson.reduce(function(acc, cur) {
+          acc[cur.num] = cur.text;
+          return acc;
+        }, {});
 
-        var go_to_note = function(event) {
-            el = document.getElementById("note_" + this.dataset.note)
-            if (el) {
-                event.preventDefault();
-                el.scrollIntoView();
-                var back = this;
-                el.parentElement.setAttribute('title', "Нажмите на номер ссылки для возврата обратно");
+        var openArticleNote = function(event) {
+            event.preventDefault();
 
-                var go_back = function() {
-                    el.parentElement.removeAttribute('title');
-                    back.scrollIntoView();
-                }
+            var nextSibling = this.nextElementSibling;
+            if (nextSibling && nextSibling.classList.contains('atricle-note')) {
+                this.style.border = "none";
+                nextSibling.remove();
+                return;
+            }
 
-                el.addEventListener('click', go_back, { once: true, capture: false});
+            var note = articleNotes[this.dataset.note];
+
+            if (note) {
+                this.style.border = "1px solid blue";
+
+                var div = document.createElement('div');
+                div.className = 'atricle-note';
+                div.textContent = note;
+                div.appendChild(document.createElement('br'));
+
+                var closeLink = document.createElement('a');
+                closeLink.href = '#';
+                closeLink.textContent = 'скрыть';
+                closeLink.style.cursor = 'pointer';
+                var this_ = this;
+                closeLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    this_.style.border = "none";
+                    div.remove();
+                });
+                div.appendChild(closeLink);
+
+                this.insertAdjacentElement('afterend', div);
             }
         }
 
-        for (var i = 0; i < elements.length; i++) {
-            elements[i].addEventListener('click', go_to_note, false);
+        var openTableNote = function(event, noteId) {
+            event.preventDefault();
+            var noteRow = document.getElementById("note_" + noteId);
+
+            if (noteRow && noteRow.style.display == 'none') {
+                noteRow.style.display = 'table-row';
+
+                var closeLink = noteRow.querySelector('a');
+                closeLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    noteRow.style.display = 'none';
+                });
+            } else {
+                noteRow.style.display = 'none';
+            }
+        };
+
+        var links = document.getElementsByClassName("note");
+
+        for (var link of links) {
+            var noteId = link.dataset.note;
+            if (noteId in articleNotes) {
+                link.addEventListener('click', openArticleNote, false);
+            } else {
+                link.addEventListener('click', (id => event => openTableNote(event, id))(noteId), false);
+            }
         }
     </script>
 </body>
