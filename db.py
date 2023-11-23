@@ -364,21 +364,48 @@ class CafedraDbImporter(ChainLink):
 
 
 if __name__ == "__main__":
-    PeeweeHistHierarhStorage.create_new_sqlite_db(remove_if_exists=True)
-    db = PeeweeHistHierarhStorage()
+    import sys
+    if len(sys.argv) != 3:
+        print("""add these parameters:
+        build main - delete old and rebuild main db.
+                     comments db will be created if not exists
 
-    PeeweeUserCommentsStorage.create_new_sqlite_db(remove_if_exists=False)
+        build all - delete old and rebuild main db.
+                    comments db will be recreated (old comments will be lost!)
 
-    ch = Chain(CafedraArticlesFromJson()) \
-        .add(CafedraArticleParser()) \
-        .add(ParsedCafedraFixer()) \
-        .add(CafedraDbImporter(db))
+        create comments - only create comments db if not exists
+        reset comments - delete old and recreate comments db
+                         (old comments will be lost!)
+        """)
+        sys.exit(1)
 
-    ch.process('articles.json')
+    cmd, arg = sys.argv[1:]
 
-    print("Created cafedras:", db.count_cafedra())
-    print("Created episkops:", db.count_episkop())
+    if cmd == 'build' and arg in ('main', 'all'):
+        PeeweeHistHierarhStorage.create_new_sqlite_db(remove_if_exists=True)
+        db = PeeweeHistHierarhStorage()
 
-    # build_db(db_name = DbName, remove_if_exists=True)
-    # print("Created cafedras:", models.Cafedra.select().count())
-    # print("Created episkops:", models.Episkop.select().count())
+        f = (arg=='all')
+        PeeweeUserCommentsStorage.create_new_sqlite_db(remove_if_exists=f)
+
+        ch = Chain(CafedraArticlesFromJson()) \
+            .add(CafedraArticleParser()) \
+            .add(ParsedCafedraFixer()) \
+            .add(CafedraDbImporter(db))
+
+        ch.process('articles.json')
+
+        print("Created cafedras:", db.count_cafedra())
+        print("Created episkops:", db.count_episkop())
+    elif arg == 'comments':
+        if cmd == 'create':
+            f = False
+        elif cmd == 'reset':
+            f = True
+        else:
+            print("Wrong args")
+            sys.exit(2)
+        PeeweeUserCommentsStorage.create_new_sqlite_db(remove_if_exists=f)
+    else:
+        print("Wrong args")
+        sys.exit(3)
