@@ -10,7 +10,7 @@
 
     <table class="cafedras">
     {% for caf in data.cafedras %}
-    <tr>
+    <tr class="{{'obnovl' if caf.is_obn}}">
         <td>
             {% if caf.inexact %}
                 {{'('}}

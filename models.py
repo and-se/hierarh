@@ -221,6 +221,7 @@ class EpiskopDto:
 class CafedraOfEpiskopDto:
     cafedra: str
     cafedra_id: int
+    is_obn: bool
 
     begin_dating: str
     end_dating: str
@@ -331,7 +332,8 @@ class EpiskopCafedraOrm(Model):
                 begin_dating=self.begin_dating,
                 end_dating=self.end_dating,
                 inexact=self.inexact,
-                notes=self.notes
+                notes=self.notes,
+                is_obn = self.cafedra.is_obn
             )
 
 

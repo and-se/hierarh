@@ -18,6 +18,10 @@
     text-decoration: none;
 }
 
+.episkops a, .cafedras a {
+    text-decoration: none;
+}
+
 .note {
     vertical-align: super;
     font-size: small;
