@@ -1,13 +1,20 @@
 from flask import Flask, render_template, redirect, request
 
-from db import PeeweeHistHierarhStorage
+from db import PeeweeHistHierarhStorage, PeeweeUserCommentsStorage, \
+               StorageException
+
+from models import UserComment
+
+import logging
 
 app = Flask(__name__, static_folder='flask/static',
             template_folder='flask/templates')
+app.json.ensure_ascii = False
 
 
 
 db = PeeweeHistHierarhStorage()
+comments_db = PeeweeUserCommentsStorage()
 
 @app.route('/')
 def index():
@@ -32,6 +39,32 @@ def cafedra_article(key):
 def episkop_article(key):
     d = db.get_episkop_data(key)
     return render_template('episkop_article.html', data=d, item_type='episkop')
+
+@app.post('/comments')
+def add_comment():
+    # TODO if request is html-form-data (not json),
+    # then client browser has disabled js - then send html response!
+    json = request.json;
+    try:
+        uc = UserComment(**json)
+        r = comments_db.create(uc)
+        return {
+            "success" : True,
+            "id": r.id,
+        }
+    except Exception as ex:
+        logging.exception(ex)
+        return {
+            "success": False,
+            "message": str(ex),
+            "info": repr(ex)
+        }
+
+@app.get('/comments')
+def get_comments():
+    c = comments_db.get_all()
+    return render_template('comments.html', items=c)
+    # return [x.model_dump() for x in c]
 
 
 if __name__ == '__main__':

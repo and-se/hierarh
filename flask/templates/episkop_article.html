@@ -28,4 +28,11 @@
     {% endfor %}
     </table>
 </main>
+
+<section>
+<header class="comment-form-header">Отправить комментарий</header>
+{% import 'lib.html' as lib %}
+{{ lib.comment_form('episkop', data.id, data.header) }}
+</section>
+
 {% endblock %}

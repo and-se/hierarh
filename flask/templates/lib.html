@@ -1,0 +1,76 @@
+{% macro comment_form(object_type, object_id, object_title) %}
+<form id="comment-form" action="/comments" method="POST" class="comment-form">
+
+    <input type="hidden" name="object_type" value="{{object_type}}">
+    <input type="hidden" name="object_id" value="{{object_id}}">
+    <input type="hidden" name="object_title" value="{{object_title}}">
+    <div class="row">
+        <input type="text" name="who" placeholder="представьтесь" required></input>
+        <input type="text" name="contacts" placeholder="как с Вами связаться" class="flex-to-end"></input>
+    </div>
+
+    <textarea name="comment" placeholder="Напишите здесь свой комментарий" required></textarea>
+    <input type="submit" value="отправить"></input>
+
+    <div id="comment-result"></div>
+</form>
+
+
+<script>
+    var f = document.getElementById("comment-form");
+
+    var msg = document.getElementById("comment-result");
+    function set_message(txt, timeout) {
+        msg.innerText = txt;
+
+        if (timeout) {
+            setTimeout(() => {
+               if (msg.innerText == txt) {
+                   msg.innerText = null;
+               }
+            }, timeout);
+        }
+    }
+
+    var send_comment = function(ev) {
+        ev.preventDefault();
+        var data = new FormData(f);
+
+        fetch('/comments',
+            {
+                method: "POST",
+                body: JSON.stringify(Object.fromEntries(data)),
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: "include"
+            }
+        ).then(resp => {
+                if (resp.ok) {
+                    return resp.text();
+                } else {
+                    throw "Http error " + resp.status + '. See Network console for debug';
+                }
+             })
+            .then(text => {
+                try {
+                    return JSON.parse(text);
+                } catch (err) {
+                    throw `Cant parse as JSON\n${text}\n${err.message}`;
+                }
+            })
+            .then(j => {
+                if(j.success) {
+                    set_message('Комментарий отправлен', 2000);
+                } else {
+                    set_message('Ошибка отправки комментария: ' + j.message);
+                }
+            })
+            .catch(err => {
+                set_message('Ошибка: ' + err);
+            });
+    }
+
+    f.addEventListener("submit", send_comment, true);
+</script>
+{%- endmacro %}

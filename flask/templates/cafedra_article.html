@@ -127,4 +127,10 @@
 </script>
 
 </main>
+
+<section>
+<header class="comment-form-header">Отправить комментарий</header>
+{% import 'lib.html' as lib %}
+{{ lib.comment_form('cafedra', article.id, article.header) }}
+</section>
 {% endblock %}

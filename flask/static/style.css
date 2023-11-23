@@ -59,4 +59,20 @@ li .obnovl {
     font-size: 0.9em;
 }
 
+.comment-form-header {
+    font-size: 2rem;
+    line-height: 1.1;
+    margin-bottom: 20px;
+}
+
+.comment-form .row {
+    display:flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.comment-form .row  input:last-child {
+    flex-grow: 1;
+}
 
