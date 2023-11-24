@@ -45,10 +45,17 @@
 
 
 
-table.episkops {
+table.episkops, table.cafedras {
     border: 1px solid black;
     width: 100%;
     table-layout: fixed;
+    word-wrap: break-word;
+}
+
+@media (max-width: 550px) {
+    table.episkops, table.cafedras {
+        font-size: 1rem;
+    }
 }
 
 .episkops_header {
