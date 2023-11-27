@@ -40,10 +40,11 @@
     {% for note in ep.notes%}
     <tr id="note_{{note.num}}" style="display: none;">
         <td colspan="3">
-            <span class="table-note">{{note.num}}</span>
-            {{note.text}}
-            <br>
-            <a href="#" style="cursor: pointer;">скрыть</a>
+            <div class="table-note">
+                {{note.text}}
+                <br>
+                <a href="#" style="cursor: pointer;">скрыть</a>
+            </div>
         </td>
     </tr>
     {% endfor %}
