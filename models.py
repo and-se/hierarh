@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field, asdict
-from typing import Union, List, Optional
-from datetime import date
+from typing import Union, List, Optional, Literal
+from datetime import date, datetime
 from lib.roman_num import to_roman
 
 
@@ -11,7 +11,6 @@ class _HHModel(pydantic.BaseModel):
     class Config:
         extra = 'forbid'  # options: allow | forbid | ignore
         validate_assignment = True  # validate assignment of fields in code
-
 
 # ----------- Models for HistHierarchyStorage - these are main models
 
@@ -113,6 +112,20 @@ class CafedraOfEpiskop(_EpiskopCafedraBase):
 
     notes: List[str] = []
 
+
+class UserComment(_HHModel):
+    id: int | None = None
+    who: str
+    contacts: str = None
+    comment: str
+
+    object_type: Literal['cafedra', 'episkop']
+    object_id: int
+    object_title: str
+
+    timestamp: datetime | None = None
+
+
 #   ------ Models for book parser of chapter 'Списки иерархов по кафедрам'
 
 
@@ -175,6 +188,8 @@ class CafedraDto:
     episkops: List[Union['EpiskopOfCafedraDto', str]] = field(default_factory=list)  # noqa: E501
     notes: List['ArticleNote'] = field(default_factory=list)
 
+    id: int = None
+
     @staticmethod
     def from_dict(d):
         res = CafedraDto(**d)
@@ -199,12 +214,14 @@ class EpiskopDto:
     header: str
     is_obn: bool
     cafedras: List['CafedraOfEpiskopDto'] = field(default_factory=list)
+    id: int = None
 
 
 @dataclass
 class CafedraOfEpiskopDto:
     cafedra: str
     cafedra_id: int
+    is_obn: bool
 
     begin_dating: str
     end_dating: str
@@ -245,7 +262,8 @@ def build_title(header, temp_status: str, again_num: int,
 # Db models using Peewee ORM
 
 from peewee import Model, AutoField, TextField, BooleanField, \
-                   ForeignKeyField, IntegerField, DateField, SQL  # noqa: E402
+                   ForeignKeyField, IntegerField, \
+                   DateField, TimestampField, SQL  # noqa: E402
 
 
 class CafedraOrm(Model):
@@ -314,7 +332,8 @@ class EpiskopCafedraOrm(Model):
                 begin_dating=self.begin_dating,
                 end_dating=self.end_dating,
                 inexact=self.inexact,
-                notes=self.notes
+                notes=self.notes,
+                is_obn = self.cafedra.is_obn
             )
 
 
@@ -339,4 +358,21 @@ class NoteOrm(Model):
     """For notes linked to episkops table of cafedra article"""
 
 
-AllOrmModels = (CafedraOrm, EpiskopOrm, EpiskopCafedraOrm, NoteOrm)
+class UserCommentOrm(Model):
+    class Meta:
+        table_name = 'UserComment'
+
+    id = AutoField()
+    who = TextField()
+    contacts = TextField(null=True)
+    comment = TextField()
+
+    object_type = TextField()
+    object_id = IntegerField()
+    object_title = TextField()
+
+    timestamp = TimestampField()
+
+
+HierarhOrmModels = (CafedraOrm, EpiskopOrm, EpiskopCafedraOrm, NoteOrm)
+CommentOrmModels = (UserCommentOrm, )

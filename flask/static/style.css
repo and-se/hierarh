@@ -18,6 +18,10 @@
     text-decoration: none;
 }
 
+.episkops a, .cafedras a {
+    text-decoration: none;
+}
+
 .note {
     vertical-align: super;
     font-size: small;
@@ -41,10 +45,17 @@
 
 
 
-table.episkops {
+table.episkops, table.cafedras {
     border: 1px solid black;
     width: 100%;
     table-layout: fixed;
+    word-wrap: break-word;
+}
+
+@media (max-width: 550px) {
+    table.episkops, table.cafedras {
+        font-size: 1rem;
+    }
 }
 
 .episkops_header {
@@ -59,4 +70,20 @@ li .obnovl {
     font-size: 0.9em;
 }
 
+.comment-form-header {
+    font-size: 2rem;
+    line-height: 1.1;
+    margin-bottom: 20px;
+}
+
+.comment-form .row {
+    display:flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.comment-form .row  input:last-child {
+    flex-grow: 1;
+}
 

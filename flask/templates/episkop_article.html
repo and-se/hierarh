@@ -1,50 +1,38 @@
-<!DOCTYPE html>
-<head>
+{% extends "base.html" %}
 
-<meta charset="utf8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{data.name}}</title>
+{% block pagetitle %}
+{{data.header}}
+{% endblock %}
 
-<link rel="stylesheet" type="text/css" href="/static/simple.css" >
-<link rel="stylesheet" type="text/css" href="/static/style.css" >
+{% block content %}
+<main>
+    <h1 class="{{'obnovl' if data.is_obn}}">{{data.header}}</h1>
 
+    <table class="cafedras">
+    {% for caf in data.cafedras %}
+    <tr class="{{'obnovl' if caf.is_obn}}">
+        <td>
+            {% if caf.inexact %}
+                {{'('}}
+            {% endif %}
+            <a href="/cafedra/{{caf.cafedra_id}}">{{caf.cafedra}}</a>
+        </td>
+        <td>{{caf.begin_dating or ''}}</td>
+        <td>
+            {{caf.end_dating or ''}}
+            {% if caf.inexact %}
+                {{')'}}
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    </table>
+</main>
 
-</head>
+<section>
+<header class="comment-form-header">Отправить комментарий</header>
+{% import 'lib.html' as lib %}
+{{ lib.comment_form('episkop', data.id, data.header) }}
+</section>
 
-<body>
-    <header>
-        <nav>
-          <ul class="collections">
-              <li><a class="{{'current' if item_type=='cafedra'}}" href="/cafedra">Кафедры</a></li>
-              <li><a class="{{'current' if item_type=='episkop'}}" href="/episkop">Епископы</a></li>
-          </ul>
-        </nav>
-    </header>
-
-    <main>
-        <h1 class="{{'obnovl' if data.is_obn}}">{{data.header}}</h1>
-
-        <table class="cafedras">
-        {% for caf in data.cafedras %}
-        <tr>
-            <td>
-                {% if caf.inexact %}
-                    {{'('}}
-                {% endif %}
-                <a href="/cafedra/{{caf.cafedra_id}}">{{caf.cafedra}}</a>
-            </td>
-            <td>{{caf.begin_dating or ''}}</td>
-            <td>
-                {{caf.end_dating or ''}}
-                {% if caf.inexact %}
-                    {{')'}}
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-        </table>
-
-        </ul>
-    </body>
-
-</body>
+{% endblock %}

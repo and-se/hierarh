@@ -8,6 +8,7 @@ from models import CafedraOrm, EpiskopOrm, EpiskopCafedraOrm, NoteOrm
 from models import Cafedra, ArticleNote, EpiskopInfo
 from models import CafedraDto, EpiskopDto, \
                    EpiskopOfCafedraDto, CafedraOfEpiskopDto
+from models import UserCommentOrm, UserComment
 
 import human
 
@@ -16,6 +17,7 @@ import json
 import os
 from collections import Counter
 from typing import Tuple, Iterable
+from datetime import datetime
 
 
 class HistHierarhStorageBase:
@@ -57,7 +59,7 @@ class HistHierarhStorageBase:
 
 # ----------------- Peewee ORM Db ----------------
 
-from peewee import fn, SqliteDatabase  # noqa: E402
+from peewee import fn, SqliteDatabase, PeeweeException  # noqa: E402
 
 
 def get_db(db_name: str):
@@ -80,28 +82,40 @@ def get_db(db_name: str):
 
 DbName = 'hierarh.sqlite3'
 _Db = get_db(DbName)
-_Db.bind(models.AllOrmModels)
+_Db.bind(models.HierarhOrmModels)
 
+DbCommentsName = 'hierarh.comments.sqlite3'
+_DbComments = get_db(DbCommentsName)
+_DbComments.bind(models.CommentOrmModels)
+
+def _create_sqlite_db(db_name, schema_creator, when_exists='fail'):
+    if os.path.exists(db_name):
+        match when_exists:
+            case 'remove':
+                os.remove(db_name)
+            case 'fail':
+                raise Exception(f"Db {db_name} exists")
+            case 'skip':
+                return
+            case _:
+                raise Exception(f'Wrong action when_exists={when_exists}. '
+                                f"Expected 'fail', 'remove' or 'skip'")
+
+    db = get_db(db_name)
+    schema_creator(db)
+    db.close()
 
 class PeeweeHistHierarhStorage(HistHierarhStorageBase):
     @staticmethod
     def create_new_sqlite_db(remove_if_exists):
-        db_name = DbName
+        def schema_creator(db):
+            with db.bind_ctx(models.HierarhOrmModels):
+                db.create_tables(models.HierarhOrmModels)
 
-        if os.path.exists(db_name):
-            if remove_if_exists:
-                os.remove(db_name)
-            else:
-                raise Exception(f"Db {db_name} exists")
+        _create_sqlite_db(DbName, schema_creator,
+                          'remove' if remove_if_exists else 'fail')
 
-        db = _Db
-
-        with db.bind_ctx(models.AllOrmModels):
-            db.create_tables(models.AllOrmModels)
-
-        db.close()
-
-    # Now we use global _Db object bound to AllOrmModels, so all
+    # Now we use global _Db object bound to HierarhOrmModels, so all
     # PeeweeHistHierarhStorage objects are automatically connected
     # to one sqlite Db named DbName.
     # If you want manage db connection manually (and possible use
@@ -110,7 +124,7 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
     # def __init__(self, db: peewee.Database):
     #     self.db = db
     # def ctx(self):
-    #     return self.db.bind_ctx(models.AllOrmModels)
+    #     return self.db.bind_ctx(models.HierarhOrmModels)
 
     def begin_transaction(self):
         _Db.begin()
@@ -175,15 +189,16 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
         return q.count()
 
     def get_cafedra_data(self, key: int) -> CafedraDto:
-        c = CafedraOrm.select(CafedraOrm.article_json) \
+        c = CafedraOrm.select(CafedraOrm.id, CafedraOrm.article_json) \
                       .where(CafedraOrm.id == key).get_or_none()
         if c:
-            return CafedraDto.from_dict(json.loads(c.article_json))
+            r = CafedraDto.from_dict(json.loads(c.article_json))
+            return r
 
     def get_episkop_data(self, key: int) -> EpiskopDto:
         ep = EpiskopOrm.get(key)
 
-        epv = EpiskopDto(header=ep.header, is_obn=ep.is_obn)
+        epv = EpiskopDto(header=ep.header, is_obn=ep.is_obn, id=key)
 
         cnt = Counter()
         for caf in ep.cafedras.order_by(
@@ -206,7 +221,8 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
         cafjson = models.CafedraDto(
             header=caf.header,
             is_obn=caf.is_obn, is_link=caf.is_link,
-            text=caf.text
+            text=caf.text,
+            id = caf_orm.id
         )
 
         cnt = Counter()
@@ -258,8 +274,8 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
                         for i in ep.notes
                 ])
 
-            epjson.notes = [ArticleNote(num=note.num, text=note.text) 
-                            for note in caf.notes 
+            epjson.notes = [ArticleNote(num=note.num, text=note.text)
+                            for note in caf.notes
                             if note.num in ep.notes]
             caf.notes = [note for note in caf.notes if note.num not in ep.notes]
 
@@ -276,7 +292,7 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
             note_orm = NoteOrm.create(
                 text=note.text,
                 cafedra_id=caf_orm.id,
-                #TODO episkop_cafedra_id= 
+                #TODO episkop_cafedra_id=
             )
             note_orm.save()
 
@@ -300,6 +316,37 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
         return ep_qq.get_or_none()
 
 
+class PeeweeUserCommentsStorage:
+    @staticmethod
+    def create_new_sqlite_db(remove_if_exists):
+        def schema_creator(db):
+            with db.bind_ctx(models.CommentOrmModels):
+                db.create_tables(models.CommentOrmModels)
+
+        _create_sqlite_db(DbCommentsName, schema_creator,
+                          'remove' if remove_if_exists else 'skip')
+
+    def create(self, data: UserComment) -> UserComment:
+        data.id = None
+        data.timestamp = datetime.now()
+
+        try:
+            orm = UserCommentOrm.create(**data.dict())
+        except PeeweeException as ex:
+            raise StorageException(ex)
+        else:
+            return UserComment.model_validate(orm, from_attributes=True)
+
+    def get_all(self):
+        return [
+            UserComment.model_validate(orm) \
+            for orm in UserCommentOrm.select() \
+                       .order_by(UserCommentOrm.timestamp.desc()).dicts()
+        ]
+
+class StorageException(Exception):
+    pass
+
 # -------------- End Peewee -------------
 
 
@@ -317,19 +364,48 @@ class CafedraDbImporter(ChainLink):
 
 
 if __name__ == "__main__":
-    PeeweeHistHierarhStorage.create_new_sqlite_db(remove_if_exists=True)
-    db = PeeweeHistHierarhStorage()
+    import sys
+    if len(sys.argv) != 3:
+        print("""add these parameters:
+        build main - delete old and rebuild main db.
+                     comments db will be created if not exists
 
-    ch = Chain(CafedraArticlesFromJson()) \
-        .add(CafedraArticleParser()) \
-        .add(ParsedCafedraFixer()) \
-        .add(CafedraDbImporter(db))
+        build all - delete old and rebuild main db.
+                    comments db will be recreated (old comments will be lost!)
 
-    ch.process('articles.json')
+        create comments - only create comments db if not exists
+        reset comments - delete old and recreate comments db
+                         (old comments will be lost!)
+        """)
+        sys.exit(1)
 
-    print("Created cafedras:", db.count_cafedra())
-    print("Created episkops:", db.count_episkop())
+    cmd, arg = sys.argv[1:]
 
-    # build_db(db_name = DbName, remove_if_exists=True)
-    # print("Created cafedras:", models.Cafedra.select().count())
-    # print("Created episkops:", models.Episkop.select().count())
+    if cmd == 'build' and arg in ('main', 'all'):
+        PeeweeHistHierarhStorage.create_new_sqlite_db(remove_if_exists=True)
+        db = PeeweeHistHierarhStorage()
+
+        f = (arg=='all')
+        PeeweeUserCommentsStorage.create_new_sqlite_db(remove_if_exists=f)
+
+        ch = Chain(CafedraArticlesFromJson()) \
+            .add(CafedraArticleParser()) \
+            .add(ParsedCafedraFixer()) \
+            .add(CafedraDbImporter(db))
+
+        ch.process('articles.json')
+
+        print("Created cafedras:", db.count_cafedra())
+        print("Created episkops:", db.count_episkop())
+    elif arg == 'comments':
+        if cmd == 'create':
+            f = False
+        elif cmd == 'reset':
+            f = True
+        else:
+            print("Wrong args")
+            sys.exit(2)
+        PeeweeUserCommentsStorage.create_new_sqlite_db(remove_if_exists=f)
+    else:
+        print("Wrong args")
+        sys.exit(3)

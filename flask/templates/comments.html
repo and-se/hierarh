@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<main>
+    <ul class="items">
+    {% for item in items %}
+        <li>
+            <a href="/{{item.object_type}}/{{item.object_id}}">{{item.object_title}}</a>
+            <br>
+            {{item.who}} ({{item.contacts}}) {{item.timestamp}}<br>
+
+            {{item.comment}}
+        </li>
+    {% endfor %}
+    </ul>
+</main>
+{% endblock %}
