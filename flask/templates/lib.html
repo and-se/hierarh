@@ -10,7 +10,7 @@
     </div>
 
     <textarea name="comment" placeholder="Напишите здесь свой комментарий" required></textarea>
-    <input type="submit" value="отправить" disabled></input>
+    <input type="submit" value="отправить"></input>
 
     <div id="comment-result"></div>
 </form>
@@ -19,22 +19,7 @@
 <script>
     var f = document.getElementById("comment-form");
 
-    var submitButton = f.querySelector('input[type="submit"]');
-
-    function updateSubmitButtonState() {
-       var allFilled = true;
-       f.querySelectorAll('[required]').forEach(function(input) {
-           if (!input.value) allFilled = false;
-       });
-
-       submitButton.disabled = !allFilled;
-    }
-    updateSubmitButtonState();
-
-    f.querySelectorAll('[required]').forEach(function(input) {
-       input.addEventListener('input', updateSubmitButtonState);
-    });
-
+    var commentField = f.querySelector('textarea[name="comment"]');
 
     var msg = document.getElementById("comment-result");
     function set_message(txt, timeout) {
@@ -79,7 +64,7 @@
             .then(j => {
                 if(j.success) {
                     set_message('Комментарий отправлен', 2000);
-                    f.reset();
+                    commentField.value = '';
                 } else {
                     set_message('Ошибка отправки комментария: ' + j.message);
                 }
