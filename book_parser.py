@@ -33,6 +33,18 @@ class SignalPrinter(ChainLink):
         self.send(s)
 
 
+class SignalSaver(ChainLink):
+    def __init__(self, filename):
+        self.f = open(filename, 'w', encoding='utf8')
+
+    def process(self, s: Signal):
+        self.f.write(s.serialize() + '\n')
+        self.send(s)
+
+    def finish(self):
+        self.f.close()
+
+
 class SignalCounter(ChainLink):
     def __init__(self):
         self.counts = {}
@@ -632,6 +644,7 @@ if __name__ == '__main__':
     import sys
     chain = Chain(XmlSax()) \
         .add(CafedraSignaller()) \
+        .add(SignalSaver('signals.txt')) \
         .add(SkippedTextCatcher()).add(TextCleaner()) \
         .add(SignalPatcher(parse_text_patch(cafedra_signals_patch)))
     if 'articles' in sys.argv:

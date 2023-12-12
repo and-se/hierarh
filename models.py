@@ -71,6 +71,8 @@ class EpiskopOfCafedra(_EpiskopCafedraBase):
 
     notes: List[int] = []
 
+    _original_text: str | None = None
+
     def to_episkop_of_cafedra_dto(self, again_num: int = None, is_obn=False)\
             -> 'EpiskopOfCafedraDto':
 

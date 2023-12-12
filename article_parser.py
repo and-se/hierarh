@@ -36,9 +36,11 @@ class CafedraArticleParser(ChainLink):
             pp: ParsedEpiskopRow = parse_episkop_row(aep.text)
 
             if isinstance(pp, ParseFail):
-                human.send("Can't parse this - skip data", aep.text, pp)
+                human.send("Can't parse this - save as header", aep.text, pp)
+                caf.episkops.append("#unparsed# " + aep.text)
                 continue
-            elif pp.error:
+
+            if pp.error:
                 if isinstance(pp.who, ParseFail):
                     human.send('Fail episkop!!!', aep.text, pp)
                 else:
@@ -59,6 +61,8 @@ class CafedraArticleParser(ChainLink):
                             inexact=pp.inexact,
                             namesake_num=get_namesake_num(pp.who)
                     )
+
+            epcaf._original_text = aep.text
 
             if pp.notes:
                 epcaf.notes = [int(x) for x in pp.notes]
@@ -184,7 +188,7 @@ def extract_notes(s) -> Tuple[str, list]:
     return s, all_notes
 
 
-class ParsedCafedraFixer(ChainLink):
+class WholeRussiaCafedraFixer(ChainLink):
     def __init__(self):
         self._moscow_done = False
         self._stashed_caf = None
@@ -233,6 +237,43 @@ class ParsedCafedraFixer(ChainLink):
             raise Exception('Не обработана «МИТРОПОЛИЯ РОССИИ» - '
                             'надо убрать кавычки')
 
+
+class UnparsedCafedraFixer(ChainLink):
+    # TODO Сейчас только лишь сохраняет неразобранные строки о епископах вместе с контекстом в указанный файл
+    def __init__(self, patch_file):
+        self.patch_file = patch_file
+        self.stream = open(self.patch_file, 'w', encoding='utf8')
+
+    def process(self, s: Cafedra):
+        l = list(filter(lambda x: isinstance(x, str) and
+                                  x.startswith('#unparsed#'),
+                 s.episkops)
+        )
+
+
+        if l:
+            self.stream.write('#header# ' + s.header + '\n')
+            printed = []
+            for i, e in enumerate(s.episkops):
+                if isinstance(e, str) and e.startswith('#unparsed#'):
+                    if i-1 not in printed and i-1 >= 0:
+                        prev = s.episkops[i-1]
+                        if isinstance(prev, str):
+                            self.stream.write(prev + '\n')
+                        else:
+                            self.stream.write(prev._original_text + '\n')
+
+                    self.stream.write(e + '\n')
+                    printed += [i-1, i]
+
+            self.stream.write('\n\n')
+
+        self.send(s)
+
+            # print("Unparsed data here: ", s.model_dump_json(indent=4))
+
+    def finish(self):
+        self.stream.close()
 
 # -------------- Test ---------------------------
 class EpiskopRowsSaver(ChainLink):

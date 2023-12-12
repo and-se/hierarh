@@ -1,7 +1,8 @@
 from chain import Chain, ChainLink
 
 from book_parser import CafedraArticlesFromJson
-from article_parser import CafedraArticleParser, ParsedCafedraFixer
+from article_parser import CafedraArticleParser, \
+                           WholeRussiaCafedraFixer, UnparsedCafedraFixer
 
 import models
 from models import CafedraOrm, EpiskopOrm, EpiskopCafedraOrm, NoteOrm
@@ -390,7 +391,8 @@ if __name__ == "__main__":
 
         ch = Chain(CafedraArticlesFromJson()) \
             .add(CafedraArticleParser()) \
-            .add(ParsedCafedraFixer()) \
+            .add(WholeRussiaCafedraFixer()) \
+            .add(UnparsedCafedraFixer('cafedra-parsing-patch.txt')) \
             .add(CafedraDbImporter(db))
 
         ch.process('articles.json')
