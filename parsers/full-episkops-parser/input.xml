@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<idPkg:Story xmlns:idPkg="http://ns.adobe.com/AdobeInDesign/idml/1.0/packaging" DOMVersion="16.1">
+	<Story Self="u106c6" AppliedTOCStyle="n" UserText="true" IsEndnoteStory="false" TrackChanges="false" StoryTitle="$ID/" AppliedNamedGrid="n">
+		<StoryPreference OpticalMarginAlignment="false" OpticalMarginSize="12" FrameType="TextFrameType" StoryOrientation="Horizontal" StoryDirection="LeftToRightDirection" />
+		<InCopyExportOption IncludeGraphicProxies="true" IncludeAllResources="false" />
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Персона Обновл">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>Александр Щербаков</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Табл-персон Обн">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>	АКМОЛИНСКАЯ, обн.	13(26)07.1923	–	1923</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Br />
+				<Content>	в/у КИЕВСКАЯ, обн.	03.1924	–	05.1924</Content>
+				<Br />
+				<Content>	в/у МИНСКАЯ, обн.	04.1925	–	02.1926</Content>
+				<Br />
+				<Content>	ВИТЕБСКАЯ, обн</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>.	03(16)09.1925	–	06(19)12.1929</Content>
+				<Br />
+				<Content>	в/у ПОЛОЦКАЯ, обн.	08(21)12.1926	–	08.1927</Content>
+				<Br />
+				<Content>	в/у СМОЛЕНСКАЯ, обн.	04(17)12.1927	–	1927</Content>
+				<Br />
+				<Content>	ПЯТИГОРСКАЯ, </Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>обн.	11(24)11.1928	–	1929</Content>
+				<Br />
+				<Content>	САРАТОВСКАЯ, обн.	12.1929	–	</Content>
+				<Br />
+				<Content>	БОРОВИЧСКАЯ, обн.	01.1930	–	17(30)03.1930</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Персона Обновл">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>Христофор Сокольский</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+		<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Табл-персон Обн">
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>	СТАВРОПОЛЬСКАЯ (Северокавк.), обн.	25.01(07.02)1924	–	07(20)12.1924</Content>
+				<Br />
+				<Content>	</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>КАЛУЖСКАЯ, обн.	07(20)12.1924	–	10(23)01.1925</Content>
+				<Br />
+				<Content>	АЛЕКСИНСКАЯ, обн.	26.03(08.04)1925	–	14(27)10.1925</Content>
+				<Br />
+				<Content>	БЕЛЬСКАЯ, обн.	14(27)10.1925	–	07(20)11.1925</Content>
+				<Br />
+				<Content>	УРАЛЬСКАЯ, обн.	07(20)11.1925	–	04(17)08.1926</Content>
+				<Br />
+				<Content>	САЛЬСКАЯ, обн.	12.1926	–	09.1927</Content>
+				<Br />
+				<Content>	</Content>
+			</CharacterStyleRange>
+			<CharacterStyleRange AppliedCharacterStyle="CharacterStyle/$ID/[No character style]">
+				<Content>МИЧУРИНСКАЯ, обн.	10(23)09.1927	–	01(14)10.1927</Content>
+				<Br />
+				<Content>	ТУЛЬЧИНСКАЯ, обн., паки	1928	–	1929</Content>
+				<Br />
+				<Content>	АЛЕКСИНСКАЯ, обн., паки	06(19)11.1932	–	1935</Content>
+				<Br />
+			</CharacterStyleRange>
+		</ParagraphStyleRange>
+	</Story>
+</idPkg:Story>
