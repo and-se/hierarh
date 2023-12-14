@@ -1,8 +1,8 @@
 from chain import Chain, ChainLink
 
 from book_parser import CafedraArticlesFromJson
-from article_parser import CafedraArticleParser, \
-                           WholeRussiaCafedraFixer, UnparsedCafedraFixer
+from article_parser import CafedraArticleParser, WholeRussiaCafedraFixer,\
+                           CafedraJsonPatcher, UnparsedCafedraEpiskopLogger
 
 import models
 from models import CafedraOrm, EpiskopOrm, EpiskopCafedraOrm, NoteOrm
@@ -390,9 +390,10 @@ if __name__ == "__main__":
         PeeweeUserCommentsStorage.create_new_sqlite_db(remove_if_exists=f)
 
         ch = Chain(CafedraArticlesFromJson()) \
+            .add(CafedraJsonPatcher('cafedra-episkop-patch.txt')) \
             .add(CafedraArticleParser()) \
             .add(WholeRussiaCafedraFixer()) \
-            .add(UnparsedCafedraFixer('cafedra-parsing-patch.txt')) \
+            .add(UnparsedCafedraEpiskopLogger('cafedra-episkop-fail.txt')) \
             .add(CafedraDbImporter(db))
 
         ch.process('articles.json')

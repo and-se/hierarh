@@ -1,5 +1,5 @@
 from chain import ChainLink, Chain
-from models import CafedraArticle
+from models import CafedraArticle, ArticleEpiskopRow
 from models import Cafedra, EpiskopOfCafedra, Note, EpiskopInfo, Dating
 
 from parsers.fail import ParseFail
@@ -238,11 +238,13 @@ class WholeRussiaCafedraFixer(ChainLink):
                             'надо убрать кавычки')
 
 
-class UnparsedCafedraFixer(ChainLink):
-    # TODO Сейчас только лишь сохраняет неразобранные строки о епископах вместе с контекстом в указанный файл
-    def __init__(self, patch_file):
-        self.patch_file = patch_file
-        self.stream = open(self.patch_file, 'w', encoding='utf8')
+class UnparsedCafedraEpiskopLogger(ChainLink):
+    # Сохраняет неразобранные строки о епископах вместе с контекстом в указанный файл
+    # Содержимое этого файла может быть использовано для наполнения файла с исправлениями,
+    # обрабатываемого CafedraJsonPatcher
+    def __init__(self, log_file):
+        self.log_file = log_file
+        self.stream = open(self.log_file, 'w', encoding='utf8')
 
     def process(self, s: Cafedra):
         l = list(filter(lambda x: isinstance(x, str) and
@@ -274,6 +276,105 @@ class UnparsedCafedraFixer(ChainLink):
 
     def finish(self):
         self.stream.close()
+
+
+
+class CafedraJsonPatcher(ChainLink):
+    def __init__(self, patch_file):
+        with open(patch_file) as f:
+            p = f.read()
+            self.patches = parse_patches(p)
+
+    def process(self, s: CafedraArticle):
+        patched = 0
+        if s.header in self.patches:
+            patch = self.patches[s.header]
+            i = 0
+            while i < len(s.episkops):
+                ep = s.episkops[i]
+                if isinstance(ep, ArticleEpiskopRow):
+                    p = patch.get_patch(ep.text)
+                    if p:
+                        patched += 1
+                        if p != '#delete#':
+                            ep.text = p
+                        else:
+                            del s.episkops[i]
+                            continue
+                i+=1
+
+            if patched != patch.count_patches():
+                raise Exception(f'{s.header} patched {patched}, patch count {patch.count_patches()}')
+        self.send(s)
+
+
+def parse_patches(p: str):
+    p = [x for x in p.split('\n') if x]
+    res = {}
+
+    cur_patch = None
+    prev_line_data = None
+    for l in p:
+        cmd, data = split_patch_line(l)
+        if cmd == '#header#':
+            if cur_patch:
+                res[cur_patch.name] = cur_patch
+            cur_patch = PatchItem(data)
+        elif cmd == '#fixed#':
+            assert cur_patch is not None
+            cur_patch.add(data, data)
+        elif cmd == '#join prev#':
+            assert prev_line_data is not None
+            cur_patch.add(prev_line_data, prev_line_data.strip() + ' ' + data.strip())
+            cur_patch.add(data, '#delete#')
+        elif cmd == '#unparsed#':
+            # Необработанные проблемы - слово unparsed ещё не заменили на правильную команду
+            continue
+        elif cmd is not None:
+            raise ValueError(f'Unknown patch command {cmd} in {l}')
+        prev_line_data = data
+    if cur_patch:
+        res[cur_patch.name] = cur_patch
+
+    #print(res)
+    return res
+
+
+class PatchItem:
+    def __init__(self, name):
+        self.name = name
+        self.patches = {}
+
+    def add(self, for_data, patched_data):
+        key = self._get_key(for_data)
+        self.patches[key] = patched_data
+
+    def get_patch(self, for_data):
+        key = self._get_key(for_data)
+        return self.patches.get(key)
+
+    def count_patches(self):
+        return len(self.patches)
+
+    @staticmethod
+    def _get_key(for_data):
+        return re.sub(f'[^a-zA-ZА-Яа-я0-9]', '', for_data)
+
+    def __repr__(self):
+        import json
+        return f'PatchItem {self.name} {json.dumps(self.patches, indent=4, ensure_ascii=False)}\n'
+
+    def __str__(self):
+        return repr(self)
+
+
+def split_patch_line(l):
+    m = re.match(r'(#[a-zA-Z ]+#)(.*)', l)
+    if m:
+        return m.group(1), m.group(2).strip()
+    else:
+        return None, l
+
 
 # -------------- Test ---------------------------
 class EpiskopRowsSaver(ChainLink):
