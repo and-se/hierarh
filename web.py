@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, request
+from flask import Flask, render_template, redirect, request, make_response
 
 from db import PeeweeHistHierarhStorage, PeeweeUserCommentsStorage, \
                StorageException
@@ -65,6 +65,15 @@ def get_comments():
     c = comments_db.get_all()
     return render_template('comments.html', items=c)
     # return [x.model_dump() for x in c]
+
+
+@app.get('/robots.txt')
+def for_search_engines():
+    txt = "User-agent: *\n" + \
+             "Disallow: /\n"
+    r = make_response(txt, 200)
+    r.mimetype = "text/plain"
+    return r
 
 
 if __name__ == '__main__':
