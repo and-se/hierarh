@@ -51,7 +51,12 @@ class CafedraArticleParser(ChainLink):
                     human.send("Empty episkop name", aep.text, pp.who)
                 temp_status = pp.who.temp_status
             else:
-                temp_status = None
+                fp = pp.who
+                if fp.text.startswith('в/у'):
+                    temp_status = 'в/у'
+                    fp.text = fp.text[3:].strip()
+                else:
+                    temp_status = None
 
             epcaf = EpiskopOfCafedra(
                             episkop=to_episkop_info(pp.who),
@@ -434,6 +439,8 @@ if __name__ == '__main__':
 –	23.04.? г.	–	Иоанн II
 (1570 ?) 1571	–	1586	–	Варлаам
 (Разумовский?)<span class="note" data-note="13">13</span>
+
+ранее 01(14)09.1921	–	06(19)11.1925 / 11(24)08.1937	– Сщмч. Прокопий Титов<span class="note" data-note="6">6</span>
         '''.split('\n')
 
     show_ok = True
