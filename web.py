@@ -69,6 +69,8 @@ def get_comments():
 
 @app.get('/robots.txt')
 def for_search_engines():
+    #fixme Пока просим поисковики не индексировать наш сайт
+    #todo Когда сайт будет готов к публикации, это место надо поправить.
     txt = "User-agent: *\n" + \
              "Disallow: /\n"
     r = make_response(txt, 200)

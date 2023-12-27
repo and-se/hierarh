@@ -81,11 +81,11 @@ def get_db(db_name: str):
 # Global db settings
 
 
-DbName = 'hierarh.sqlite3'
+DbName = 'data/hierarh.sqlite3'
 _Db = get_db(DbName)
 _Db.bind(models.HierarhOrmModels)
 
-DbCommentsName = 'hierarh.comments.sqlite3'
+DbCommentsName = 'data/hierarh.comments.sqlite3'
 _DbComments = get_db(DbCommentsName)
 _DbComments.bind(models.CommentOrmModels)
 
@@ -390,13 +390,13 @@ if __name__ == "__main__":
         PeeweeUserCommentsStorage.create_new_sqlite_db(remove_if_exists=f)
 
         ch = Chain(CafedraArticlesFromJson()) \
-            .add(CafedraJsonPatcher('cafedra-episkop-patch.txt')) \
+            .add(CafedraJsonPatcher('data/patch/cafedra-episkop-patch.txt')) \
             .add(CafedraArticleParser()) \
             .add(WholeRussiaCafedraFixer()) \
-            .add(UnparsedCafedraEpiskopLogger('cafedra-episkop-fail.txt')) \
+            .add(UnparsedCafedraEpiskopLogger('data/cafedra-episkop-fail.txt')) \
             .add(CafedraDbImporter(db))
 
-        ch.process('articles.json')
+        ch.process('data/cafedra_articles.json')
 
         print("Created cafedras:", db.count_cafedra())
         print("Created episkops:", db.count_episkop())

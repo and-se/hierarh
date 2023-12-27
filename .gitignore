@@ -3,12 +3,10 @@
 
 SRC_DATA
 init_book
-full_cafedry.xml
 
-signals*.txt
-articles.json*
-hierarh*.sqlite3*
-episkop_rows.txt
+#В папке с данными лежит то, что в репозиторий класть не надо. Но вот подпапку data/patch хранить в репозитории надо.
+data/*
+!data/patch
 
 env
 venv

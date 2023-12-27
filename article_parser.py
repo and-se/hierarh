@@ -403,13 +403,13 @@ if __name__ == '__main__':
     from book_parser import CafedraArticlesFromJson
     import sys
 
-    f = 'episkop_rows.txt'
+    f = 'data/episkop_rows.txt'
 
     if 'rows' in sys.argv:
         print(f'Save rows to file {f}')
         rs = EpiskopRowsSaver(f)
         ch = Chain(CafedraArticlesFromJson()).add(rs)
-        ch.process('articles.json')
+        ch.process('data/cafedra_articles.json')
         print(f'Total episkop rows: {len(rs.rows)}')
         sys.exit(0)
 

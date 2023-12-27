@@ -307,7 +307,7 @@ class SignalPatcher(ChainLink):
         self.send(s)
 
 
-cafedra_signals_patch = open('signal_patch.txt', encoding='utf8').read()
+cafedra_signals_patch = open('data/patch/cafedra_signal_patch.txt', encoding='utf8').read()
 
 
 def parse_text_patch(text_patch):
@@ -644,12 +644,12 @@ if __name__ == '__main__':
     import sys
     chain = Chain(XmlSax()) \
         .add(CafedraSignaller()) \
-        .add(SignalSaver('signals.txt')) \
+        .add(SignalSaver('data/cafedra_signals.txt')) \
         .add(SkippedTextCatcher()).add(TextCleaner()) \
         .add(SignalPatcher(parse_text_patch(cafedra_signals_patch)))
     if 'articles' in sys.argv:
         chain.add(CafedraArticleBuilder())\
-             .add(CafedraArticlesToJsonFile('articles.json'))
+             .add(CafedraArticlesToJsonFile('data/cafedra_articles.json'))
     elif 'tool' in sys.argv:
         chain.add(SignalTool('header', 'br', 'header'))
 
@@ -660,7 +660,7 @@ if __name__ == '__main__':
     if 'count' in sys.argv:
         chain.add(SignalCounter())
 
-    filename = 'sample_cafedry.xml'
+    filename = 'data/sample_cafedry.xml'
     if len(sys.argv) > 1 and sys.argv[1].endswith('.xml'):
         filename = sys.argv[1]
 
