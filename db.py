@@ -392,9 +392,12 @@ if __name__ == "__main__":
         ch = Chain(CafedraArticlesFromJson()) \
             .add(CafedraJsonPatcher('data/patch/cafedra-episkop-patch.txt')) \
             .add(CafedraArticleParser()) \
-            .add(WholeRussiaCafedraFixer()) \
-            .add(UnparsedCafedraEpiskopLogger('data/cafedra-episkop-fail.txt')) \
-            .add(CafedraDbImporter(db))
+
+        # comment this when using sample_cafedry.xml
+        ch = ch.add(WholeRussiaCafedraFixer())
+
+        ch = ch.add(UnparsedCafedraEpiskopLogger('data/cafedra-episkop-fail.txt')) \
+               .add(CafedraDbImporter(db))
 
         ch.process('data/cafedra_articles.json')
 
