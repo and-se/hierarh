@@ -1,4 +1,5 @@
-from flask import Flask, render_template, redirect, request, make_response
+from flask import Flask, render_template, redirect, request, \
+                  make_response, send_from_directory
 
 from db import PeeweeHistHierarhStorage, PeeweeUserCommentsStorage, \
                StorageException
@@ -9,6 +10,7 @@ import logging
 
 app = Flask(__name__, static_folder='flask/static',
             template_folder='flask/templates')
+
 app.json.ensure_ascii = False
 
 
@@ -18,7 +20,8 @@ comments_db = PeeweeUserCommentsStorage()
 
 @app.route('/')
 def index():
-    return redirect('/cafedra')
+    #return redirect('/cafedra')
+    return render_template('main.html')
 
 @app.route('/cafedra')
 def cafedra_list():
@@ -39,6 +42,10 @@ def cafedra_article(key):
 def episkop_article(key):
     d = db.get_episkop_data(key)
     return render_template('episkop_article.html', data=d, item_type='episkop')
+
+@app.route('/files/<path:name>')
+def get_file(name):
+    return send_from_directory('data/hierarh-files', name)
 
 @app.post('/comments')
 def add_comment():
