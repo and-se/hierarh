@@ -10,6 +10,10 @@
 <!--<link rel="stylesheet" type="text/css" href="/static/style.css" >-->
 
 <style>
+	body {
+		background-color:#DBB278;
+	}
+	
     .main-header {
         text-align: center;
         line-height: 1.5;
@@ -40,21 +44,50 @@
         margin: 10px 0;
     }
 
-    .main-chapters-list a {
+    .main-chapters-list a, .main-header a {
         text-decoration: none;
     }
 
     .main-chapters-list .attention a {
         color: red;
     }
+	.menu {
+		width: 100%;
+		display: table;
+		margin-top: 20px;
+		background: #2767A0;
+		border-radius: 5px;	
+	}
+	.menu ul {
+		display: table-row;
+	}
+	.menu li {
+		display: table-cell;
+	}
+	.menu ul li:hover, .menu a:hover {
+		background: #666;
+	}
+	.menu li a {
+		display: block;
+		padding: 8px 15px;
+		color: #fff;
+		text-align: center;
+	}
+	
 </style>
 </head>
 
 <body>
-<h1 class="main-header">ИСТОРИЯ ИЕРАРХИИ <br> РУССКОЙ ПРАВОСЛАВНОЙ ЦЕРКВИ</h1>
+<h1 class="main-header"><a target="_blank" href="/cafedra">ИСТОРИЯ ИЕРАРХИИ <br> РУССКОЙ ПРАВОСЛАВНОЙ ЦЕРКВИ</a></h1>
 
-<h2 class="main-header">Комментированные списки иерархов <br> по епископским кафедрам с 862 г.</h2>
+<h2 class="main-header"><a target="_blank" href="/episkop">Комментированные списки иерархов <br> по епископским кафедрам с 862 г.</a></h2>
 
+<div class="menu">
+	<ul>
+		<li><a href="/cafedra">Кафедры</a></li>
+		<li><a href="/episkop">Епископы</a></li>
+	</ul>
+</div>
 <p align="center">
 Работа выполнена в Отделе новейшей истории Русской Православной Церкви <br> Православного Свято-Тихоновского Гуманитарного Университета <br> под общим руководством <br> заведующего отделом профессора-протоиерея Владимира Воробьева
 </p>
@@ -68,10 +101,6 @@
 <ul class="main-chapters-list">
     <li><a target="_blank" href="/files/2. Предисловие к первому изданию.html">Предисловие к первому изданию (2006 г.)</a></li>
     <li><a target="_blank" href="/files/3. Предисловие к второму изданию.html">Предисловие к второму изданию (2019 г.)</a></li>
-
-    <li class="attention"><a target="_blank" href="/cafedra">Списки иерархов по кафедрам</a></li>
-    <li class="attention"><a target="_blank" href="/episkop">Персоналии иерархов</a></li>
-
     <li><a target="_blank" href="/files/4. Губонин Введение.pdf">M. E. Губонин ВВЕДЕНИЕ В ИСТОРИЮ РОССИЙСКОЙ ИЕРАРХИИ</a></li>
     <li><a target="_blank" href="/files/5. Грюнберг Кирпичев О начале иерархии.pdf">П. Н. Грюнберг, И. П. Кирпичев К ВОПРОСУ О НАЧАЛЕ РОССИЙСКОЙ ИЕРАРХИИ И РУССКОЙ ЦЕРКВИ</a></li>
     <li><a target="_blank" href="/files/6. Воробьев О происхождении перечней.rtf">М. Н. Воробьев К ВОПРОСУ О ПРОИСХОЖДЕНИИ ПЕРЕЧНЕЙ (СПИСКОВ) КИЕВСКИХ МИТРОПОЛИТОВ ДОМОНГОЛЬСКОГО ПЕРИОДА В РУССКИХ ЛЕТОПИСЯХ</a></li>
