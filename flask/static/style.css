@@ -1,3 +1,73 @@
+body {
+	background-color:#DBB278;
+}
+
+p {
+	margin-bottom: 0;
+}
+
+/*main*/
+
+.main-header {
+	text-align: center;
+	line-height: 1.5;
+	margin-bottom: 0;
+}
+
+h1.main-header {
+	font-size: 24pt;
+}
+
+h2.main-header {
+	font-size: 15pt;
+	margin-top: 0;
+}
+
+.main-chapters-list {
+	list-style: none;
+	padding-left: 0;
+	margin-top:0;
+	font-size: 20px;
+}
+
+.main-chapters-list li {
+	margin: 10px 0;
+}
+
+.main-chapters-list a, .main-header a {
+	text-decoration: none;
+}
+
+.main-chapters-list .attention a {
+	color: red;
+}
+.menu {
+	width: 100%;
+	display: table;
+	margin-top: 20px;
+	background: #2767A0;
+	border-radius: 5px;	
+}
+.menu ul {
+	display: table-row;
+}
+.menu li {
+	display: table-cell;
+}
+.menu ul li:hover, .menu a:hover {
+	background: #666;
+}
+.menu li a {
+	display: block;
+	padding: 8px 15px;
+	color: #fff;
+	text-align: center;
+}
+
+.copyright {
+	margin-top: 50px;
+}
+/*остальное*/
 
 .collections .current {
     color: red;
@@ -51,6 +121,10 @@ table.episkops, table.cafedras {
     word-wrap: break-word;
 }
 
+.episkops tr, .cafedras tr {
+    background-color: inherit;
+}
+
 @media (max-width: 550px) {
     table.episkops, table.cafedras {
         font-size: 1rem;
@@ -58,7 +132,8 @@ table.episkops, table.cafedras {
 }
 
 .episkops_header {
- font-size: x-large;
+    font-size: x-large;
+    background-color: inherit;
 }
 
 .obnovl {
