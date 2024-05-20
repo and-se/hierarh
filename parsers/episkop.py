@@ -51,9 +51,14 @@ Name = original_text_for(Name | 'NN')('name')
 Surname = Combine(CapitalizedWord + Opt('-' + CapitalizedWord))
 Surname = original_text_for(Surname + Opt(CapitalizedWord))("surname")
 
-SaintTitle = Regex(r'(Св\.(\s+муч\.)?)|(Сщмч\.)|(Блаж\.)',
-                   flags=re.I)('saint_title')
-Temp = Char('в') + '/' + 'у' + Opt(Question)
+SaintTitle = Regex(r'''(Св\.(\s+муч\.)?)|(Сщмч\.)|(Блаж\.)|
+                       ( Святой(\s+мученик)? ) |
+                       священномученик |
+                       святитель |
+                       блаженный 
+                       ''',
+                   flags=re.I | re.X)('saint_title')
+Temp = ((Char('в') + '/' + 'у') | Regex("временно\s+управляющий")) + Opt(Question)
 Temp |= Char('(') + Temp + ')'
 Temp = original_text_for(Temp)('temp_status')
 
@@ -63,7 +68,7 @@ NumberAferSurnname = RimNumber('number_after_surname')
 Paki = Char(',') + Regex(r'паки|(в\s+\d+-й\s+раз)')('paki')
 
 
-WorldTitle = Opt(Char(',')) + Regex(r'кн\.')('world_title')
+WorldTitle = Opt(Char(',')) + Regex(r'кн(язь|\.)')('world_title')
 
 
 EpiskopInCafedra = Opt(Temp) + Opt(SaintTitle) + \
@@ -125,6 +130,12 @@ NN (кон. XII в.)
 Христофор Сулима Грек
 
 Харитон Обрынский-Угровецкий.
+
+Святой мученик Василий
+
+Нестор, князь Ольгимунтович
+
+временно управляющий Кирилл II Чагадаевич
     """.split('\n')
     for t in tests:
         if not t.strip():

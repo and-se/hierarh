@@ -373,6 +373,10 @@ if __name__ == "__main__":
 
         build all - delete old and rebuild main db.
                     comments db will be recreated (old comments will be lost!)
+                    
+        build main-old - delete old and rebuild main db using 'cafedra_articles.json' file 
+                    generated from xml. Text data contains many abbreviations.
+                    In 'main' mode they are resolved.
 
         create comments - only create comments db if not exists
         reset comments - delete old and recreate comments db
@@ -382,15 +386,19 @@ if __name__ == "__main__":
 
     cmd, arg = sys.argv[1:]
 
-    if cmd == 'build' and arg in ('main', 'all'):
+    if cmd == 'build' and arg in ('main', 'all', 'main-old'):
         PeeweeHistHierarhStorage.create_new_sqlite_db(remove_if_exists=True)
         db = PeeweeHistHierarhStorage()
 
         f = (arg=='all')
         PeeweeUserCommentsStorage.create_new_sqlite_db(remove_if_exists=f)
 
+        patch_file = 'data/patch/cafedra-episkop-patch.txt'
+        if arg == 'main-old':
+            patch_file = 'data/patch/cafedra-episkop-patch-old.txt'
+
         ch = Chain(CafedraArticlesFromJson()) \
-            .add(CafedraJsonPatcher('data/patch/cafedra-episkop-patch.txt')) \
+            .add(CafedraJsonPatcher(patch_file)) \
             .add(CafedraArticleParser()) \
 
         # comment this when using sample_cafedry.xml
@@ -399,7 +407,11 @@ if __name__ == "__main__":
         ch = ch.add(UnparsedCafedraEpiskopLogger('data/cafedra-episkop-fail.txt')) \
                .add(CafedraDbImporter(db))
 
-        ch.process('data/cafedra_articles.json')
+        if arg == 'main-old':
+            ch.process('data/cafedra_articles.json')  # old file built from xml
+        else:
+            # new file base on old cafedra_articles.json with expanded abbreviations.
+            ch.process('data/cafedra_articles_expand_abbrs.json')
 
         print("Created cafedras:", db.count_cafedra())
         print("Created episkops:", db.count_episkop())
