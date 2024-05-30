@@ -55,17 +55,17 @@ SaintTitle = Regex(r'''(Св\.(\s+муч\.)?)|(Сщмч\.)|(Блаж\.)|
                        ( Святой(\s+мученик)? ) |
                        священномученик |
                        святитель |
-                       блаженный 
+                       блаженный
                        ''',
                    flags=re.I | re.X)('saint_title')
-Temp = ((Char('в') + '/' + 'у') | Regex("временно\s+управляющий")) + Opt(Question)
+Temp = ((Char('в') + '/' + 'у') | Regex("временно\s+управляющий")|"заместитель временно управляющего") + Opt(Question)
 Temp |= Char('(') + Temp + ')'
 Temp = original_text_for(Temp)('temp_status')
 
 NumberAferName = RimNumber('number_after_name')
 NumberAferSurnname = RimNumber('number_after_surname')
 
-Paki = Char(',') + Regex(r'паки|(в\s+\d+-й\s+раз)')('paki')
+Paki = Char(',') + Regex(r'паки|(в\s+\d+-й\s+раз)|(в (третий|четвертый) раз)')('paki')
 
 
 WorldTitle = Opt(Char(',')) + Regex(r'кн(язь|\.)')('world_title')
@@ -136,6 +136,7 @@ NN (кон. XII в.)
 Нестор, князь Ольгимунтович
 
 временно управляющий Кирилл II Чагадаевич
+
     """.split('\n')
     for t in tests:
         if not t.strip():

@@ -55,6 +55,9 @@ class CafedraArticleParser(ChainLink):
                 if fp.text.startswith('в/у'):
                     temp_status = 'в/у'
                     fp.text = fp.text[3:].strip()
+                elif fp.text.startswith('временно управляющий'):
+                    temp_status = 'в/у'
+                    fp.text = fp.text[20:].strip()
                 else:
                     temp_status = None
 
