@@ -166,11 +166,15 @@ li .obnovl {
 	margin-bottom: 15px;
 }
 
-table {
+.table {
   width: 650px;
   border-top: 7px solid rgb(43, 129, 17);
   border-collapse: collapse;
   text-align: center;
   margin-bottom: 20px;
   border: 1px solid #dddddd;
+}
+.blockquote {
+	text-align: right;
+	width: 100px;
 }
