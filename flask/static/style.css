@@ -174,7 +174,12 @@ li .obnovl {
   margin-bottom: 20px;
   border: 1px solid #dddddd;
 }
+
 .blockquote {
 	text-align: right;
 	width: 100px;
+}
+
+.button {
+	text-align: center;
 }
