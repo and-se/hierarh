@@ -1,5 +1,5 @@
 from flask import Flask, render_template, redirect, request, \
-                  make_response, send_from_directory
+                  make_response, send_from_directory, Blueprint
 
 from db import PeeweeHistHierarhStorage, PeeweeUserCommentsStorage, \
                StorageException
@@ -17,6 +17,7 @@ app.json.ensure_ascii = False
 
 db = PeeweeHistHierarhStorage()
 comments_db = PeeweeUserCommentsStorage()
+db_edit = HierarhEditStorage()
 
 @app.route('/')
 def index():
@@ -67,6 +68,7 @@ def add_comment():
             "info": repr(ex)
         }
 
+
 @app.get('/comments')
 def get_comments():
     c = comments_db.get_all()
@@ -83,6 +85,51 @@ def for_search_engines():
     r = make_response(txt, 200)
     r.mimetype = "text/plain"
     return r
+
+####### EDIT ################
+
+ed = Blueprint('hierarh_edit', __name__)
+app.register_blueprint(ed, url_prefix='/edit')
+
+@ed.get('/cafedra')
+def list_cafedra_edit():
+    d = db_edit.cafedra.get()
+    return render_template('edit/list.html', data=d, item_type='cafedra')
+
+
+@ed.get('/cafedra/new')
+def new_cafedra_ui():
+    caf = db_edit.cafedra.new()
+    return render_template('edit/cadefra.html', data=caf)
+
+
+@ed.post('/cafedra')
+def create_cafedra():
+    data = request.html
+    return do_cafedra_upsert(request.html, None)
+
+def do_cafedra_upsert(html, key):
+    try:
+        doc = db_edit.cafedra.upsert(key, html)
+        return {
+            "success" : True,
+            "id": doc.id,
+        }
+    except Exception as ex:
+        logging.exception(ex)
+        return {
+            "success": False,
+            "message": str(ex),
+            "info": repr(ex)
+        }
+
+@ed.route('/cafedra/<int:key>')
+def update_cafedra(key):
+    if request.method == 'POST':
+        return do_cafedra_upsert(request.html, key)
+    elif request.method == 'GET':
+        caf = db_edit.cafedra.get(key)
+        return render_template('edit/cadefra.html', data=caf)
 
 
 if __name__ == '__main__':
