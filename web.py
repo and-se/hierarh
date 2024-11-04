@@ -4,6 +4,8 @@ from flask import Flask, render_template, redirect, request, \
 from db import PeeweeHistHierarhStorage, PeeweeUserCommentsStorage, \
                StorageException
 
+from edit.storage import HierarhEditStorage
+
 from models import UserComment
 
 import logging
@@ -89,11 +91,10 @@ def for_search_engines():
 ####### EDIT ################
 
 ed = Blueprint('hierarh_edit', __name__)
-app.register_blueprint(ed, url_prefix='/edit')
 
 @ed.get('/cafedra')
 def list_cafedra_edit():
-    d = db_edit.cafedra.get()
+    d = db_edit.cafedra.portion()
     return render_template('edit/list.html', data=d, item_type='cafedra')
 
 
@@ -131,6 +132,8 @@ def update_cafedra(key):
         caf = db_edit.cafedra.get(key)
         return render_template('edit/cadefra.html', data=caf)
 
+
+app.register_blueprint(ed, url_prefix='/edit')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
