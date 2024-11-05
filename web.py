@@ -94,14 +94,16 @@ ed = Blueprint('hierarh_edit', __name__)
 
 @ed.get('/cafedra')
 def list_cafedra_edit():
-    d = db_edit.cafedra.portion()
-    return render_template('edit/list.html', data=d, item_type='cafedra')
+    query = request.args.get('query', '')
+    d = db_edit.cafedra.portion(query=query)
+    print(d)
+    return render_template('edit/list.html', items=d, item_type='cafedra', query=query)
 
 
 @ed.get('/cafedra/new')
 def new_cafedra_ui():
     caf = db_edit.cafedra.new()
-    return render_template('edit/cadefra.html', data=caf)
+    return render_template('edit/cadefra.html', doc=caf)
 
 
 @ed.post('/cafedra')
@@ -130,7 +132,7 @@ def update_cafedra(key):
         return do_cafedra_upsert(request.html, key)
     elif request.method == 'GET':
         caf = db_edit.cafedra.get(key)
-        return render_template('edit/cadefra.html', data=caf)
+        return render_template('edit/cafedra.html', doc=caf)
 
 
 app.register_blueprint(ed, url_prefix='/edit')

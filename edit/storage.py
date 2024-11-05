@@ -15,6 +15,12 @@ class TextCafedra:
         doc.html = html
         return doc
 
+    def header(self):
+        return self.html.split('\n')[0]
+
+    def is_obn(self):
+        return False  # ...
+
     def __repr__(self):
         return f"TextCafedra({self.key}, {self.html})"
 
@@ -24,16 +30,16 @@ class TextCafedra:
 
 
 TCAF = {
-    1: TextCafedra.from_html(1, "cafedra 1"),
-    2: TextCafedra.from_html(2, "cafedra 2"),
-    3: TextCafedra.from_html(3, "cafedra 3")
+    1: TextCafedra.from_html(1, "cafedra 1\n<b>some text</b>"),
+    2: TextCafedra.from_html(2, "cafedra 2\n<b>some text 2</b>"),
+    3: TextCafedra.from_html(3, "cafedra 3\n<b>some text 3</b>")
 }
 
 class TextCollection:
     def __init__(self, name):
         self.name = name
 
-    def portion(self, skip=0, take=20):
+    def portion(self, skip=0, take=20, query=None):
         return [x for x in TCAF.values()]
 
     def new(self):
@@ -68,10 +74,10 @@ def test():
     caf = HierarhEditStorage().cafedra
     print("PORTION", caf.portion())
 
-
     print("UPDATE key=2")
     doc = caf.get(2)
     print(doc)
+    print("HEADER key=2", doc.header())
     doc.html = "UPDATED"
     doc = caf.upsert(doc)
     print("after: ", doc)
