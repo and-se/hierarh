@@ -8,12 +8,59 @@
 {% autoescape false %}
 <main>
 
-<div>
+<div contenteditable="true" id="data">
 {{doc.html}}
 </div>
 
+<button onclick="saveData()">Сохранить</button>
+<div id="message"></div>
+
 {% endautoescape %}
 </main>
+
+<script>
+async function saveData() {
+    var d = document.getElementById('data').innerHTML;
+    var doc_key = '{{key}}';
+
+
+    var resp = await fetch('{{post_url}}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json;charset=utf-8'
+        },
+        body: JSON.stringify({
+            key: doc_key,
+            html: d
+        }),
+        credentials: 'include'
+    });
+
+    if (resp.ok) {
+        var j = await resp.json();
+
+        if (j.success) {
+            showMessage('Saved. Wait page reload');
+            setTimeout(() =>  window.location.href = '/edit/{{item_type}}/' + j.key, 500);
+        } else {
+            showError(j.message);
+        }
+
+    } else {
+        showError(resp.text());
+    }
+}
+
+function showMessage(msg) {
+    tag = document.getElementById('message');
+    tag.innerHTML = msg;
+}
+
+function showError(msg) {
+    showMessage("ERROR: " + msg);
+}
+</script>
+
 
 
 {% endblock %}

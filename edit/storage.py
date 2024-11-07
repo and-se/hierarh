@@ -11,12 +11,14 @@ class TextCafedra:
     @staticmethod
     def from_html(key, html):
         doc = TextCafedra()
+        if key:
+            key = int(key)
         doc.key = key
         doc.html = html
         return doc
 
     def header(self):
-        return self.html.split('\n')[0]
+        return self.html.strip().split('\n')[0]
 
     def is_obn(self):
         return False  # ...
@@ -52,6 +54,9 @@ class TextCollection:
 
         if isinstance(key, TextCafedra):
             key, html = key.key, key.html
+
+        if key:
+            key = int(key)
 
         global TCAF
         if key in TCAF:

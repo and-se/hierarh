@@ -1,5 +1,6 @@
 from flask import Flask, render_template, redirect, request, \
-                  make_response, send_from_directory, Blueprint
+                  make_response, send_from_directory, Blueprint, \
+                  url_for
 
 from db import PeeweeHistHierarhStorage, PeeweeUserCommentsStorage, \
                StorageException
@@ -92,31 +93,35 @@ def for_search_engines():
 
 ed = Blueprint('hierarh_edit', __name__)
 
+@ed.get('/')
+def edit_root():
+    return redirect('./cafedra')
+
 @ed.get('/cafedra')
 def list_cafedra_edit():
     query = request.args.get('query', '')
     d = db_edit.cafedra.portion(query=query)
-    print(d)
     return render_template('edit/list.html', items=d, item_type='cafedra', query=query)
 
 
 @ed.get('/cafedra/new')
 def new_cafedra_ui():
     caf = db_edit.cafedra.new()
-    return render_template('edit/cadefra.html', doc=caf)
+    return render_template('edit/cafedra.html', doc=caf, item_type='cafedra', post_url=url_for('.create_cafedra'))
 
 
 @ed.post('/cafedra')
 def create_cafedra():
-    data = request.html
-    return do_cafedra_upsert(request.html, None)
+    d = request.json
+    print("NEW", d)
+    return do_cafedra_upsert(d['html'], None);
 
 def do_cafedra_upsert(html, key):
     try:
         doc = db_edit.cafedra.upsert(key, html)
         return {
             "success" : True,
-            "id": doc.id,
+            "key": doc.key,
         }
     except Exception as ex:
         logging.exception(ex)
@@ -126,13 +131,16 @@ def do_cafedra_upsert(html, key):
             "info": repr(ex)
         }
 
-@ed.route('/cafedra/<int:key>')
+@ed.route('/cafedra/<int:key>', methods=['GET', 'POST'])
 def update_cafedra(key):
     if request.method == 'POST':
-        return do_cafedra_upsert(request.html, key)
+        d = request.json
+        print("UPDATE", d)
+        return do_cafedra_upsert(d['html'], d['key'])
     elif request.method == 'GET':
         caf = db_edit.cafedra.get(key)
-        return render_template('edit/cafedra.html', doc=caf)
+        return render_template('edit/cafedra.html', doc=caf, item_type='cafedra', key=key,
+                                post_url=url_for('.update_cafedra', key=key))
 
 
 app.register_blueprint(ed, url_prefix='/edit')

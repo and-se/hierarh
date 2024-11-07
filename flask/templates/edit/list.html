@@ -11,5 +11,9 @@
         <li><a href="/edit/{{item_type}}/{{doc.key}}" class="{{'obnovl' if doc.is_obn()}}">{{doc.header()}}</a></li>
     {% endfor %}
     </ul>
+
+    <a class="button" href="/edit/{{item_type}}/new">новая</a>
+
+
 </main>
 {% endblock %}
