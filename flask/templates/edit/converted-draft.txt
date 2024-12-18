@@ -1,4 +1,4 @@
-<cafedra start_line=8 is_link"="false" is_obn="false">
+<div class="cafedra_article" data-start-line="8" data-is-link="false" data-is-obn="false">
 <div class="header">АБАКАНСКАЯ</div>
 
 <div class="text">
@@ -13,11 +13,15 @@
     </details>
 </td></tr>
 
-<tr class="unparsed"><td><ep>"text": "\t\t16(29)12.1999\t–\t\t–\tИонафан Цветков<span class=\"note\" data-note=\"2\">2</span>"</ep></td></tr>
+<tr>
+<td>16(29)12.1999</td>
+<td></td>
+<td>Ионафан Цветков<details><summary>[сноска]</summary><div>Архиеп. с 19.01(01.02)2010.</div></details></td>
+</tr>
 
 
 </table>
-</cafedra>
+</div>
 
 
 

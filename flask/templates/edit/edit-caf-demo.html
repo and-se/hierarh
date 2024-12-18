@@ -6,54 +6,55 @@
 </head>
 
 <style>
-    
+
     #tableMenu {
         position: absolute;
         display: none;
     }
-    
+
     #menu {
         position: sticky;
-        top: 10px;
+        top: 0px;
         background-color: white;
+        border-bottom: 1px solid gray;
     }
-    
+
     .note {
         display:inline;
         border: none;
-        margin-bottom: 0;      
+        margin-bottom: 0;
     }
-    
+
     .note summary {
-        padding: 0;        
+        padding: 0;
         list-style-type: none;
     }
-    
+
     .note summary .deleteButton {
         display: none;
     }
-    
+
     .note[open] {
         display: block;
     }
-    
+
     .note[open] summary {
         list-style-type: disclosure-open;
     }
-    
+
     .note[open] summary .deleteButton {
         display: inline;
         padding: 4px;
         margin-left: 10px;
     }
-    
+
     .cancelBtn {
         margin-left: 60px;
         background-color: gray;
     }
-    
 
-    
+
+
 </style>
 <body>
 
@@ -69,7 +70,7 @@
         <button onclick="downRow()">v</button>
         <button onclick="addRow()">+</button>
     </span>
-    
+
     <button onclick="doUndo()" class="cancelBtn">отмена (Ctrl+Z)</button>
 
 </div>
@@ -90,38 +91,38 @@
 
 
 <table id="art_table" class="episkops" contenteditable="true">
- 
+
 <tr class="epcaf">
-    <td>        
+    <td>
         1700
     </td>
     <td>1700</td>
-    <td>        
+    <td>
             <a href="/episkop/4">в/у Св. Митрофан<span class="note" data-note="2">2</span></a>
-            
+
             <details class="note" contenteditable="false">
                 <summary class="note-header"><sup>[сноска]</sup></summary>
                 <div class="note-content" contenteditable="true">Еп. Воронежск. В 1696–1700 гг. Воронежская епархия имен. «Воронежск. и Азовск.», поэтому можно предположить, что первоначально, в процессе организации Азовск. епархии, Св. Митрофану было поручено архипастырск. попечение о ней. Однако, по мнению И. М. Покровского, «относительно титула «Азовский», приписываемого Св.&nbsp;Митрофану, нужно заметить, что он не документальный. Власть Св. Митрофана не простиралась на Азов. По справедливому объяснению исследователя по церк. истории Воронежск. края П. В. Никольского, такой титул приписывали воронежскому (святителю. – Сост.) потому, что Св. Митрофан считал завоевателей Азова своими пасомыми и молился как об их здравии, так и об упокоении душ убитых там воинов... Таким образом, места по нижнему бассейну Дона и сев. побережью Азовского моря, где кипела жизнь вследствие азовских походов, не будучи официально подчинены Св. Митрофану, пока не имели определенной епарх. подведомственности…» (Покровский И. М. Указ. соч. Т. 2. С. 36–37).
                 </div>
-                </details>
-            <span><br><br></span>    
+            </details>
+            <span><br><br></span>
     </td>
 
 </tr>
-    
 
-<tr  class="epcaf" >  
- 
-    <td>        
+
+<tr  class="epcaf" >
+
+    <td>
         1700
     </td>
     <td>1701</td>
-    <td>        
+    <td>
             Досифей (Хореско?)
     </td>
 
 </tr>
-    
+
 
 
 </table>
@@ -135,7 +136,7 @@
         <summary class="note-header"><sup>[сноска]</sup><button class="deleteButton" onclick="deleteNote(this)">удалить</button></summary>
         <div class="note-content" contenteditable="true">текст сноски...</div>
     </details>
-    
+
     <span id="eof-template"><br></span>
 </div>
 
@@ -145,50 +146,50 @@
         if (!sl.rangeCount) return null;
         return sl.getRangeAt(0);
     }
-    
-     function addEofIfRequired() {    
-        var target = get_selection_range();        
+
+     function addEofIfRequired() {
+        var target = get_selection_range();
         if (!target) return;
-        
+
         target = target.startContainer;
         if (target.nodeType == Node.TEXT_NODE) target = target.parentNode;
         //console.log(target);
-        
+
         var last = target.lastChild;
         if (last.nodeName == 'DETAILS' || (last.nodeType == Node.TEXT_NODE && last.nodeValue == "")) {
-            // добавляем пустую строку, чтобы можно было редактировать и ставить курсор после сноски. 
+            // добавляем пустую строку, чтобы можно было редактировать и ставить курсор после сноски.
             var eof = document.getElementById('eof-template').cloneNode(true);
             eof.removeAttribute('id');
-            
+
             target.appendChild(eof);
-            
+
             console.log('add eof to', target);
         }
     }
-    
+
     function doUndo() {
         document.execCommand('undo', false, null);
     }
-    
+
     function addNote() {
         var sl = window.getSelection();
         if (!sl.rangeCount) return;
-        
-        var r = sl.getRangeAt(0);        
+
+        var r = sl.getRangeAt(0);
         var n = document.getElementById('note-template').cloneNode(true);
         n.removeAttribute('id');
         r.insertNode(n);
         r.collapse();
         addEofIfRequired();
-        
+
         // открываем сноску на редактирование
         n.setAttribute('open', '');
         // выделяем текст сноски - там Placeholder "текст сноски"
         sl.empty();
         sl.selectAllChildren(n.querySelector('.note-content'));
-        
+
     }
-    
+
     function deleteNote(node) {
         node.closest('details.note').remove();
     }
@@ -198,7 +199,7 @@
         if (!r) return;
         var p = r.startContainer;
         const mext = document.getElementById('table_opts');
-        
+
         while(p) {
             //console.log('wh', p);
             if (p.id == 'art_text') {
@@ -208,70 +209,70 @@
                 mext.style.display="inline";
                 return;
             }
-            
+
             p = p.parentNode;
         }
     }
-    
+
     function get_cur_table_row() {
         var r = get_selection_range();
         if(!r) return null;
-        
+
         var p = r.startContainer;
         while(p) {
             if (p.tagName == 'TR') {
                 return p;
             }
-            
+
             p = p.parentNode;
         }
-        
+
         return null;
     }
 
     document.querySelector('.edit-form').addEventListener('click', (ev) => {
-        update_menu();        
+        update_menu();
     });
 
     var ed = document.querySelector('.edit-form');
     ed.addEventListener("paste", (ev) => {
-        ev.preventDefault();       
-        
+        ev.preventDefault();
+
         let paste = (event.clipboardData || window.clipboardData).getData("text");
-        
+
         const selection = window.getSelection();
         if (!selection.rangeCount) return;
         selection.deleteFromDocument();
         selection.getRangeAt(0).insertNode(document.createTextNode(paste));
         selection.collapseToEnd();
-        
+
     });
-    
+
     ed.addEventListener("beforeinput", (ev) => {
         //console.log(ev);
         // ev.target берёт только таблицу целиком, а нам нужен сам редактируемый элемент
         // - ищем его на основе анализа выделения
         addEofIfRequired();
     });
-    
-   
-    
 
-    
+
+
+
+
     var art_tbl = document.getElementById("art_table");
     /*var tblmenu = document.getElementById("tableMenu");
-    
+
     var cur_row = null;
-    
+
     document.querySelectorAll("#art_table tr").forEach(el => {
-        el.addEventListener("mouseenter", (ev) => {        
+        el.addEventListener("mouseenter", (ev) => {
             showMenu(ev);
         });
 
     });
-    
-    
-    
+
+
+
     function showMenu(ev) {
         cur_row = ev.target;
         tblmenu.style.display = "block";
@@ -279,30 +280,30 @@
         tblmenu.style.left = window.pageXOffset + rect.left - tblmenu.getBoundingClientRect().width - 10 + "px";
         tblmenu.style.top = window.pageYOffset + rect.top + "px";
     }*/
-    
+
     function deleteRow() {
         var cur_row = get_cur_table_row();
         if (cur_row) {
             cur_row.remove();
         }
-        
+
         if (art_tbl.querySelector('tr.epcaf') == null){
             addRow();
         }
     }
-    
+
     function addRow() {
         var ntr = document.createElement('tr');
         //ntr.addEventListener("mouseenter", (ev) => showMenu(ev));
         ntr.classList.add("epcaf");
         ntr.innerHTML = "<td>from</td><td>to</td><td>who</td>";
-        
+
         var cur_row = get_cur_table_row();
         if (cur_row) {
             cur_row.parentNode.insertBefore(ntr, cur_row.nextElementSibling);
         } else art_tbl.appendChild(ntr);
     }
-    
+
     function upRow() {
         var cur_row = get_cur_table_row();
         if (cur_row) {
@@ -312,7 +313,7 @@
             }
         }
     }
-    
+
     function downRow() {
         var cur_row = get_cur_table_row();
         if (cur_row) {
@@ -322,31 +323,31 @@
             }
         }
     }
-    
+
     function get_prev_row(cur_row) {
         var prev = cur_row.previousElementSibling;
         while(prev) {
             if (prev.classList.contains("epcaf")) {
                 return prev;
             }
-            
+
             prev = prev.previousElementSibling;
         }
     }
-    
+
     function get_next_row(cur_row) {
         var nxt = cur_row.nextElementSibling;
         while(nxt) {
             if (nxt.classList.contains("epcaf")) {
                 return nxt;
             }
-            
+
             nxt = nxt.nextElementSibling;
         }
     }
-    
- 
-    
+
+
+
 </script>
 
 </body>

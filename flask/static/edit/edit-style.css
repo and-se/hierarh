@@ -1,0 +1,67 @@
+#menu {
+    position: sticky;
+    top: 0px;
+    background-color: #008899;
+    border-bottom: 1px solid gray;
+}
+
+.he-edit-form {
+    background-color: white;
+}
+
+.he-edit-form .header {
+    font-weight: bold;
+    font-size: xx-large;
+}
+
+.he-edit-form details {
+    display:inline;
+    border: none;
+    margin-bottom: 0;
+}
+
+.he-edit-form details summary {
+    padding: 0;
+    list-style-type: none;
+}
+
+.he-edit-form details summary .he-delete-button {
+    display: none;
+}
+
+.he-edit-form details[open] {
+    display: block;
+}
+
+.he-edit-form details[open] summary {
+    list-style-type: disclosure-open;
+}
+
+.he-edit-form details[open] summary .he-delete-button {
+    display: inline;
+    padding: 4px;
+    margin-left: 10px;
+}
+
+.he-cancel-button {
+    margin-left: 60px;
+    background-color: gray;
+}
+
+
+.he-edit-form tr.header-row {
+    font-weight: bold;
+    font-size: x-large;
+}
+
+.he-edit-form td {
+    height: 40px; /* it is min height */
+}
+
+/*
+td:empty:before {
+  content: 'введите текст';
+  color: gray;
+  position: relative;
+}*/ /*attr(data-text)*/
+

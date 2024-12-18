@@ -8,15 +8,36 @@
 {% autoescape false %}
 <main>
 
-<div contenteditable="true" id="data">
+<script src="/static/edit/main.js"></script>
+<script>
+    window.onload = function(){
+        try {
+            var d = document.querySelector('#data article.cafedra_article');
+            makeCafedraEditForm(d);
+
+            var m = document.querySelector('#menu');
+            makeEditMenu(m);
+        } catch (ex) {
+            showError(ex.message);
+            console.log(ex);
+        }
+    }
+</script>
+
+<div id="menu"></div>
+
+<div id="data">
 {{doc.html}}
 </div>
+
 
 <button onclick="saveData()">Сохранить</button>
 <div id="message"></div>
 
 {% endautoescape %}
 </main>
+
+
 
 <script>
 async function saveData() {
