@@ -10,13 +10,15 @@
 
 <script src="/static/edit/main.js"></script>
 <script>
+    let hform = null;
+
     window.onload = function(){
         try {
-            var d = document.querySelector('#data article.cafedra_article');
-            makeCafedraEditForm(d);
+            let d = document.querySelector('#data article.cafedra_article');
+            hform = makeCafedraEditForm(d);
 
-            var m = document.querySelector('#menu');
-            makeEditMenu(m);
+            let m = document.querySelector('#menu');
+            hform.makeMenu(m);
         } catch (ex) {
             showError(ex.message);
             console.log(ex);
@@ -41,11 +43,13 @@
 
 <script>
 async function saveData() {
-    var d = document.getElementById('data').innerHTML;
-    var doc_key = '{{key}}';
+    let d = hform.getData();//document.getElementById('data').innerHTML;
+    //console.log(d);
+
+    let doc_key = '{{key}}';
 
 
-    var resp = await fetch('{{post_url}}', {
+    let resp = await fetch('{{post_url}}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json;charset=utf-8'
@@ -58,7 +62,7 @@ async function saveData() {
     });
 
     if (resp.ok) {
-        var j = await resp.json();
+        let j = await resp.json();
 
         if (j.success) {
             showMessage('Saved. Wait page reload');

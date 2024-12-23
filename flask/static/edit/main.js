@@ -4,6 +4,9 @@
 /*** public ***/
 
 function makeCafedraEditForm(root) {
+    let result = {};
+    result.root = root;
+
     if (!root) throw new Error('empty root!');
     // пройти по элементам, убрать contenteditable везде - расставим правильно далее
     processAllChildren(root, (ch) => {
@@ -18,15 +21,18 @@ function makeCafedraEditForm(root) {
         throw new Error('Header not found.');
     }
     header.setAttribute('contenteditable', 'true');
+    result.header = header;
 
     let text = root.querySelector('.text');
     if (!text) throw new Error('Text not found');
+    result.text = text;
 
     text.setAttribute('contenteditable', 'true');
     prepareNotes(text);
 
     let table = root.querySelector('table.episkops');
     if (!table) throw new Error('Episkops table not found');
+    result.table = table;
 
     table.setAttribute('contenteditable', 'true');
 
@@ -39,8 +45,8 @@ function makeCafedraEditForm(root) {
     }
     th.setAttribute('contenteditable', false);
     th.classList.add('he-table-head');
-
     prepareNotes(table);
+    // TODO проверить, что у заголовков tr.header-row стоит colspan=3
 
     // скрытие/показ кнопок, специфичных для таблицы
     root.addEventListener('click', updateMenu);
@@ -66,12 +72,42 @@ function makeCafedraEditForm(root) {
         // - ищем его на основе анализа выделения
         addEofIfRequired();
     });
+
+    result.makeMenu = makeEditMenu;
+    result.getData = getSaveData;
+
+    return result;
+}
+/*** form private ***/
+function makeEditMenu(menuRoot) {
+    let menu = createElementByHtml(MENU_TEMPLATE);
+    for(let btn of menu.querySelectorAll('.he-table-menu button')) {
+        btn.table = this.table;
+    }
+
+    menuRoot.appendChild(menu);
 }
 
-function makeEditMenu(root) {
-    root.appendChild(createElementByHtml(MENU_TEMPLATE));
-}
+function getSaveData() {
+    let data = this.root.cloneNode(true);
+    processAllChildren(data, (ch) => {
+            if (ch.hasAttribute('contenteditable')) ch.removeAttribute('contenteditable');
+            if (ch.classList.contains('he-delete-button')) ch.remove();
+            let toDel = [];
+            for (let cl of ch.classList) {
+                if (cl.startsWith('he-')) {
+                    toDel.push(cl);
+                }
+            }
 
+            for(let cl of toDel) {
+                ch.classList.remove(cl);
+            }
+            if(ch.classList.length == 0) ch.removeAttribute('class');
+    });
+
+    return data.outerHTML;
+}
 /*** html templates ***/
 
 let DELETE_BTN_TEMPLATE = `<button class="he-delete-button" onclick="deleteNote(this)">удалить</button>`;
@@ -91,17 +127,17 @@ let NOTE_TEMPLATE = `
 
 let MENU_TEMPLATE = `
     <div class="he-menu">
-        <button onclick="addNote()">сноска</button>
+        <button class="he-add-note-button" onclick="addNote()">сноска</button>
 
         <span class="he-table-menu" style="display:none">
-            <button onclick="deleteRow()">X</button>
-            <button onclick="upRow()">^</button>
-            <button onclick="downRow()">v</button>
-            <button onclick="addRow()">+</button>
-            <button onclick="addRow('header-row')">+ заголовок</button>
+            <button class="he-delete-row-button" onclick="deleteRow(this.table)">X</button>
+            <button class="he-up-row-button" onclick="upRow(this.table)">^</button>
+            <button class="he-down-row-button" onclick="downRow(this.table)">v</button>
+            <button class="he-add-row-buton" onclick="addRow(this.table)">+</button>
+            <button class="he-add-header-button" onclick="addRow(this.table, 'header-row')">+ заголовок</button>
         </span>
 
-        <button onclick="doUndo()" class="he-cancel-button">отмена (Ctrl+Z)</button>
+        <button onclick="doUndo()" class="he-undo-button">отмена (Ctrl+Z)</button>
 
     </div>
 `;
@@ -160,53 +196,107 @@ function deleteNote(node) {
 
 }
 
-function addRow(rowClass) {
+function addRow(table, rowClass) {
+    let curRow = getCurrentTableRow();
+    let isHeader = (rowClass == 'header-row');
+
     let ntr;
-    if (rowClass == 'header-row') {
+    if (isHeader) {
         ntr = createElementByHtml(TABLE_HEADER_ROW_TEMPLATE);
     } else {
         ntr = createElementByHtml(TABLE_ROW_TEMPLATE);
     }
 
-    let curRow = getCurrentTableRow();
     if (curRow) {
+        if(!table.contains(curRow)) return; // выбранная строка не относится к текущей таблице!
         curRow.parentNode.insertBefore(ntr, curRow.nextElementSibling);
-    } else document.querySelector('.he-edit-form table').appendChild(ntr);
+    } else {
+        console.log('Create row for empty table', table);
+        table.querySelector('tbody').appendChild(ntr);
+    }
+
+    // Ставим курсор внутрь новосозданного элемента
+    if (isHeader) {
+        document.getSelection().selectAllChildren(ntr.querySelector('td'));
+    }
+    else {
+        document.getSelection().collapse(ntr.querySelector('td'), 0);
+    }
 }
 
 
-function deleteRow() {
+function deleteRow(table) {
     let curRow = getCurrentTableRow();
-    if (curRow) {
-        let table = curRow.closest('table');
 
+    if (curRow) {
+        if(!table.contains(curRow)) return;
+
+        let otherRow = getNextTableRow(curRow);
+        if (!otherRow) {
+            otherRow = getPrevTableRow(curRow);
+        }
+
+        //let table = curRow.closest('table');
         //curRow.remove();
         deleteWithUndo(curRow);
 
-        if (table.querySelector('tbody tr') == null) addRow();
+        if (table.querySelector('tbody tr') == null) addRow(table);
+        else if (otherRow) {
+            document.getSelection().collapse(otherRow.querySelector('td'), 0);
+        }
     }
 }
 
 
-function upRow() {
-    let cur_row = getCurrentTableRow();
-    if (cur_row) {
-        const prev = getPrevTableRow(cur_row);
+function upRow(table) {
+    let curRow = getCurrentTableRow();
+    if (curRow) {
+        const prev = getPrevTableRow(curRow);
         if (prev) {
-            prev.before(cur_row);
+            prev.before(curRow);
         }
     }
 }
 
-function downRow() {
-    let cur_row = getCurrentTableRow();
-    if (cur_row) {
-        const nxt = getNextTableRow(cur_row);
+function downRow(table) {
+    let curRow = getCurrentTableRow();
+    if (curRow) {
+        const nxt = getNextTableRow(curRow);
         if (nxt) {
-            nxt.after(cur_row);
+            nxt.after(curRow);
         }
     }
 }
+
+
+/*** selection and navigation***/
+
+function getSelectionRange() {
+    const sl = window.getSelection();
+    if (!sl.rangeCount) return null;
+    return sl.getRangeAt(0);
+}
+
+
+function getCurrentTableRow() {
+    let r = getSelectionRange();
+    if(!r) return null;
+
+    let p = r.startContainer;
+    while(p) {
+        // в заголовке таблицы не работаем!
+        if (p.tagName == 'TH') return null;
+
+        if (p.tagName == 'TR') {
+            return p;
+        }
+
+        p = p.parentNode;
+    }
+
+    return null;
+}
+
 
 function getPrevTableRow(curRow) {
     let prev = curRow.previousElementSibling;
@@ -231,36 +321,6 @@ function getNextTableRow(curRow) {
     }*/
     return nxt;
 }
-
-
-
-/*** selection and navigation***/
-
-function getSelectionRange() {
-    const sl = window.getSelection();
-    if (!sl.rangeCount) return null;
-    return sl.getRangeAt(0);
-}
-
-
-function getCurrentTableRow() {
-        let r = getSelectionRange();
-        if(!r) return null;
-
-        let p = r.startContainer;
-        while(p) {
-            // в заголовке таблицы не работаем!
-            if (p.tagName == 'TH') return null;
-
-            if (p.tagName == 'TR') {
-                return p;
-            }
-
-            p = p.parentNode;
-        }
-
-        return null;
-    }
 
 /*** other internals***/
 
