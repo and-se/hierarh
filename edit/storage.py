@@ -6,7 +6,13 @@ class HierarhEditStorage:
 class TextCafedra:
     def __init__(self):
         self.key = None
-        self.html = ""
+        self.html = """
+        <article class="cafedra_article" data-is-obn="false">
+            <div class="header">Заголовок...</div>
+            <div class="text">Текст статьи...</div>
+            <table class="episkops"></table>
+        </article>
+        """
 
     @staticmethod
     def from_html(key, html):
@@ -53,7 +59,6 @@ class TextCollection:
 
     def new(self):
         doc = TextCafedra()
-        doc.html = "empty NEW"
         return doc
 
     def upsert(self, key, html=None):

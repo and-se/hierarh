@@ -39,14 +39,21 @@ function makeCafedraEditForm(root) {
     // заголовок таблицы
     let th = table.querySelector('thead');
     if (!th) {
+        console.log('Restore header in table', table);
         th = createElementByHtml(TABLE_HEAD_TEMPLATE);
         table.insertBefore(th, table.firstElementChild);
-        console.log('Restore header in table', table);
     }
     th.setAttribute('contenteditable', false);
     th.classList.add('he-table-head');
     prepareNotes(table);
     // TODO проверить, что у заголовков tr.header-row стоит colspan=3
+    if (!table.querySelector('tbody')) {
+        console.log('Add data row to empty table', table);
+
+        let tb = document.createElement('tbody');
+        tb.appendChild(createElementByHtml(TABLE_ROW_TEMPLATE));
+        table.appendChild(tb);
+    }
 
     // скрытие/показ кнопок, специфичных для таблицы
     root.addEventListener('click', updateMenu);
