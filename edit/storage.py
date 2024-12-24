@@ -46,7 +46,8 @@ TCAF = {
     1: TextCafedra.from_html(1, "cafedra 1\n<b>some text</b>"),
     2: TextCafedra.from_html(2, "cafedra 2\n<b>some text 2</b>"),
     3: TextCafedra.from_html(3, "cafedra 3\n<b>some text 3</b>"),
-    4: load_test_file(4, 'edit/testdata/1.html')
+    4: load_test_file(4, 'edit/testdata/1.html'),
+    5: load_test_file(5, 'edit/testdata/2.html'),
 }
 
 

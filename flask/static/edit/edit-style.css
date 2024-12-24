@@ -12,6 +12,13 @@
 .he-edit-form .header {
     font-weight: bold;
     font-size: xx-large;
+    display: inline-block;
+    width: 70%;
+}
+
+.he-edit-form .he-props {
+    display: inline-block;
+    vertical-align: top;
 }
 
 .he-edit-form details {

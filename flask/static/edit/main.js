@@ -58,8 +58,17 @@ function makeCafedraEditForm(root) {
     // скрытие/показ кнопок, специфичных для таблицы
     root.addEventListener('click', updateMenu);
 
+    // Редактирование общих свойств формы - пока это признак обновленческой
+    let props = root.querySelector('.he-props');
+    if (!props) props = createElementByHtml(PROPS_EDIT_TEMPLATE);
+    let obncb = props.querySelector("#he-obn-checkbox");
+    obncb.checked = root.dataset.isObn === 'true';
+    obncb.hfroot = root;
+    root.insertBefore(props, text);
+
     // из буфера обмена разрешаем вставлять только текст, чтобы случайно
     // не вставились ссылки на внешние ресурсы и неправильные теги.
+    // TODO разрешить вставлять теги details со сносками
     root.addEventListener("paste", (ev) => {
         ev.preventDefault();
 
@@ -99,7 +108,7 @@ function getSaveData() {
     let data = this.root.cloneNode(true);
     processAllChildren(data, (ch) => {
             if (ch.hasAttribute('contenteditable')) ch.removeAttribute('contenteditable');
-            if (ch.classList.contains('he-delete-button')) ch.remove();
+            if (ch.classList.contains('he-tmp')) ch.remove();
             let toDel = [];
             for (let cl of ch.classList) {
                 if (cl.startsWith('he-')) {
@@ -117,7 +126,19 @@ function getSaveData() {
 }
 /*** html templates ***/
 
-let DELETE_BTN_TEMPLATE = `<button class="he-delete-button" onclick="deleteNote(this)">удалить</button>`;
+let PROPS_EDIT_TEMPLATE = `
+    <div class="he-props he-tmp">
+    <!--<input type="text" list="he-caf-types" placeholder="заполните если обновленческая" value = ""/>
+    <datalist id="he-caf-types">
+      <option>обновленческая</option>
+      <option>григорианская</option>
+    </datalist>-->
+        <input type="checkbox" id="he-obn-checkbox" onclick="this.hfroot.dataset.isObn = this.checked"/>
+        <label for="he-obn-checkbox">обновленческая</label>
+    </div>
+`;
+
+let DELETE_BTN_TEMPLATE = `<button class="he-delete-button he-tmp" onclick="deleteNote(this)">удалить</button>`;
 
 let NOTE_HEADER_TEMPLATE = `
     <summary>
