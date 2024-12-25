@@ -1,3 +1,5 @@
+import re
+
 class HierarhEditStorage:
     def __init__(self):
         self.cafedra = TextCollection('cafedra')
@@ -24,13 +26,14 @@ class TextCafedra:
         return doc
 
     def header(self):
-        return self.html.strip().split('\n')[0]
+        m = re.search(r'<div class="header">([^<]+)</div>', self.html)
+        return m.group(1) if m else self.html.strip().split('\n')[0]
 
     def is_obn(self):
         return False  # ...
 
     def __repr__(self):
-        return f"TextCafedra({self.key}, {self.html})"
+        return f"TextCafedra({self.key}, {self.header()})"
 
     def __str__(self):
         return repr(self)
