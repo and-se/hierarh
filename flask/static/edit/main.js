@@ -106,9 +106,15 @@ function makeEditMenu(menuRoot) {
 
 function getSaveData() {
     let data = this.root.cloneNode(true);
+    data.classList.remove('he-edit-form');
+
     processAllChildren(data, (ch) => {
             if (ch.hasAttribute('contenteditable')) ch.removeAttribute('contenteditable');
-            if (ch.classList.contains('he-tmp')) ch.remove();
+            if (ch.classList.contains('he-tmp')) {
+                //console.log('remove', ch);
+                ch.remove();
+                return true;
+            }
             let toDel = [];
             for (let cl of ch.classList) {
                 if (cl.startsWith('he-')) {
@@ -121,7 +127,7 @@ function getSaveData() {
             }
             if(ch.classList.length == 0) ch.removeAttribute('class');
     });
-
+    console.log(data.outerHTML);
     return data.outerHTML;
 }
 /*** html templates ***/
@@ -407,7 +413,12 @@ function prepareNotes(tag) {
 }
 
 function processAllChildren(elem, f) {
+    let chh = []
     for (let ch of elem.children) {
+        chh.push(ch);
+    }
+
+    for (let ch of chh) {
         let skipChildren = f(ch);
         if (!skipChildren)
             processAllChildren(ch, f);

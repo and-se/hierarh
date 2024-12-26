@@ -12,7 +12,10 @@
 <script>
     let hform = null;
 
-    window.onload = function(){
+    window.onload = initForm;
+
+
+    function initForm(){
         try {
             let d = document.querySelector('#data article.cafedra_article');
             hform = makeCafedraEditForm(d);
@@ -32,9 +35,15 @@
 {{doc.html}}
 </div>
 
+<div id="message"></div>
 
 <button onclick="saveData()">Сохранить</button>
-<div id="message"></div>
+<span class="download-buttons">
+<button onclick="downloadData()">Скачать</button>
+<button onclick="document.getElementById('dupl').click()">Загрузить из файла</button>
+<input id="dupl" type="file" accept=".html" style="display: none;" onchange="loadDataFromFile()">
+</span>
+
 
 {% endautoescape %}
 </main>
@@ -65,7 +74,7 @@ async function saveData() {
         let j = await resp.json();
 
         if (j.success) {
-            showMessage('Saved. Wait page reload');
+            showMessage('Изменения сохранены. Дождитесь обновления страницы');
             setTimeout(() =>  window.location.href = '/edit/{{item_type}}/' + j.key, 500);
         } else {
             showError(j.message);
@@ -74,6 +83,40 @@ async function saveData() {
     } else {
         showError(resp.text());
     }
+}
+
+function downloadData() {
+    var bl = new Blob([hform.getData()], {type: 'text/plain'});
+
+    var a = document.createElement('a');
+    document.body.appendChild(a);
+
+    a.href = URL.createObjectURL(bl);
+    a.download = hform.header.innerText + '.html';
+    a.click();
+
+    document.body.removeChild(a);
+}
+
+function loadDataFromFile() {
+    var file = document.getElementById('dupl').files[0];
+        if (!file) {
+            return;
+        }
+
+        let reader = new FileReader();
+        reader.readAsText(file);
+
+        reader.onload = () => {
+            document.getElementById('data').innerHTML = reader.result;
+            document.getElementById('menu').innerHTML = '';
+            initForm(); // TODO remove old event handlers???
+        }
+
+        reader.onerror = () => {
+            showError("Ошибка загрузки данных файла. Попробуйте ещё раз");
+        }
+
 }
 
 function showMessage(msg) {

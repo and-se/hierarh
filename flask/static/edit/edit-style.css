@@ -3,6 +3,12 @@
     top: 0px;
     background-color: #008899;
     border-bottom: 1px solid gray;
+    padding: 0 15px;
+    border-radius: 5px;
+}
+
+.download-buttons {
+    float: right;
 }
 
 .he-edit-form {
