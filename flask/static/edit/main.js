@@ -89,6 +89,26 @@ function makeCafedraEditForm(root) {
         addEofIfRequired();
     });
 
+    root.addEventListener("input", (ev) => {
+        // Следим, чтобы сноски были после текста, а не с новой строки
+        // contenteditable при нажатии Enter иногда раскладывает сноски по отдельным строкам
+        // так, что это нельзя отредактировать.
+        repairDetails(root);
+    });
+
+    // <br> между строками вместо тегов <div> для каждой строки
+    root.addEventListener("keydown", (ev) => {
+        ev = ev || window.event;
+        var keyCode = ev.charCode || ev.keyCode;
+        if (keyCode == 13) {
+            document.execCommand('insertHTML', false, '<br/>');
+            //document.execCommand('insertLineBreak');
+            ev.preventDefault();
+        }
+
+
+    });
+
     result.makeMenu = makeEditMenu;
     result.getData = getSaveData;
 
@@ -134,11 +154,6 @@ function getSaveData() {
 
 let PROPS_EDIT_TEMPLATE = `
     <div class="he-props he-tmp">
-    <!--<input type="text" list="he-caf-types" placeholder="заполните если обновленческая" value = ""/>
-    <datalist id="he-caf-types">
-      <option>обновленческая</option>
-      <option>григорианская</option>
-    </datalist>-->
         <input type="checkbox" id="he-obn-checkbox" onclick="this.hfroot.dataset.isObn = this.checked"/>
         <label for="he-obn-checkbox">обновленческая</label>
     </div>
@@ -443,6 +458,25 @@ function addEofIfRequired() {
 
         //console.log('add eof to', target);
     }
+}
+
+function repairDetails(root) {
+    processAllChildren(root, tag => {
+        if (tag.tagName == 'DETAILS') {
+            let pr = tag.previousSibling;
+            if (pr && pr.nodeType == Node.ELEMENT_NODE && pr.tagName == 'BR') {
+                console.log('remove', pr, 'before', tag);
+                // сноска не может быть с новой строки - она всегда после текста
+                pr.remove();
+            }
+
+            pr = tag.previousSibling;
+            if (!pr || (pr.nodeType == Node.TEXT_NODE && pr.textContent.trim()=='')) {
+                console.log('add ... before', tag);
+                tag.before("...");
+            }
+        }
+    });
 }
 
 function createElementByHtml(html) {
