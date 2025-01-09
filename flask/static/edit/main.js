@@ -105,8 +105,6 @@ function makeCafedraEditForm(root) {
             //document.execCommand('insertLineBreak');
             ev.preventDefault();
         }
-
-
     });
 
     result.makeMenu = makeEditMenu;
