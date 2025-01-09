@@ -4,6 +4,7 @@
     <form class="search" method="get">
         <input name="query" value="{{query}}">
         <button type="submit">Поиск</button>
+        <a class="button" href="/edit/{{item_type}}/new">Новая</a>
     </form>
 
     <ul class="items">
@@ -12,7 +13,6 @@
     {% endfor %}
     </ul>
 
-    <a class="button" href="/edit/{{item_type}}/new">новая</a>
 
 
 </main>

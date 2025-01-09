@@ -23,4 +23,8 @@
     </header>
     {% block content required %}
     {% endblock content %}
+
+    <footer>
+        Вы вошли под пользователем <strong>{{current_user.title}}</strong>. <a href='/logout'>Выйти</a>
+    </footer>
 </body>

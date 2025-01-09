@@ -10,3 +10,5 @@ data/*
 
 env
 venv
+
+settings.py

@@ -1,4 +1,5 @@
 import re
+import json
 
 class HierarhEditStorage:
     def __init__(self, mode="db"):
@@ -19,6 +20,7 @@ class TextCafedra:
             <table class="episkops"></table>
         </article>
         """
+        self.reg_data = None
 
     @staticmethod
     def from_html(key, html):
@@ -60,20 +62,29 @@ class TextCollectionDb:
         doc = TextCafedra()
         return doc
 
-    def upsert(self, key, html=None):
+    def upsert(self, key, html=None, reg_data:dict=None):
         # create new or update current item
         if isinstance(key, TextCafedra):
             key, html = key.key, key.html
+        elif not html:
+            raise ValueError("html can't be None")
+
+        if reg_data:
+            if not isinstance(reg_data, dict):
+                raise ValueError("reg_data must be dict or None")
+            reg_data = json.dumps(reg_data)
 
         doc = TextCafedra.from_html(key, html)
 
         if key:
             key = int(key)
-            key2 = self.orm.replace(id=key, header=doc.header(), html=html).execute()
+            key2 = self.orm.replace(id=key, header=doc.header(), html=html, reg_data=reg_data).execute()
             assert key==key2
             doc.key = key
         else:
-            doc.key = self.orm.create(header=doc.header(), html=html).id
+            doc.key = self.orm.create(header=doc.header(), html=html, reg_data=reg_data).id
+
+        doc.reg_data = reg_data
 
         return doc
 
@@ -81,7 +92,11 @@ class TextCollectionDb:
         # get from db
         r = self.orm.get_or_none(key)
         if r:
-            return TextCafedra.from_html(r.id, r.html)
+            res = TextCafedra.from_html(r.id, r.html)
+
+            if r.reg_data:
+                res.reg_data = json.loads(r.reg_data)
+            return res
 
 
 class CafedraEditOrm(Model):
@@ -91,6 +106,7 @@ class CafedraEditOrm(Model):
     id = AutoField()
     header = TextField(index=True)
     html = TextField(null=False)
+    reg_data = TextField(null=True)
 
 if __name__ == '__main__':
     import sys
@@ -138,7 +154,7 @@ class TestTextCollection:
         doc = TextCafedra()
         return doc
 
-    def upsert(self, key, html=None):
+    def upsert(self, key, html=None, reg_data=None):
         # create new or update current item
 
         if isinstance(key, TextCafedra):

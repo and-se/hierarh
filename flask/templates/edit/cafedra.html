@@ -41,9 +41,14 @@
 <span class="download-buttons">
 <button onclick="downloadData()">Скачать</button>
 <button onclick="document.getElementById('dupl').click()">Загрузить из файла</button>
+
+
 <input id="dupl" type="file" accept=".html" style="display: none;" onchange="loadDataFromFile()">
 </span>
 
+{% if last_edit%}
+<div>последняя правка <em>{{last_edit}}</em></div>
+{% endif %}
 
 {% endautoescape %}
 </main>
