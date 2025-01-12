@@ -9,20 +9,22 @@ sys.path.append(os.getcwd())
 from article_parser import divide_episkop_row
 from parsers.fail import ParseFail
 
-CSS_UNPARSED_CLASS = 'error-unparsed'
 CSS_NOTE_ERROR = 'error-note'
 
 def main():
-    filename = sys.argv[1]
+    filename = 'data/edit-init/cafedra-exp-abbrs-edit.json' #sys.argv[1]
+    print("Process file", filename)
+
     if filename.endswith(".json"):
         filename, error = article_json_to_html_edit(filename)
         if error:
             print(f"""При конвертации начальных данных для редактирования есть ошибки.
-            Отредактируйте в файле {filename} элементы с class="{CSS_UNPARSED_CLASS}"
-            {error}""")
+            Результат конвертации лежит в {filename},
+            а отчёт с удобным просмотром ошибок - {error}.
+            Для поиска ошибок ищите html теги с class = {CSS_NOTE_ERROR}""")
             return 1
 
-    print(f"Сконвертированный html в файле {filename}")
+        print(f"Успешно сконвертированный html в файле {filename}")
 
 def article_json_to_html_edit(filename):
     result_file = Path(filename).with_suffix(".html")
@@ -32,10 +34,49 @@ def article_json_to_html_edit(filename):
         assert isinstance(data, list)
         for d in data:
             r, err = convert_cafedra_json_to_html(d)
-            if err:
-                errs.append(d['header'])
             t.write(r)
-    return result_file, errs
+            if err:
+                r, err = convert_cafedra_json_to_html(d, mode='error_report')
+
+                errs.append(r)
+
+
+    if errs:
+        error_file = Path(filename).with_suffix(".errors.html")
+        with open(error_file, 'w', encoding="utf8") as f:
+            f.write(f'''
+            <body>
+            <style>
+            .{CSS_NOTE_ERROR} {{
+                color:red;
+                background-color: yellow;
+            }}
+
+            body {{
+                max-width: 800px;
+                margin: auto;
+            }}
+
+            .header {{
+                font-size: x-large;
+                font-weight: bold;
+            }}
+            </style>
+
+            <h1>Статьи с ошибками</h1>
+            <div>
+            Всего статей с ошибками: {len(errs)}<br/>
+            Жёлтым выделены ошибки в сносках и прочем.
+            </div>
+            <hr/>
+            ''')
+            for er in errs:
+                f.write(er)
+            f.write("</body>")
+    else:
+        error_file = None
+
+    return result_file, error_file
 
 
 
@@ -47,7 +88,7 @@ class Note:
     text: str
     touched: bool = False
 
-def convert_cafedra_json_to_html(caf: dict):
+def convert_cafedra_json_to_html(caf: dict, mode="normal"):
     has_err = False
     notes = [Note(int(x['num']), x['text']) for x in caf['notes']]
 
@@ -61,51 +102,84 @@ def convert_cafedra_json_to_html(caf: dict):
         r = find_note(m.group('note_num'))
         if r:
             r.touched=True
-            return f''' <details><div data-note-num="{m.group('note_num')}">{r.text}</div>'''
+            if mode=="error_report":
+                return f'''<sup data-note-num="{m.group('note_num')}">{m.group('note_num')}</sup>'''
+            else:
+                return f'''<details><div>{r.text}</div></details>'''
         else:
+            nonlocal has_err
             has_err=True
-            return f'''<span class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}"></span>'''
+
+            if mode=="error_report":
+                return f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="сноска БЕЗ ТЕКСТА"><b>{m.group('note_num')}</b> - сноска БЕЗ ТЕКСТА ???</sup>'''
+            else:
+                return f'''<sup style="color:red" title="сноска БЕЗ ТЕКСТА"><b>{m.group('note_num')}</b>???</sup>''' + \
+                f'''<details><div>??? нет текста сноски ???</div></details>'''
 
     def convert_notes(txt):
+        if not txt: return ''
         return note_re.sub(note_convert, txt)
 
     header = convert_notes(caf['header'])
     text = convert_notes(caf.get('text') or '')
 
     html_eps = []
-    for ep in (caf['episkops'] or []):
+    for i, ep in enumerate((caf['episkops'] or []), 1):
         if isinstance(ep, str):
             ep = convert_notes(ep)
             html_eps.append(f'''<tr class="header-row"><td colspan="3">{ep}</td></tr>''')
         else:
             assert isinstance(ep, dict) and len(ep) == 1
             ep = ep['text']
-            r = divide_episkop_row(ep)
-            if isinstance(r, ParseFail):
-                ep = convert_notes(ep)
-                html_eps.append(
-                f'  <tr class="{CSS_UNPARSED_CLASS}"><td></td><td></td><td>{ep}</td></tr>')
+            if isinstance(ep, list):
+                assert len(ep) == 3 and all(map(lambda x: isinstance(x, str) or x is None, ep)), \
+                       "Поле text должно содержать либо строку, либо массив 3-х строк"
+                start, end, who = ep
             else:
+                r = divide_episkop_row(ep)
+                if isinstance(r, ParseFail):
+                    raise Exception(f'''
+В статье {caf['header']} не удалось разбить строку епископа №{i}
+{ep}
+на колонки ОТ ДО и КТО.
+
+Во входном json файле сделайте разбивку под длинным тирэ вручную:
+полю 'text' вместо строки сопоставьте массив из трёх строк.
+Если исходная строка взята в скобки, например "text": "(90 – 120 – Кто-то)", то сделайте так:
+"text": ["(90", "120", "Кто-то)"]  ''')
                 start, end, who, inexact = r
                 if inexact:
                     start = '( ' + start
                     who = who + ' )'
-                start, end, who = map(convert_notes, (start, end, who))
-                html_eps.append(
-                f'  <tr><td>{start}</td><td>{end}</td><td>{who}</td></tr>')
+
+            start, end, who = map(convert_notes, (start, end, who))
+            html_eps.append(
+            f'  <tr><td>{start}</td><td>{end}</td><td>{who}</td></tr>')
     html_eps = '\n'.join(html_eps)
 
-    unused_notes = '\n'.join([f'''<li>{x.num}. {x.text}</li>''' for x in notes if not x.touched])
-    if unused_notes:
-        unused_notes = f'''
-        <div class="{CSS_NOTE_ERROR}">
-        Неиспользованные ссылки
+    unused_notes = '\n'.join([f'''<li style="color:red">{x.num}. {x.text}</li>''' for x in notes if not x.touched])
+    if unused_notes: has_err = True
+
+    if mode == "error_report":
+        def gen_attrs(is_touched):
+            if is_touched:
+                return ''
+            else:
+                return f'class="{CSS_NOTE_ERROR}" title="не упомянута в тексте"'
+
+        notes_info = '\n'.join([f'''<li {gen_attrs(x.touched)}>{x.num}. {x.text}</li>''' for x in notes])
+        caption = "Красным отмечены сноски, не упомянутые в статье"
+    else:
+        notes_info = unused_notes
+        caption = "Неиспользованные сноски"
+    if notes_info:
+        notes_info = f'''<br>
+        <div>
+        <em>{caption}</em>
             <ul>
-            {unused_notes}
+            {notes_info}
             </ul>
         </div>'''
-        has_err = True
-
 
     #NB! html-escaping уже сделан во входном json
     result = f'''
@@ -113,13 +187,14 @@ def convert_cafedra_json_to_html(caf: dict):
 <div class="header">{header}</div>
 <div class="text">
 {text}
+<br>
 </div>
 <table class="episkops">
 {html_eps}
 </table>
-{unused_notes}
+{notes_info}
 </article>
-    '''
+'''
 
     return result, has_err
 
