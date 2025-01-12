@@ -60,6 +60,12 @@
     margin-left: 10px;
 }
 
+.he-edit-form details div {
+    border-left: 1px solid gray;
+    padding-left: 5px;
+    border-radius: 10px;
+}
+
 .he-undo-button {
     margin-left: 60px;
     background-color: gray;
