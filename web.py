@@ -170,7 +170,7 @@ def edit_root():
 @login_required
 def list_cafedra_edit():
     query = request.args.get('query', '')
-    d = db_edit.cafedra.portion(query=query)
+    d = db_edit.cafedra.portion(query=query, take=10**7)
     return render_template('edit/list.html', items=d, item_type='cafedra', query=query)
 
 

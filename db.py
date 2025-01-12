@@ -136,24 +136,8 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
     def rollback(self):
         _Db.rollback()
 
-    @staticmethod
-    def _build_search_condition(query, column):
-        words = tuple(x.lower() for x in query.split())
-
-        def word_cond(w):
-            return fn.INSTR(fn.LOWER_PY(column), w)
-
-        if words:
-            cond = word_cond(words[0])
-            for w in words[1:]:
-                cond = cond & word_cond(w)
-        else:
-            cond = None
-
-        return cond
-
     def _cafedra_q(self, query):
-        cond = self._build_search_condition(query, CafedraOrm.header)
+        cond = orm_all_words_search_condition(query, CafedraOrm.header)
         # with self.ctx():
         q = CafedraOrm.select(CafedraOrm.id,
                               CafedraOrm.header,
@@ -172,7 +156,7 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
         return q
 
     def _episkop_q(self, query):
-        cond = self._build_search_condition(query, EpiskopOrm.header)
+        cond = orm_all_words_search_condition(query, EpiskopOrm.header)
         q = EpiskopOrm.select(EpiskopOrm.id,
                               EpiskopOrm.header,
                               EpiskopOrm.is_obn) \
@@ -317,6 +301,21 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
         return ep_qq.get_or_none()
 
 
+def orm_all_words_search_condition(query, column):
+    words = tuple(x.lower() for x in query.split())
+
+    def word_cond(w):
+        return fn.INSTR(fn.LOWER_PY(column), w)
+
+    if words:
+        cond = word_cond(words[0])
+        for w in words[1:]:
+            cond = cond & word_cond(w)
+    else:
+        cond = None
+
+    return cond
+
 class PeeweeUserCommentsStorage:
     @staticmethod
     def create_new_sqlite_db(remove_if_exists):
@@ -373,8 +372,8 @@ if __name__ == "__main__":
 
         build all - delete old and rebuild main db.
                     comments db will be recreated (old comments will be lost!)
-                    
-        build main-old - delete old and rebuild main db using 'cafedra_articles.json' file 
+
+        build main-old - delete old and rebuild main db using 'cafedra_articles.json' file
                     generated from xml. Text data contains many abbreviations.
                     In 'main' mode they are resolved.
 

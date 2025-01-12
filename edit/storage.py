@@ -1,5 +1,6 @@
 import re
 import json
+from db import get_db, orm_all_words_search_condition
 
 class HierarhEditStorage:
     def __init__(self, mode="db"):
@@ -55,7 +56,10 @@ class TextCollectionDb:
         self.orm = orm_model
 
     def portion(self, skip=0, take=20, query=None):
-        q = self.orm.select(self.orm.id, self.orm.html).order_by(self.orm.header).limit(take).offset(skip)
+        q = self.orm.select(self.orm.id, self.orm.html) \
+                    .where(orm_all_words_search_condition(query, self.orm.header)) \
+                    .order_by(self.orm.header) \
+                    .limit(take).offset(skip)
         return [TextCafedra.from_html(x.id, x.html) for x in q]
 
     def new(self):
@@ -66,6 +70,8 @@ class TextCollectionDb:
         # create new or update current item
         if isinstance(key, TextCafedra):
             key, html = key.key, key.html
+            if not reg_data:
+                reg_data = key.reg_data
         elif not html:
             raise ValueError("html can't be None")
 
@@ -113,18 +119,18 @@ if __name__ == '__main__':
     from pathlib import Path
     sys.path.append(str(Path(__file__).parent.parent))
 
-#import sys
-#print(sys.path)
-from db import get_db
 
 DbName = 'data/hierarh-edit.sqlite3'
+EditDb = None
 
-Edit_db = get_db(DbName)
-Edit_db.bind([CafedraEditOrm])
+def init_edit_db():
+    global EditDb
+    EditDb = get_db(DbName)
+    EditDb.bind([CafedraEditOrm])
+    EditDb.create_tables([CafedraEditOrm])
+    return EditDb
 
-Edit_db.create_tables([CafedraEditOrm])
-
-
+init_edit_db()
 
 #############  TEST ##############
 

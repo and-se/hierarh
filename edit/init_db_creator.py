@@ -9,22 +9,73 @@ sys.path.append(os.getcwd())
 from article_parser import divide_episkop_row
 from parsers.fail import ParseFail
 
+from edit import storage
+
+from time import time as unix_now
+
 CSS_NOTE_ERROR = 'error-note'
 
 def main():
-    filename = 'data/edit-init/cafedra-exp-abbrs-edit.json' #sys.argv[1]
-    print("Process file", filename)
+    if len(sys.argv) != 2:
+        print("добавьте параметр json для преобразования json во входной html,\n" + \
+              "либо db для построения БД на основе html")
+        return 1
+    if sys.argv[1] == 'json':
+        filename = 'data/edit-init/cafedra-exp-abbrs-edit.json' #sys.argv[1]
+        print("Конвертируем файл", filename, "во входной html")
 
-    if filename.endswith(".json"):
-        filename, error = article_json_to_html_edit(filename)
-        if error:
-            print(f"""При конвертации начальных данных для редактирования есть ошибки.
-            Результат конвертации лежит в {filename},
-            а отчёт с удобным просмотром ошибок - {error}.
-            Для поиска ошибок ищите html теги с class = {CSS_NOTE_ERROR}""")
-            return 1
+        if filename.endswith(".json"):
+            filename, error = article_json_to_html_edit(filename)
+            if error:
+                print(f"""При конвертации начальных данных для редактирования есть ошибки.
+                Результат конвертации лежит в {filename},
+                а отчёт с удобным просмотром ошибок - {error}.
+                Для поиска ошибок ищите html теги с class = {CSS_NOTE_ERROR}""")
+                return 2
 
-        print(f"Успешно сконвертированный html в файле {filename}")
+            print(f"Успешно сконвертированный html в файле {filename}")
+    elif sys.argv[1] == 'db':
+        filename = 'data/edit-init/cafedra-exp-abbrs-edit.html'
+        print("Загружаем данные из файла", filename, "в БД", storage.DbName)
+
+        with open(filename) as f:
+            html = f.read().strip()
+
+        articles = [x.strip() + '</article>' for x in html.split('</article>') if x.strip().startswith('<article')]
+
+        check = html.count('<article class="cafedra_article')
+        assert len(articles) == check, f"Должно быть {check} статей, а получилось {len(articles)}"
+
+        print(f"Всего {check} статей")
+
+        print("Создаём БД", storage.DbName)
+        if os.path.exists(storage.DbName):
+            ans = input("БД уже существует. Удалить? ")
+            if ans.lower().strip() in ['1', 'true', 'yes', 'да']:
+                os.remove(storage.DbName)
+            else:
+                print("Тогда ничего не делаем")
+                return 3
+
+        db = storage.init_edit_db()
+        with db.atomic():
+            stor = storage.HierarhEditStorage()
+            reg_data = {
+                'who': 'admin',
+                'when': unix_now()
+            }
+            for art in articles:
+                stor.cafedra.upsert(key=None, html=art, reg_data=reg_data)
+
+
+        print("Готово!")
+
+
+
+
+
+
+
 
 def article_json_to_html_edit(filename):
     result_file = Path(filename).with_suffix(".html")
