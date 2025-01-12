@@ -116,6 +116,7 @@ function loadDataFromFile() {
             document.getElementById('data').innerHTML = reader.result;
             document.getElementById('menu').innerHTML = '';
             initForm(); // TODO remove old event handlers???
+            showMessage('Данные успешно загружены');
         }
 
         reader.onerror = () => {

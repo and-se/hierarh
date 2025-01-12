@@ -174,14 +174,14 @@ let NOTE_TEMPLATE = `
 
 let MENU_TEMPLATE = `
     <div class="he-menu">
-        <button class="he-add-note-button" onclick="addNote()">сноска</button>
+        <button class="he-add-note-button" onclick="addNote()" title="добавить сноску">сноска</button>
 
         <span class="he-table-menu" style="display:none">
-            <button class="he-delete-row-button" onclick="deleteRow(this.table)">X</button>
-            <button class="he-up-row-button" onclick="upRow(this.table)">^</button>
-            <button class="he-down-row-button" onclick="downRow(this.table)">v</button>
-            <button class="he-add-row-buton" onclick="addRow(this.table)">+</button>
-            <button class="he-add-header-button" onclick="addRow(this.table, 'header-row')">+ заголовок</button>
+            <button class="he-delete-row-button" onclick="deleteRow(this.table)" title="удалить строку">X</button>
+            <button class="he-up-row-button" onclick="upRow(this.table)" title="переместить строку ввверх">^</button>
+            <button class="he-down-row-button" onclick="downRow(this.table)" title="переместить строку вниз">v</button>
+            <button class="he-add-row-buton" onclick="addRow(this.table)" title="добавить строку">+</button>
+            <button class="he-add-header-button" onclick="addRow(this.table, 'header-row')" title="добавить подзаголовок таблицы">+ заголовок</button>
         </span>
 
         <button onclick="doUndo()" class="he-undo-button">отмена (Ctrl+Z)</button>
