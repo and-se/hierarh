@@ -44,7 +44,7 @@ def article_json_to_html_edit(filename):
     if errs:
         error_file = Path(filename).with_suffix(".errors.html")
         with open(error_file, 'w', encoding="utf8") as f:
-            f.write(f'''
+            f.write(f'''<!DOCTYPE html>
             <body>
             <style>
             .{CSS_NOTE_ERROR} {{
@@ -60,6 +60,15 @@ def article_json_to_html_edit(filename):
             .header {{
                 font-size: x-large;
                 font-weight: bold;
+            }}
+
+            table {{
+                border-collapse: collapse;
+            }}
+            td {{
+                height: 40px; /* it is min height */
+                border: 1px solid #DDDDDD;
+                padding: 5px;
             }}
             </style>
 
@@ -113,7 +122,7 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
             if mode=="error_report":
                 return f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="сноска БЕЗ ТЕКСТА"><b>{m.group('note_num')}</b> - сноска БЕЗ ТЕКСТА ???</sup>'''
             else:
-                return f'''<sup style="color:red" title="сноска БЕЗ ТЕКСТА"><b>{m.group('note_num')}</b>???</sup>''' + \
+                return f'''<sup class="{CSS_NOTE_ERROR}" style="color:red" title="сноска БЕЗ ТЕКСТА"><b>{m.group('note_num')}</b>???</sup>''' + \
                 f'''<details><div>??? нет текста сноски ???</div></details>'''
 
     def convert_notes(txt):
@@ -157,29 +166,7 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
             f'  <tr><td>{start}</td><td>{end}</td><td>{who}</td></tr>')
     html_eps = '\n'.join(html_eps)
 
-    unused_notes = '\n'.join([f'''<li style="color:red">{x.num}. {x.text}</li>''' for x in notes if not x.touched])
-    if unused_notes: has_err = True
-
-    if mode == "error_report":
-        def gen_attrs(is_touched):
-            if is_touched:
-                return ''
-            else:
-                return f'class="{CSS_NOTE_ERROR}" title="не упомянута в тексте"'
-
-        notes_info = '\n'.join([f'''<li {gen_attrs(x.touched)}>{x.num}. {x.text}</li>''' for x in notes])
-        caption = "Красным отмечены сноски, не упомянутые в статье"
-    else:
-        notes_info = unused_notes
-        caption = "Неиспользованные сноски"
-    if notes_info:
-        notes_info = f'''<br>
-        <div>
-        <em>{caption}</em>
-            <ul>
-            {notes_info}
-            </ul>
-        </div>'''
+    notes_info = build_bad_notes(mode, notes)
 
     #NB! html-escaping уже сделан во входном json
     result = f'''
@@ -197,6 +184,35 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
 '''
 
     return result, has_err
+
+def build_bad_notes(mode, notes):
+    unused_notes = '\n'.join([f'''<li class="{CSS_NOTE_ERROR}" style="color:red">{x.num}. {x.text}</li>''' for x in notes if not x.touched])
+    if unused_notes: has_err = True
+
+    if mode == "error_report":
+        def gen_attrs(is_touched):
+            if is_touched:
+                return ''
+            else:
+                return f'class="{CSS_NOTE_ERROR}" title="не упомянута в тексте"'
+
+        notes_info = '\n'.join([f'''<li {gen_attrs(x.touched)}>{x.num}. {x.text}</li>''' for x in notes])
+        caption = "Красным отмечены сноски, не упомянутые в статье"
+        action = ''
+    else:
+        notes_info = unused_notes
+        caption = "Неиспользуемые сноски:"
+        action = '''<button onclick="this.closest('.notes-info').remove()">удалить это сообщение</button>'''
+    if notes_info:
+        return f'''
+        <div class="notes-info">
+        <em>{caption}</em>
+        {action}
+        <ul>
+        {notes_info}
+        </ul>
+        </div>'''
+    return ''
 
 if __name__ == '__main__':
     main()
