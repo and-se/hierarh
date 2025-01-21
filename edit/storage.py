@@ -125,42 +125,6 @@ def init_edit_db():
 
 init_edit_db()
 
-#############  TEST ##############
-
-if __name__ == '__main__':
-    import sys
-    from pathlib import Path
-    sys.path.append(str(Path(__file__).parent.parent))
-
-
-
-def test():
-    caf = HierarhEditStorage().cafedra
-    print("PORTION", caf.portion())
-
-    print("UPDATE key=2")
-    doc = caf.get(2)
-    if not doc:
-        print("FAIL => CREATE key=2")
-        doc = caf.upsert(2, "new 2 ar")
-    print(doc)
-    print("HEADER key=2", doc.header())
-    from datetime import datetime
-    doc.html = "UPDATED " + str(datetime.now())
-    doc = caf.upsert(doc)
-    print("after: ", doc)
-    print(caf.portion(), '\n')
-
-    print("KEY=123", caf.get(123), '\n')
-
-    print("NEW")
-    doc = caf.new()
-    doc.html = "THE NEW"
-    print(doc)
-    doc = caf.upsert(doc)
-    print("after:", doc)
-    print(caf.portion())
-    print()
 
 if __name__ == '__main__':
     test()

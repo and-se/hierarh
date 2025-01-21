@@ -76,6 +76,15 @@ class TestStorage(unittest.TestCase):
         self.cafedra.upsert(n6)
         self.assertGreater(n6.reg_data['when'], n5.reg_data['when'])
 
+        n7 = self.cafedra.get(n6.key)
+        self.checkCafEqual(n7, n6)
+        n8 = self.cafedra.portion(take=1)[0]
+        self.checkCafEqual(n8, n6)
+
+        # test no unknown doc
+        no = self.cafedra.get(12345)
+        self.assertIsNone(no)
+
     def checkCafEqual(self, c1, c2):
         self.assertEqual(c1.key, c2.key)
         self.assertEqual(c1.html, c2.html)
