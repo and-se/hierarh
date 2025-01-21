@@ -302,6 +302,8 @@ class PeeweeHistHierarhStorage(HistHierarhStorageBase):
 
 
 def orm_all_words_search_condition(query, column):
+    if not query:
+        return None
     words = tuple(x.lower() for x in query.split())
 
     def word_cond(w):

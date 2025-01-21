@@ -195,7 +195,10 @@ def do_cafedra_upsert(html, key):
             'when': unix_now()
         }
 
-        doc = db_edit.cafedra.upsert(key, html, reg_data)
+        c = db_edit.cafedra.new()
+        c.key = key
+        c.html = html
+        doc = db_edit.cafedra.upsert(c, reg_data=reg_data)
         return {
             "success" : True,
             "key": doc.key,

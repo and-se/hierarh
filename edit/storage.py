@@ -1,14 +1,65 @@
 import re
 import json
 from db import get_db, orm_all_words_search_condition
+import settings
+from peewee import Model, AutoField, TextField, BooleanField
+
+DbName = settings.EditDbName
 
 class HierarhEditStorage:
-    def __init__(self, mode="db"):
-        if mode=='test':
-            self.cafedra = TestTextCollection('cafedra')
-        else:
-            self.cafedra = TextCollectionDb('cafedra', CafedraEditOrm)
+    def __init__(self):
+        self.cafedra = TextCollectionDb('cafedra', CafedraEditOrm)
 
+    def atomic(self):
+        return EditDb.atomic()
+
+
+
+class TextCollectionDb:
+    def __init__(self, name, orm_model):
+        self.name = name
+        self.orm = orm_model
+
+    def portion(self, skip=0, take=20, query=None):
+        q = self.orm.select(self.orm.id, self.orm.html, self.orm.reg_data) \
+                    .where(orm_all_words_search_condition(query, self.orm.header)) \
+                    .order_by(self.orm.header) \
+                    .limit(take).offset(skip)
+        return [x.toTextCafedra() for x in q]
+
+    def new(self):
+        doc = TextCafedra()
+        return doc
+
+    def upsert(self, doc: 'TextCafedra', reg_data:dict=None) -> 'TextCafedra':
+        # create new or update current item
+        if reg_data is not None:
+            if not isinstance(reg_data, dict):
+                raise ValueError("reg_data must be dict or None")
+        else:
+            reg_data = doc.reg_data
+
+        if 'when' not in reg_data:
+            from time import time as unix_now
+            reg_data['when'] = unix_now()
+
+        rgd = json.dumps(reg_data)
+        if doc.key:
+            doc.key = int(doc.key)
+            key2 = self.orm.replace(id=doc.key, header=doc.header(), html=doc.html, reg_data=rgd).execute()
+            assert doc.key==key2
+        else:
+            doc.key = self.orm.create(header=doc.header(), html=doc.html, reg_data=rgd).id
+
+        doc.reg_data = reg_data
+
+        return doc
+
+    def get(self, key):
+        # get from db
+        r = self.orm.get_or_none(key)
+        if r:
+            return r.toTextCafedra()
 
 
 class TextCafedra:
@@ -21,7 +72,7 @@ class TextCafedra:
             <table class="episkops"></table>
         </article>
         """
-        self.reg_data = None
+        self.reg_data = {}
 
     @staticmethod
     def from_html(key, html):
@@ -46,64 +97,7 @@ class TextCafedra:
         return repr(self)
 
 
-############# ORM ################
-
-from peewee import Model, AutoField, TextField, BooleanField
-
-class TextCollectionDb:
-    def __init__(self, name, orm_model):
-        self.name = name
-        self.orm = orm_model
-
-    def portion(self, skip=0, take=20, query=None):
-        q = self.orm.select(self.orm.id, self.orm.html) \
-                    .where(orm_all_words_search_condition(query, self.orm.header)) \
-                    .order_by(self.orm.header) \
-                    .limit(take).offset(skip)
-        return [TextCafedra.from_html(x.id, x.html) for x in q]
-
-    def new(self):
-        doc = TextCafedra()
-        return doc
-
-    def upsert(self, key, html=None, reg_data:dict=None):
-        # create new or update current item
-        if isinstance(key, TextCafedra):
-            key, html = key.key, key.html
-            if not reg_data:
-                reg_data = key.reg_data
-        elif not html:
-            raise ValueError("html can't be None")
-
-        if reg_data:
-            if not isinstance(reg_data, dict):
-                raise ValueError("reg_data must be dict or None")
-            reg_data = json.dumps(reg_data)
-
-        doc = TextCafedra.from_html(key, html)
-
-        if key:
-            key = int(key)
-            key2 = self.orm.replace(id=key, header=doc.header(), html=html, reg_data=reg_data).execute()
-            assert key==key2
-            doc.key = key
-        else:
-            doc.key = self.orm.create(header=doc.header(), html=html, reg_data=reg_data).id
-
-        doc.reg_data = reg_data
-
-        return doc
-
-    def get(self, key):
-        # get from db
-        r = self.orm.get_or_none(key)
-        if r:
-            res = TextCafedra.from_html(r.id, r.html)
-
-            if r.reg_data:
-                res.reg_data = json.loads(r.reg_data)
-            return res
-
+### ORM ###
 
 class CafedraEditOrm(Model):
     class Meta:
@@ -114,18 +108,17 @@ class CafedraEditOrm(Model):
     html = TextField(null=False)
     reg_data = TextField(null=True)
 
-if __name__ == '__main__':
-    import sys
-    from pathlib import Path
-    sys.path.append(str(Path(__file__).parent.parent))
+    def toTextCafedra(self):
+        r = TextCafedra.from_html(self.id, self.html)
+        r.reg_data = json.loads(self.reg_data)
+        return r
 
 
-DbName = 'data/hierarh-edit.sqlite3'
 EditDb = None
 
 def init_edit_db():
     global EditDb
-    EditDb = get_db(DbName)
+    EditDb = get_db(settings.EditDbName)
     EditDb.bind([CafedraEditOrm])
     EditDb.create_tables([CafedraEditOrm])
     return EditDb
@@ -134,56 +127,11 @@ init_edit_db()
 
 #############  TEST ##############
 
+if __name__ == '__main__':
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
 
-def load_test_file(key, path):
-    with open(path) as f:
-        html = f.read()
-        return TextCafedra.from_html(key, html)
-
-TCAF = {
-    1: TextCafedra.from_html(1, "cafedra 1\n<b>some text</b>"),
-    2: TextCafedra.from_html(2, "cafedra 2\n<b>some text 2</b>"),
-    3: TextCafedra.from_html(3, "cafedra 3\n<b>some text 3</b>"),
-    4: load_test_file(4, 'edit/testdata/1.html'),
-    5: load_test_file(5, 'edit/testdata/2.html'),
-}
-
-
-class TestTextCollection:
-    def __init__(self, name):
-        self.name = name
-
-    def portion(self, skip=0, take=20, query=None):
-        return [x for x in TCAF.values()]
-
-    def new(self):
-        doc = TextCafedra()
-        return doc
-
-    def upsert(self, key, html=None, reg_data=None):
-        # create new or update current item
-
-        if isinstance(key, TextCafedra):
-            key, html = key.key, key.html
-
-        if key:
-            key = int(key)
-
-        global TCAF
-        if key in TCAF:
-            doc = TCAF[key]
-            doc.html = html
-        else:
-            if not key:
-                key = max(TCAF.keys())+1
-            doc = TextCafedra.from_html(key, html)
-            TCAF[key] = doc
-
-        return doc
-
-    def get(self, key):
-        # get from db
-        return TCAF.get(key)
 
 
 def test():

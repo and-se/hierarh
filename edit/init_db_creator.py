@@ -53,19 +53,22 @@ def main():
             ans = input("БД уже существует. Удалить? ")
             if ans.lower().strip() in ['1', 'true', 'yes', 'да']:
                 os.remove(storage.DbName)
+                print("Create new edit db")
+                storage.init_edit_db()
             else:
                 print("Тогда ничего не делаем")
                 return 3
 
-        db = storage.init_edit_db()
-        with db.atomic():
-            stor = storage.HierarhEditStorage()
+        stor = storage.HierarhEditStorage()
+        with stor.atomic():
             reg_data = {
                 'who': 'admin',
                 'when': unix_now()
             }
             for art in articles:
-                stor.cafedra.upsert(key=None, html=art, reg_data=reg_data)
+                c = stor.cafedra.new()
+                c.html = art
+                stor.cafedra.upsert(c, reg_data=reg_data)
 
 
         print("Готово!")
