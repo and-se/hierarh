@@ -128,6 +128,7 @@ function getSaveData() {
 
     processAllChildren(data, (ch) => {
             if (ch.hasAttribute('contenteditable')) ch.removeAttribute('contenteditable');
+            // todo удалять ли атрибут "open" у тегов details или пусть запоминается, что сноски открыты?
             if (ch.classList.contains('he-tmp')) {
                 //console.log('remove', ch);
                 ch.remove();

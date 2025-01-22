@@ -1,0 +1,31 @@
+{% extends "edit/base-edit.html" %}
+{% block content %}
+<main class="hierarh-history">
+    <h1>{{cur_doc.header()}}</h1>
+    <div>Текущая версия: {{time_convert(cur_doc.reg_data)}}</div>
+
+    <h2>История правок</h2>
+    {% if (items) %}
+    <ul class="items">
+    {% for ver in items %}
+        <li>
+            <details class="version">
+                <summary>{{time_convert(ver.reg_data)}}</summary>
+                <div>
+                    {% autoescape false %}
+                    {{ver.html}}
+                    {% endautoescape%}
+                </div>
+            </details>
+        </li>
+    {% endfor %}
+
+    {%else%}
+    <div>Пока правок не было...</div>
+    {%endif%}
+    </ul>
+
+
+
+</main>
+{% endblock %}

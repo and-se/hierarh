@@ -1,6 +1,6 @@
 from flask import Flask, render_template, redirect, request, \
                   make_response, send_from_directory, Blueprint, \
-                  url_for, flash
+                  url_for, flash, abort
 
 import flask_login
 from flask_login import login_required
@@ -65,6 +65,8 @@ def episkop_list():
 @app.route('/cafedra/<int:key>')
 def cafedra_article(key):
     d = db.get_cafedra_data(key)
+    if not d:
+        abort(404, 'Статья не найдена')
     return render_template('cafedra_article.html', article=d, item_type='cafedra')
 
 @app.route('/episkop/<int:key>')
@@ -114,6 +116,12 @@ def for_search_engines():
     r.mimetype = "text/plain"
     return r
 
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html', msg=e), 404
+
+
 ###### AUTH #################
 class SiteUser(flask_login.UserMixin):
     def __init__(self, user_id, active=True):
@@ -155,6 +163,7 @@ def login():
 def logout():
     flask_login.logout_user()
     return redirect('/')
+
 
 
 ####### EDIT ################
@@ -220,15 +229,30 @@ def update_cafedra(key):
         return do_cafedra_upsert(d['html'], d['key'])
     elif request.method == 'GET':
         caf = db_edit.cafedra.get(key)
+        if not caf: abort(404, 'Статья не найдена')
         last_edit = None
         if caf.reg_data:
-            last_edit = caf.reg_data.get('who') or ''
-            when = caf.reg_data.get('when')
-            if when:
-                last_edit += time.strftime(' %d-%m-%y %H:%M', time.localtime(when))
+            last_edit = build_editor_info(caf.reg_data)
 
         return render_template('edit/cafedra.html', doc=caf, item_type='cafedra', key=key,
                                 post_url=url_for('.update_cafedra', key=key), last_edit=last_edit)
+
+def build_editor_info(reg_data):
+    last_edit = reg_data.get('who') or ''
+    when = reg_data.get('when')
+    if when:
+        last_edit += time.strftime(' %d-%m-%y %H:%M', time.localtime(when))
+    return last_edit
+
+
+@ed.get('/cafedra/<int:key>/versions')
+@login_required
+def cafedra_history(key):
+    caf = db_edit.cafedra.get(key)
+    if not caf: abort(404, 'Такой статьи нет, нет и её истории')
+
+    hist = db_edit.cafedra.versions(key, take=10**7)
+    return render_template('edit/cafedra_history.html', cur_doc=caf, items=hist, item_type='cafedra', time_convert=build_editor_info)
 
 
 app.register_blueprint(ed, url_prefix='/edit')

@@ -19,11 +19,15 @@
     background-color: white;
 }
 
-.he-edit-form .header {
+.he-edit-form .header, {
     font-weight: bold;
     font-size: xx-large;
     display: inline-block;
     width: 70%;
+}
+
+.version .header {
+    font-weight: bold;
 }
 
 .he-edit-form .he-props {
@@ -31,13 +35,13 @@
     vertical-align: top;
 }
 
-.he-edit-form details {
+.he-edit-form details, .version details {
     display:inline;
     border: none;
     margin-bottom: 0;
 }
 
-.he-edit-form details summary {
+.he-edit-form details summary, .version details summary {
     padding: 0;
     list-style-type: none;
 }
@@ -46,11 +50,11 @@
     display: none;
 }
 
-.he-edit-form details[open] {
+.he-edit-form details[open], .version details[open] {
     display: block;
 }
 
-.he-edit-form details[open] summary {
+.he-edit-form details[open] summary, .version details[open] summary {
     list-style-type: disclosure-open;
 }
 
@@ -60,7 +64,7 @@
     margin-left: 10px;
 }
 
-.he-edit-form details div {
+.he-edit-form details div, .version details div {
     border-left: 1px solid gray;
     padding-left: 5px;
     border-radius: 10px;
