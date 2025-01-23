@@ -7,6 +7,20 @@
     border-radius: 5px;
 }
 
+.he-table-menu-inaccurate {
+/*
+ * Нужно, чтобы чекбокс был невыбираемым, иначе он снимает выделение из текста
+ * и уже непонятно, с какой строкой таблицы мы работаем
+*/
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: -moz-none;
+    -o-user-select: none;
+    user-select: none;
+
+    color: white;
+}
+
 /*[contenteditable=true] {
     white-space: pre-wrap;
 }*/
@@ -24,7 +38,7 @@
     background-color: white;
 }
 
-.he-edit-form .header, {
+.he-edit-form .header {
     font-weight: bold;
     font-size: xx-large;
     display: inline-block;
@@ -86,10 +100,24 @@
     font-size: x-large;
 }
 
+.he-edit-form tr.inaccurate {
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+.he-edit-form tr.inaccurate td:first-of-type:before {
+    content: '(';
+}
+
+.he-edit-form tr.inaccurate td:last-of-type:after {
+    content: ')';
+}
+
 .he-edit-form td {
     height: 40px; /* it is min height */
     border: 1px solid #DDDDDD;
 }
+
 
 
 /*

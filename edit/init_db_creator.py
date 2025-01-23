@@ -11,7 +11,7 @@ from parsers.fail import ParseFail
 
 from edit import storage
 
-from time import time as unix_now
+from datetime import datetime
 
 CSS_NOTE_ERROR = 'error-note'
 
@@ -63,12 +63,13 @@ def main():
         with stor.atomic():
             reg_data = {
                 'who': 'admin',
-                'when': unix_now()
+                'when': datetime.fromisoformat('2024-06-01T09:00:00+00:00').timestamp(),
+                'comment': 'автоматически раскрыты сокращения'
             }
             for art in articles:
                 c = stor.cafedra.new()
                 c.html = art
-                stor.cafedra.upsert(c, reg_data=reg_data)
+                stor.cafedra.upsert(c, reg_data=reg_data, fix_reg_data=False)
 
 
         print("Готово!")
@@ -95,8 +96,9 @@ def article_json_to_html_edit(filename):
                 errs.append(r)
 
 
+    error_file = Path(filename).with_suffix(".errors.html")
+    error_file.unlink(missing_ok=True)
     if errs:
-        error_file = Path(filename).with_suffix(".errors.html")
         with open(error_file, 'w', encoding="utf8") as f:
             f.write(f'''<!DOCTYPE html>
             <body>
@@ -168,7 +170,7 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
             if mode=="error_report":
                 return f'''<sup data-note-num="{m.group('note_num')}">{m.group('note_num')}</sup>'''
             else:
-                return f'''<details><div>{r.text}</div></details>'''
+                return f'''<details><summary><sup>[сноска]</sup></summary><div>{r.text}</div></details>'''
         else:
             nonlocal has_err
             has_err=True
@@ -198,6 +200,12 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
                 assert len(ep) == 3 and all(map(lambda x: isinstance(x, str) or x is None, ep)), \
                        "Поле text должно содержать либо строку, либо массив 3-х строк"
                 start, end, who = ep
+                if start and end and start.strip().startswith('(') and who.strip().endswith(')'):
+                    inexact = True
+                    start = start.strip()[1:]
+                    who = who.strip()[:-1]
+                else:
+                    inexact = False
             else:
                 r = divide_episkop_row(ep)
                 if isinstance(r, ParseFail):
@@ -211,13 +219,16 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
 Если исходная строка взята в скобки, например "text": "(90 – 120 – Кто-то)", то сделайте так:
 "text": ["(90", "120", "Кто-то)"]  ''')
                 start, end, who, inexact = r
-                if inexact:
-                    start = '( ' + start
-                    who = who + ' )'
 
             start, end, who = map(convert_notes, (start, end, who))
+
+            if inexact:
+                startTr = '<tr class="inaccurate">'
+            else:
+                startTr = '<tr>'
+
             html_eps.append(
-            f'  <tr><td>{start}</td><td>{end}</td><td>{who}</td></tr>')
+            f'  {startTr}<td>{start}</td><td>{end}</td><td>{who}</td></tr>')
     html_eps = '\n'.join(html_eps)
 
     notes_info = build_bad_notes(mode, notes)

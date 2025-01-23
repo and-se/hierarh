@@ -70,32 +70,37 @@ async function saveData() {
 
     let doc_key = '{{key}}';
 
+    let problemMsg = "Не удалось сохранить данные! Попробуйте ещё раз или воспользуйтесь кнопкой Скачать.\n";
 
-    let resp = await fetch('{{post_url}}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json;charset=utf-8'
-        },
-        body: JSON.stringify({
-            key: doc_key,
-            html: d,
-            comment: msg
-        }),
-        credentials: 'include'
-    });
+    try {
+        let resp = await fetch('{{post_url}}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json;charset=utf-8'
+            },
+            body: JSON.stringify({
+                key: doc_key,
+                html: d,
+                comment: msg
+            }),
+            credentials: 'include'
+        });
 
-    if (resp.ok) {
-        let j = await resp.json();
+        if (resp.ok) {
+            let j = await resp.json();
 
-        if (j.success) {
-            showMessage('Изменения сохранены. Дождитесь обновления страницы');
-            setTimeout(() =>  window.location.href = '/edit/{{item_type}}/' + j.key, 500);
+            if (j.success) {
+                showMessage('Изменения сохранены. Дождитесь обновления страницы');
+                setTimeout(() =>  window.location.href = '/edit/{{item_type}}/' + j.key, 500);
+            } else {
+                showError(j.message);
+            }
+
         } else {
-            showError(j.message);
+            showError(problemMsg + resp.text());
         }
-
-    } else {
-        showError(resp.text());
+    } catch(e) {
+        showError(problemMsg + e);
     }
 }
 
@@ -140,7 +145,7 @@ function showMessage(msg) {
 }
 
 function showError(msg) {
-    showMessage("ERROR: " + msg);
+    showMessage(`<p style="color:red">ERROR: ${msg}</p>`);
 }
 </script>
 

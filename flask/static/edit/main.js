@@ -57,6 +57,7 @@ function makeCafedraEditForm(root) {
 
     // скрытие/показ кнопок, специфичных для таблицы
     root.addEventListener('click', updateMenu);
+    // TODO при работе только с клавиатуры (без мыши) меню не обновляется
 
     // Редактирование общих свойств формы - пока это признак обновленческой
     let props = root.querySelector('.he-props');
@@ -183,12 +184,20 @@ let MENU_TEMPLATE = `
             <button class="he-down-row-button" onclick="downRow(this.table)" title="переместить строку вниз">v</button>
             <button class="he-add-row-buton" onclick="addRow(this.table)" title="добавить строку">+</button>
             <button class="he-add-header-button" onclick="addRow(this.table, 'header-row')" title="добавить подзаголовок таблицы">+ заголовок</button>
+
+            <span title="помещён в список управляющих кафедрой условно" class="he-table-menu-inaccurate">
+                <input type="checkbox" id="he-inaccurate-row-checkbox"
+                       onclick="return setRowInaccurate(this.closest('.he-table-menu').table, this.checked)"/>
+                <label for="he-inaccurate-row-checkbox">условно</label>
+            </span>
         </span>
 
         <button onclick="doUndo()" class="he-undo-button">отмена (Ctrl+Z)</button>
 
     </div>
 `;
+
+let INACCURATE_ROW_CLASS = "inaccurate";
 
 let TABLE_HEAD_TEMPLATE = `
     <thead class="he-table-head">
@@ -319,6 +328,26 @@ function downRow(table) {
         if (nxt) {
             nxt.after(curRow);
         }
+    }
+}
+
+function setRowInaccurate(table, value) {
+    let curRow = getCurrentTableRow();
+    if (curRow) {
+        if (curRow.classList.contains('header-row')) {
+            console.log("Can't set header-row inaccurate");
+            return false;
+        }
+        if (value) {
+            curRow.classList.add(INACCURATE_ROW_CLASS);
+        } else {
+            curRow.classList.remove(INACCURATE_ROW_CLASS);
+        }
+
+        return true;
+    } else {
+        console.log('No row to set inaccurate!');
+        return false;
     }
 }
 
@@ -513,6 +542,7 @@ function updateMenu() {
     if (!r) return;
     let p = r.startContainer;
     const mext = document.querySelector('.he-table-menu');
+    let cb = document.getElementById('he-inaccurate-row-checkbox')
 
     while(p) {
         //console.log('wh', p);
@@ -522,6 +552,8 @@ function updateMenu() {
                 return;
             } else if (p.tagName == 'TD') {
                 mext.style.display="inline";
+
+                cb.checked = p.closest('tr').classList.contains(INACCURATE_ROW_CLASS);
                 return;
             }
         }

@@ -195,7 +195,7 @@ def new_cafedra_ui():
 def create_cafedra():
     d = request.json
     # print("NEW", d)
-    return do_cafedra_upsert(d['html'], None);
+    return do_cafedra_upsert(d['html'], None, d['comment']);
 
 def do_cafedra_upsert(html, key, comment):
     try:
