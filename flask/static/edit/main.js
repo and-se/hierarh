@@ -219,10 +219,16 @@ function addNote() {
     if (!sl.rangeCount) return;
 
     let r = sl.getRangeAt(0);
+    r.collapse();
+
+    if (!canUserEditRange(r)) {
+        console.log("Can't add note to not-editable area");
+        return;
+    }
+
     let n = createElementByHtml(NOTE_TEMPLATE);
 
     r.insertNode(n);
-    r.collapse();
     addEofIfRequired();
 
     // открываем сноску на редактирование
@@ -371,6 +377,24 @@ function getNextTableRow(curRow) {
 }
 
 /*** other internals***/
+function canUserEditRange(r) {
+    let tag = r.startContainer;
+    if (tag.nodeType == Node.TEXT_NODE) {
+        tag = tag.parentElement;
+    }
+
+    while (tag) {
+        if(tag.getAttribute('contenteditable') == "false") {
+            return false;
+        } else if (tag.getAttribute('contenteditable') == "true") {
+            return true;
+        }
+
+        tag = tag.parentElement;
+    }
+
+    return false;
+}
 
 function prepareNotes(tag) {
     // Отключаем редактирование у пояснений (details), но оставляем для текста пояснения
