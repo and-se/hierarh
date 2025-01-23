@@ -146,7 +146,7 @@ function getSaveData() {
             }
             if(ch.classList.length == 0) ch.removeAttribute('class');
     });
-    console.log(data.outerHTML);
+
     return data.outerHTML;
 }
 /*** html templates ***/
@@ -222,7 +222,7 @@ function addNote() {
     r.collapse();
 
     if (!canUserEditRange(r)) {
-        console.log("Can't add note to not-editable area");
+        console.log("Can't add note to not-editable area", r);
         return;
     }
 

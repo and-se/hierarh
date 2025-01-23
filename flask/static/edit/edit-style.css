@@ -15,6 +15,11 @@
     float: right;
 }
 
+
+.edit-comment {
+    width: 100%;
+}
+
 .he-edit-form {
     background-color: white;
 }
@@ -85,6 +90,7 @@
     height: 40px; /* it is min height */
     border: 1px solid #DDDDDD;
 }
+
 
 /*
 td:empty:before {

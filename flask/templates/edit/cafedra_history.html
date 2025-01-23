@@ -1,8 +1,16 @@
 {% extends "edit/base-edit.html" %}
+{% block pagetitle %}
+История: {{cur_doc.header()}}
+{% endblock %}
 {% block content %}
 <main class="hierarh-history">
     <h1>{{cur_doc.header()}}</h1>
-    <div>Текущая версия: {{time_convert(cur_doc.reg_data)}}</div>
+    <div>Текущая версия: {{time_convert(cur_doc.reg_data)}}
+    {%set cur_com = cur_doc.reg_data.get('comment') %}
+    {%if cur_com%}
+    <q>{{cur_com}}</q>
+    {%endif%}
+    </div>
 
     <h2>История правок</h2>
     {% if (items) %}
@@ -10,7 +18,13 @@
     {% for ver in items %}
         <li>
             <details class="version">
-                <summary>{{time_convert(ver.reg_data)}}</summary>
+                <summary>
+                    {{time_convert(ver.reg_data)}}
+                    {% set ver_com = ver.reg_data.get('comment')%}
+                    {%if  ver_com %}
+                    <q>{{ver_com}}</q>
+                    {%endif%}
+                </summary>
                 <div>
                     {% autoescape false %}
                     {{ver.html}}

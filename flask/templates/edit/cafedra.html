@@ -41,12 +41,17 @@
 <span class="download-buttons">
 <button onclick="downloadData()">Скачать</button>
 <button onclick="document.getElementById('dupl').click()">Загрузить из файла</button>
-
 <input id="dupl" type="file" accept=".html" style="display: none;" onchange="loadDataFromFile()">
 </span>
 
+<br>
+<input id="commit-message" class="edit-comment" placeholder="При желании кратко опишите здесь изменения">
+
 {% if last_edit%}
 <div>последняя правка <em>{{last_edit}}</em>.
+    {%if comment %}
+    <q>{{comment}}</q>
+    {%endif%}
 <a href="{{doc.key}}/versions" target="_blank">Просмотреть историю правок</a>
 </div>
 {% endif %}
@@ -61,6 +66,8 @@ async function saveData() {
     let d = hform.getData();//document.getElementById('data').innerHTML;
     //console.log(d);
 
+    let msg = document.getElementById('commit-message').value;
+
     let doc_key = '{{key}}';
 
 
@@ -71,7 +78,8 @@ async function saveData() {
         },
         body: JSON.stringify({
             key: doc_key,
-            html: d
+            html: d,
+            comment: msg
         }),
         credentials: 'include'
     });

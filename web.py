@@ -197,12 +197,15 @@ def create_cafedra():
     # print("NEW", d)
     return do_cafedra_upsert(d['html'], None);
 
-def do_cafedra_upsert(html, key):
+def do_cafedra_upsert(html, key, comment):
     try:
         reg_data = {
             'who': flask_login.current_user.title,
             'when': unix_now()
         }
+
+        if comment:
+            reg_data['comment'] = comment
 
         c = db_edit.cafedra.new()
         c.key = key
@@ -226,7 +229,7 @@ def update_cafedra(key):
     if request.method == 'POST':
         d = request.json
         # print("UPDATE", d)
-        return do_cafedra_upsert(d['html'], d['key'])
+        return do_cafedra_upsert(d['html'], d['key'], d['comment'])
     elif request.method == 'GET':
         caf = db_edit.cafedra.get(key)
         if not caf: abort(404, 'Статья не найдена')
@@ -235,7 +238,7 @@ def update_cafedra(key):
             last_edit = build_editor_info(caf.reg_data)
 
         return render_template('edit/cafedra.html', doc=caf, item_type='cafedra', key=key,
-                                post_url=url_for('.update_cafedra', key=key), last_edit=last_edit)
+                                post_url=url_for('.update_cafedra', key=key), last_edit=last_edit, comment=caf.reg_data.get('comment'))
 
 def build_editor_info(reg_data):
     last_edit = reg_data.get('who') or ''
