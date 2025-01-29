@@ -599,6 +599,8 @@ class CafedraArticlesToJsonFile(ChainLink):
 
     def process(self, s: Signal):
         import json
+        if not isinstance(s, Signal):
+            s = Signal(data=s, name="adapter for " + str(type(s)) , line=None)
         if not isinstance(s.data, CafedraArticle):
             raise ValueError('Expected Signal with CafedraArticle object '
                              'in data field')

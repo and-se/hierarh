@@ -15,27 +15,46 @@ from datetime import datetime
 
 CSS_NOTE_ERROR = 'error-note'
 
+ORIGINAL_DATA_FILE = 'data/edit-init/cafedra-edit.json'
+EXPANDED_DATA_FILE = 'data/edit-init/cafedra-exp-abbrs-edit.json'
+
 def main():
     if len(sys.argv) != 2:
         print("добавьте параметр json для преобразования json во входной html,\n" + \
               "либо db для построения БД на основе html")
         return 1
     if sys.argv[1] == 'json':
-        filename = 'data/edit-init/cafedra-exp-abbrs-edit.json' #sys.argv[1]
-        print("Конвертируем файл", filename, "во входной html")
+        print('\nКонвертируем исходный текст книги (с сокращениями)')
+        print('============================\n\n')
+        ok = process_json(ORIGINAL_DATA_FILE)
+        if not ok: return 2
 
-        if filename.endswith(".json"):
-            filename, error = article_json_to_html_edit(filename)
-            if error:
-                print(f"""При конвертации начальных данных для редактирования есть ошибки.
-                Результат конвертации лежит в {filename},
-                а отчёт с удобным просмотром ошибок - {error}.
-                Для поиска ошибок ищите html теги с class = {CSS_NOTE_ERROR}""")
-                return 2
+        print("\n\nКонвертируем текст с раскрытыми сокращениями")
+        print('============================\n\n')
+        ok = process_json(EXPANDED_DATA_FILE)
+        if not ok: return 2
 
-            print(f"Успешно сконвертированный html в файле {filename}")
+    elif sys.argv[1] == 'old-json':
+        from chain import Chain, ChainLink
+        from article_parser import CafedraArticleParser, WholeRussiaCafedraFixer,\
+                                   CafedraJsonPatcher, UnparsedCafedraEpiskopLogger
+        from book_parser import CafedraArticlesFromJson, CafedraArticlesToJsonFile
+
+        target_path = 'data/edit-init/cafedra_old.json'
+        target_json = CafedraArticlesToJsonFile(target_path)
+
+        patch_file = 'data/patch/cafedra-episkop-patch-old.txt'
+
+        ch = Chain(CafedraArticlesFromJson()) \
+            .add(CafedraJsonPatcher(patch_file)) \
+            .add(target_json)
+
+        source_file = 'data/cafedra_articles.json'
+        print(f"Patch {source_file} and save to to {target_path}")
+        ch.process(source_file)
+
     elif sys.argv[1] == 'db':
-        filename = 'data/edit-init/cafedra-exp-abbrs-edit.html'
+        filename = EXPANDED_DATA_FILE
         print("Загружаем данные из файла", filename, "в БД", storage.DbName)
 
         with open(filename) as f:
@@ -75,7 +94,22 @@ def main():
         print("Готово!")
 
 
+def process_json(filename):
+    print("Конвертируем файл", filename, "во входной html")
 
+    if filename.endswith(".json"):
+        filename, error = article_json_to_html_edit(filename)
+        if error:
+            print(f"""При конвертации начальных данных для редактирования есть ошибки.
+            Результат конвертации лежит в {filename},
+            а отчёт с удобным просмотром ошибок - {error}.
+            Для поиска ошибок ищите html теги с class = {CSS_NOTE_ERROR}""")
+            return False
+
+        print(f"Успешно сконвертированный html в файле {filename}")
+        return True
+    else:
+        raise ValueError("Expected json file")
 
 
 
@@ -231,7 +265,9 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
             f'  {startTr}<td>{start}</td><td>{end}</td><td>{who}</td></tr>')
     html_eps = '\n'.join(html_eps)
 
-    notes_info = build_bad_notes(mode, notes)
+    bad_notes_info = build_bad_notes(mode, notes)
+    if bad_notes_info:
+        has_err = True
 
     #NB! html-escaping уже сделан во входном json
     result = f'''
@@ -244,7 +280,7 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
 <table class="episkops">
 {html_eps}
 </table>
-{notes_info}
+{bad_notes_info}
 </article>
 '''
 
@@ -252,7 +288,6 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
 
 def build_bad_notes(mode, notes):
     unused_notes = '\n'.join([f'''<li class="{CSS_NOTE_ERROR}" style="color:red">{x.num}. {x.text}</li>''' for x in notes if not x.touched])
-    if unused_notes: has_err = True
 
     if mode == "error_report":
         def gen_attrs(is_touched):
@@ -262,7 +297,7 @@ def build_bad_notes(mode, notes):
                 return f'class="{CSS_NOTE_ERROR}" title="не упомянута в тексте"'
 
         notes_info = '\n'.join([f'''<li {gen_attrs(x.touched)}>{x.num}. {x.text}</li>''' for x in notes])
-        caption = "Красным отмечены сноски, не упомянутые в статье"
+        caption = "Выделены сноски, не упомянутые в статье"
         action = ''
     else:
         notes_info = unused_notes
