@@ -24,13 +24,14 @@ def main():
               "либо db для построения БД на основе html")
         return 1
     if sys.argv[1] == 'json':
-        print('\nКонвертируем исходный текст книги (с сокращениями)')
-        print('============================\n\n')
+        print('\n\n============================')
+        print('Конвертируем исходный текст книги (с сокращениями)\n')
+
         ok = process_json(ORIGINAL_DATA_FILE)
         if not ok: return 2
 
-        print("\n\nКонвертируем текст с раскрытыми сокращениями")
-        print('============================\n\n')
+        print('\n\n============================')
+        print("Конвертируем текст с раскрытыми сокращениями\n")
         ok = process_json(EXPANDED_DATA_FILE)
         if not ok: return 2
 
@@ -100,7 +101,7 @@ def process_json(filename):
     if filename.endswith(".json"):
         filename, error = article_json_to_html_edit(filename)
         if error:
-            print(f"""При конвертации начальных данных для редактирования есть ошибки.
+            print(f"""\nNB!!!\tПри конвертации данных есть ошибки!!!
             Результат конвертации лежит в {filename},
             а отчёт с удобным просмотром ошибок - {error}.
             Для поиска ошибок ищите html теги с class = {CSS_NOTE_ERROR}""")
@@ -179,7 +180,7 @@ def article_json_to_html_edit(filename):
 
 
 
-note_re = re.compile(r'<span\s+class="note"[^>]*>\s*(?P<note_num>\d+)\s*</span>')
+note_re = re.compile(r'<span\s+class="note"[^>]*? data-note="(?P<note_num_0>\d+)"[^>]*>\s*(?P<note_num>\d+)\s*</span>')
 
 @dataclass
 class Note:
@@ -201,6 +202,14 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
         r = find_note(m.group('note_num'))
         if r:
             r.touched=True
+
+            if m.group('note_num_0') != m.group('note_num'):
+                if mode == "error_report":
+                    return \
+f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="сноска БЕЗ ТЕКСТА">
+         разные номера в json: data-note={m.group('note_num_0')}   номер_сноски={m.group('note_num')}
+</sup>'''
+
             if mode=="error_report":
                 return f'''<sup data-note-num="{m.group('note_num')}">{m.group('note_num')}</sup>'''
             else:
@@ -210,7 +219,10 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
             has_err=True
 
             if mode=="error_report":
-                return f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="сноска БЕЗ ТЕКСТА"><b>{m.group('note_num')}</b> - сноска БЕЗ ТЕКСТА ???</sup>'''
+                return \
+f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="сноска БЕЗ ТЕКСТА">
+         <b>{m.group('note_num')}</b> - сноска БЕЗ ТЕКСТА ???
+</sup>'''
             else:
                 return f'''<sup class="{CSS_NOTE_ERROR}" style="color:red" title="сноска БЕЗ ТЕКСТА"><b>{m.group('note_num')}</b>???</sup>''' + \
                 f'''<details><div>??? нет текста сноски ???</div></details>'''
@@ -290,14 +302,16 @@ def build_bad_notes(mode, notes):
     unused_notes = '\n'.join([f'''<li class="{CSS_NOTE_ERROR}" style="color:red">{x.num}. {x.text}</li>''' for x in notes if not x.touched])
 
     if mode == "error_report":
-        def gen_attrs(is_touched):
-            if is_touched:
+        def gen_attrs(expected_num, note):
+            if note.touched:
+                if (expected_num != note.num):
+                    return f'class="{CSS_NOTE_ERROR}" title="нумерация не по порядку"'
                 return ''
             else:
                 return f'class="{CSS_NOTE_ERROR}" title="не упомянута в тексте"'
 
-        notes_info = '\n'.join([f'''<li {gen_attrs(x.touched)}>{x.num}. {x.text}</li>''' for x in notes])
-        caption = "Выделены сноски, не упомянутые в статье"
+        notes_info = '\n'.join([f'''<li {gen_attrs(i, x)}>{x.num}. {x.text}</li>''' for i, x in enumerate(notes, 1)])
+        caption = "Выделены сноски, не упомянутые в статье либо со сбитой нумерацией"
         action = ''
     else:
         notes_info = unused_notes
