@@ -199,12 +199,23 @@ def convert_cafedra_json_to_html(caf: dict, mode="normal"):
                 return x
 
     def note_convert(m):
+        nonlocal has_err
         r = find_note(m.group('note_num'))
         if r:
+            # если сноска уже была упомянута - то на неё ссылаются из текста два раза - это тоже плохо
+            if r.touched:
+                has_err=True
+                if mode == "error_report":                    
+                    return \
+f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="повторное обращение к сноске">
+         {m.group('note_num')} – повторное обращение к сноске
+</sup>'''
+                
             r.touched=True
 
             if m.group('note_num_0') != m.group('note_num'):
-                if mode == "error_report":
+                has_err=True
+                if mode == "error_report":                    
                     return \
 f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="сноска БЕЗ ТЕКСТА">
          разные номера в json: data-note={m.group('note_num_0')}   номер_сноски={m.group('note_num')}
@@ -215,7 +226,6 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
             else:
                 return f'''<details><summary><sup>[сноска]</sup></summary><div>{r.text}</div></details>'''
         else:
-            nonlocal has_err
             has_err=True
 
             if mode=="error_report":
