@@ -8,15 +8,20 @@ from dataclasses import dataclass
 sys.path.append(os.getcwd())
 from article_parser import divide_episkop_row
 from parsers.fail import ParseFail
+from utils import check_cafedra_expand_abbrs as check_util
 
 from edit import storage
 
 from datetime import datetime
 
+from typing import List
+
 CSS_NOTE_ERROR = 'error-note'
 
 ORIGINAL_DATA_FILE = 'data/edit-init/cafedra-edit.json'
 EXPANDED_DATA_FILE = 'data/edit-init/cafedra-exp-abbrs-edit.json'
+
+MAP_FILE = 'data/edit-init/map-origin-expanded-cafedra.json'
 
 def main():
     if len(sys.argv) != 2:
@@ -27,24 +32,48 @@ def main():
         print('\n\n============================')
         print('Конвертируем исходный текст книги (с сокращениями)\n')
 
-        ok = process_json(ORIGINAL_DATA_FILE)
-        if not ok: return 2
+        html_o = process_json(ORIGINAL_DATA_FILE)
+        if not html_o: return 2
 
         print('\n\n============================')
         print("Конвертируем текст с раскрытыми сокращениями\n")
-        ok = process_json(EXPANDED_DATA_FILE)
-        if not ok: return 2
+        html_e = process_json(EXPANDED_DATA_FILE)
+        if not html_e: return 2
         
         print('\n\n============================')
         print("Проверяем согласованность двух упомянутых текстов...")
-        from utils import check_cafedra_expand_abbrs as check_util
+        
         ok = check_util.main(ORIGINAL_DATA_FILE, EXPANDED_DATA_FILE)
         if ok: print("OK")
         else:
             print("Fail")
             return 3
+        
+        print('\n\n============================')
+        print("Соотносим заголовки в двух текстах")
+        caf_origin: List[storage.TextCafedra] = load_html(html_o)
+        caf_expand: List[storage.TextCafedra] = load_html(html_e)
+        
+        map_data = {}
+        assert len(caf_origin) == len(caf_expand), "Разное количество статей"
+        for (co, ce) in zip(caf_origin, caf_expand):
+            head1, head2 = co.header(), ce.header()
+            ok = True
+            if not check_util.header_like(head1, head2):
+                print(f'Разные кафедры? {head1}  <-> {head2}')
+                ok = False
+            else:
+                map_data[head1] = head2
+            if not ok:
+                return 4
+                
+        with open(MAP_FILE, 'w', encoding="utf8") as f:
+            json.dump(map_data, f, ensure_ascii=False, indent=2)
+        print("Соотнесение заголовков в файле", MAP_FILE)
+        
 
     elif sys.argv[1] == 'old-json':
+        # сборка json из оригинального текста книги
         from chain import Chain, ChainLink
         from article_parser import CafedraArticleParser, WholeRussiaCafedraFixer,\
                                    CafedraJsonPatcher, UnparsedCafedraEpiskopLogger
@@ -64,18 +93,17 @@ def main():
         ch.process(source_file)
 
     elif sys.argv[1] == 'db':
-        filename = EXPANDED_DATA_FILE
-        print("Загружаем данные из файла", filename, "в БД", storage.DbName)
-
-        with open(filename) as f:
-            html = f.read().strip()
-
-        articles = [x.strip() + '</article>' for x in html.split('</article>') if x.strip().startswith('<article')]
-
-        check = html.count('<article class="cafedra_article')
-        assert len(articles) == check, f"Должно быть {check} статей, а получилось {len(articles)}"
-
-        print(f"Всего {check} статей")
+        file1 = Path(ORIGINAL_DATA_FILE).with_suffix('.html')
+        file2 = Path(EXPANDED_DATA_FILE).with_suffix('.html')
+        print("Загружаем данные из файлов", file1, "и", file2, "в БД", storage.DbName)
+        
+        articles1: List[storage.TextCafedra] = load_html(file1)
+        articles2: List[storage.TextCafedra] = load_html(file2)
+        assert len(articles1) == len(articles2), "Разное количество статей"
+        print(f"Всего {len(articles1)} статей")
+        
+        with open(MAP_FILE, encoding='utf8') as f:
+            header_map = json.load(f)
 
         print("Создаём БД", storage.DbName)
         if os.path.exists(storage.DbName):
@@ -90,16 +118,26 @@ def main():
 
         stor = storage.HierarhEditStorage()
         with stor.atomic():
-            reg_data = {
+            reg_data_orig = {
+                'who': 'admin',
+                'when': datetime.fromisoformat('2019-03-03T12:00:00+00:00').timestamp(),
+                'comment': 'текст книги'
+            }
+            
+            reg_data_exp = {
                 'who': 'admin',
                 'when': datetime.fromisoformat('2024-06-01T09:00:00+00:00').timestamp(),
                 'comment': 'автоматически раскрыты сокращения'
             }
-            for art in articles:
-                c = stor.cafedra.new()
-                c.html = art
-                stor.cafedra.upsert(c, reg_data=reg_data, fix_reg_data=False)
-
+            
+            for i, art in enumerate(articles1):                
+                art = stor.cafedra.upsert(art, reg_data=reg_data_orig, fix_reg_data=False)
+                
+                assert header_map[art.header()] == articles2[i].header()
+                
+                art.html = articles2[i].html
+                art = stor.cafedra.upsert(art, reg_data=reg_data_exp, fix_reg_data=False)
+            
 
         print("Готово!")
 
@@ -117,7 +155,7 @@ def process_json(filename):
             return False
 
         print(f"Успешно сконвертированный html в файле {filename}")
-        return True
+        return filename
     else:
         raise ValueError("Expected json file")
 
@@ -309,7 +347,12 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
 <br>
 </div>
 <table class="episkops">
+<thead>
+<tr><th>начало</th><th>окончание</th><th>епископ</th></tr>
+</thead>
+<tbody>
 {html_eps}
+</tbody>
 </table>
 {bad_notes_info}
 </article>
@@ -346,6 +389,24 @@ def build_bad_notes(mode, notes):
         </ul>
         </div>'''
     return ''
+
+
+def load_html(filename):
+    #from bs4 import BeautifulSoup --- too slow!
+    #res = []
+    with open(filename, encoding="utf8") as f:        
+    #    for ar in BeautifulSoup(f, 'html.parser', from_encoding="utf8").find_all('article'):
+    #        tc = storage.TextCafedra.from_html(None, str(ar))
+    #        res.append(tc)
+        html = f.read().strip()
+
+    articles = [x.strip() + '</article>' for x in html.split('</article>') if x.strip().startswith('<article')]
+
+    check = html.count('<article class="cafedra_article')
+    assert len(articles) == check, f"Должно быть {check} статей, а получилось {len(articles)}"
+
+    res = [storage.TextCafedra.from_html(None, x) for x in articles]
+    return res
 
 if __name__ == '__main__':
     main()
