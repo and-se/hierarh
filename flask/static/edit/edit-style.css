@@ -45,6 +45,14 @@
     width: 70%;
 }
 
+.he-edit-form .text, .version .text {
+    text-indent: 10px each-line;
+}
+
+.he-edit-form .text br, .version .text br {
+    margin-bottom: 15px;
+}
+
 .version .header {
     font-weight: bold;
 }
