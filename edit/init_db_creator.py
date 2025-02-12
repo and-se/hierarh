@@ -34,6 +34,15 @@ def main():
         print("Конвертируем текст с раскрытыми сокращениями\n")
         ok = process_json(EXPANDED_DATA_FILE)
         if not ok: return 2
+        
+        print('\n\n============================')
+        print("Проверяем согласованность двух упомянутых текстов...")
+        from utils import check_cafedra_expand_abbrs as check_util
+        ok = check_util.main(ORIGINAL_DATA_FILE, EXPANDED_DATA_FILE)
+        if ok: print("OK")
+        else:
+            print("Fail")
+            return 3
 
     elif sys.argv[1] == 'old-json':
         from chain import Chain, ChainLink
@@ -77,7 +86,7 @@ def main():
                 storage.init_edit_db()
             else:
                 print("Тогда ничего не делаем")
-                return 3
+                return 4
 
         stor = storage.HierarhEditStorage()
         with stor.atomic():
