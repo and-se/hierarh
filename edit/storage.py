@@ -37,7 +37,7 @@ class TextCollectionDb:
             from time import time as unix_now
             reg_data['when'] = unix_now()
 
-        rgd = json.dumps(reg_data)
+        rgd = json.dumps(reg_data, ensure_ascii=False, indent=2)
         if doc.key:
             with EditDb.atomic(lock_type = 'IMMEDIATE'):
                 doc.key = int(doc.key)

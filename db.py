@@ -64,7 +64,7 @@ from peewee import fn, SqliteDatabase, PeeweeException  # noqa: E402
 
 
 def get_db(db_name: str):
-    db = SqliteDatabase(db_name, {
+    db = SqliteDatabase(db_name, pragmas = {
         'journal_mode': 'wal',
         'cache_size': -1 * 10000,  # 10MB
         'foreign_keys': 1,
