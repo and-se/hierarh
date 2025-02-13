@@ -339,8 +339,9 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
         has_err = True
 
     #NB! html-escaping уже сделан во входном json
+    b = lambda v: "true" if v else "false"
     result = f'''
-<article class="cafedra_article" data-start-line="{caf['start_line']}" data-is-link="{caf['is_link']}" data-is-obn="{caf['is_obn']}">
+<article class="cafedra_article" data-start-line="{caf['start_line']}" data-is-link="{b(caf['is_link'])}" data-is-obn="{b(caf['is_obn'])}">
 <div class="header">{header}</div>
 <div class="text">
 {text}

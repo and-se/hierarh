@@ -63,7 +63,7 @@ function makeCafedraEditForm(root) {
     let props = root.querySelector('.he-props');
     if (!props) props = createElementByHtml(PROPS_EDIT_TEMPLATE);
     let obncb = props.querySelector("#he-obn-checkbox");
-    obncb.checked = root.dataset.isObn === 'true';
+    obncb.checked = (['true', '1', 'yes', 'да'].indexOf(root.dataset.isObn.toLowerCase()) != -1);
     obncb.hfroot = root;
     root.insertBefore(props, text);
 

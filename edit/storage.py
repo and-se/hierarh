@@ -120,7 +120,7 @@ class TextCafedra:
         m = re.search(r'<article [^>]*data-is-obn="([A-Za-z]+)"', self.html)
         if m:
             v = m.group(1)
-            if v.strip().lower() in ['yes', 'true', '1', 'да']:
+            if v.strip().lower() in ['true', '1', 'yes', 'да']:
                 return True
         return False
 
