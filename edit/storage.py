@@ -116,7 +116,13 @@ class TextCafedra:
         return m.group(1) if m else self.html.strip().split('\n')[0]
 
     def is_obn(self):
-        return False  # ...
+        # <article class="cafedra_article" data-start-line="8" data-is-link="False" data-is-obn="False">
+        m = re.search(r'<article [^>]*data-is-obn="([A-Za-z]+)"', self.html)
+        if m:
+            v = m.group(1)
+            if v.strip().lower() in ['yes', 'true', '1', 'да']:
+                return True
+        return False
 
     def __repr__(self):
         return f"TextCafedra({self.key}, {self.header()})"
