@@ -9,6 +9,7 @@ from db import PeeweeHistHierarhStorage, PeeweeUserCommentsStorage, \
                StorageException
 
 from edit.storage import HierarhEditStorage
+from edit.services.diff import DiffService
 
 from models import UserComment
 
@@ -45,7 +46,6 @@ login_manager.login_message = None
 
 db = PeeweeHistHierarhStorage()
 comments_db = PeeweeUserCommentsStorage()
-db_edit = HierarhEditStorage()
 
 @app.route('/')
 def index():
@@ -170,6 +170,9 @@ def logout():
 
 ed = Blueprint('hierarh_edit', __name__)
 
+db_edit = HierarhEditStorage()
+diff_service = DiffService(db_edit)
+
 @ed.get('/')
 @login_required
 def edit_root():
@@ -240,7 +243,8 @@ def update_cafedra(key):
         return render_template('edit/cafedra.html', doc=caf, item_type='cafedra', key=key,
                                 post_url=url_for('.update_cafedra', key=key), last_edit=last_edit, comment=caf.reg_data.get('comment'))
 
-def build_editor_info(reg_data):
+def build_editor_info(reg_data, if_none="<нет данных>"):
+    if not reg_data: return if_none
     last_edit = reg_data.get('who') or ''
     when = reg_data.get('when')
     if when:
@@ -256,6 +260,14 @@ def cafedra_history(key):
 
     hist = db_edit.cafedra.versions(key, take=10**7, reverse=True)
     return render_template('edit/cafedra_history.html', cur_doc=caf, items=hist, item_type='cafedra', time_convert=build_editor_info)
+    
+@ed.get('/cafedra/<int:key>/diff/<string:new>/<string:old>')
+@login_required
+def cafedra_diff(key, new, old):  
+    header, new_reg_data, old_reg_data, diff = diff_service.make_html_diff('cafedra', key, new, old)
+    
+    return render_template('edit/cafedra_diff.html', diff=diff, header=header, new_reg_data=new_reg_data, old_reg_data=old_reg_data,
+                            time_convert=build_editor_info, item_type='cafedra')
 
 
 app.register_blueprint(ed, url_prefix='/edit')

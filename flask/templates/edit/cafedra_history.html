@@ -24,6 +24,18 @@
                     {%if  ver_com %}
                     <q>{{ver_com}}</q>
                     {%endif%}
+                    
+                    <div class="dropdown version-compare">
+                        <span class="dropdown-header">cравнить⇩</span>
+                        <div class="dropdown-items">
+                            <div><a href="/edit/cafedra/{{cur_doc.key}}/diff/cur/v{{loop.index0 + 1}}" target="_blank">
+                                с актуальной версией
+                            </a></div>
+                            <div><a href="/edit/cafedra/{{cur_doc.key}}/diff/v{{loop.index0 + 1}}/v{{loop.index0 + 2}}" target="_blank">
+                                с предыдущей версией
+                            </a></div>
+                        </div>
+                    </div>
                 </summary>
                 <div>
                     {% autoescape false %}
