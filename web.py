@@ -254,7 +254,7 @@ def cafedra_history(key):
     caf = db_edit.cafedra.get(key)
     if not caf: abort(404, 'Такой статьи нет, нет и её истории')
 
-    hist = db_edit.cafedra.versions(key, take=10**7)
+    hist = db_edit.cafedra.versions(key, take=10**7, reverse=True)
     return render_template('edit/cafedra_history.html', cur_doc=caf, items=hist, item_type='cafedra', time_convert=build_editor_info)
 
 

@@ -105,6 +105,8 @@ class TestStorage(unittest.TestCase):
 
         n1 = load_file('1.html')
         self.cafedra.upsert(n1)
+        
+        n1_copy = self.cafedra.get(n1.key)
 
         v = self.cafedra.versions(n1.key)
         self.assertEqual(len(v), 0)
@@ -118,6 +120,8 @@ class TestStorage(unittest.TestCase):
 
         self.assertEqual(len(v), 1)
         checkCafVerEqual(n1, v[0])
+        
+        self.assertEqual([], self.cafedra.versions(n1.key, skip=1))
 
         n3 = self.cafedra.get(n2.key)
         n3.html += 'UPDATED3'
@@ -136,6 +140,20 @@ class TestStorage(unittest.TestCase):
         checkCafVerEqual(n3, v[-1])
 
         self.assertGreater(n1.reg_data['when'], old_when)
+        
+        v = self.cafedra.versions(n3.key, skip=1, take=2)
+        self.assertEqual(len(v), 2)
+        checkCafVerEqual(n3, v[-1])
+        
+        
+        # test reverse
+        v = self.cafedra.versions(n1.key, reverse=True)
+        self.assertEqual(len(v), 3)
+        checkCafVerEqual(n3, v[0])
+        
+        v = self.cafedra.versions(n1.key, skip=2, take=1, reverse=True)
+        self.assertEqual(len(v), 1)
+        checkCafVerEqual(n1_copy, v[0])
 
 
     def checkCafEqual(self, c1, c2):

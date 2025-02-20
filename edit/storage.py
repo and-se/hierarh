@@ -79,9 +79,10 @@ class TextCollectionDb:
         return VersionOrm.select().where((VersionOrm.doc_key == key) & \
                                       (VersionOrm.collection == self.name))
 
-    def versions(self, key, skip=0, take=20):
+    def versions(self, key, skip=0, take=20, reverse=False):
+        so = lambda x: x.desc() if reverse else x
         q = self._version_query(key) \
-                      .order_by(VersionOrm.num, VersionOrm.id) \
+                      .order_by(so(VersionOrm.num), so(VersionOrm.id)) \
                       .limit(take).offset(skip)
         return [x.toTextVersion() for x in q]
 
