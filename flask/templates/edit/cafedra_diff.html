@@ -6,14 +6,14 @@
 <main class="hierarh-diff">
     <h1>Просмотр отличий {{header}}</h1>
     <div class="new">
-        <strong>Новая версия (зелёное):</strong> {{time_convert(new_reg_data)}} 
+        <strong class="header">Новая версия:</strong> {{time_convert(new_reg_data)}} 
 
         {%if new_reg_data and new_reg_data.get('comment') %}
         <q>{{new_reg_data.get('comment')}}</q>
         {%endif%}
     </div>
     <div class="old">
-        <strong>Старая версия (красное):</strong> {{time_convert(old_reg_data)}}
+        <strong class="header">Старая версия:</strong> {{time_convert(old_reg_data)}}
         {%if old_reg_data and old_reg_data.get('comment') %}
         <q>{{old_reg_data.get('comment')}}</q>
         {%endif%}

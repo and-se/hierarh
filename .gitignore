@@ -10,5 +10,6 @@ data/*
 
 env
 venv
+pypyenv
 
 settings.py

@@ -1,7 +1,35 @@
 from edit.storage import HierarhEditStorage, TextCafedra, TextCollectionDb
 
-#from htmltreediff.html import diff
+import xmldiff.main
+import xmldiff.formatting
+import lxml.html
 
+from pathlib import Path
+
+with open(Path(__file__).parent.joinpath('xmldiff-html-formatter.xslt'),
+          encoding="utf8") as xs:
+    XSLT = lxml.etree.fromstring(xs.read())
+
+class HTMLFormatter(xmldiff.formatting.XMLFormatter):
+    def render(self, result):
+        transform = lxml.etree.XSLT(XSLT)
+        result = transform(result)
+        return super(HTMLFormatter, self).render(result)
+
+
+def diff_html(html_old, html_new):
+    if not html_old:
+        html_old = "Нет старых данных"
+    if not html_new:
+        html_new = "Нет новых данных"
+        
+    tree1 = lxml.html.fromstring(html_old)
+    tree2 = lxml.html.fromstring(html_new)
+    
+    f = HTMLFormatter()
+    #f = xmldiff.formatting.XMLFormatter()
+    res = xmldiff.main.diff_trees(tree1, tree2, formatter=f)
+    return res
 
 
 class DiffService:
@@ -27,10 +55,15 @@ class DiffService:
             if not header:
                 header = old.header()
             old = old.html
-            
         
-        return header, new_reg_data, old_reg_data, '<div style="color:red">some diffs</div>'
-        #return new_reg_data, old_reg_data, diff(old, new, pretty=True)
+        #return header, new_reg_data, old_reg_data, '<div style="color:red">some diffs</div>'
+        
+        # Медленно на больших кафедрах - на Киевской за минуту не отрабатывает
+        #from ext.htmltreediff.html import diff
+        #html_diff_result = diff(old, new, pretty=True)
+        
+        html_diff_result = diff_html(old, new) # На Киевской - 10 секунд
+        return header, new_reg_data, old_reg_data, html_diff_result
     
     def get_doc_data(self, coll: TextCollectionDb, doc_key, target_version) -> TextCafedra:
         if target_version=='cur':
@@ -46,4 +79,3 @@ class DiffService:
                 
         else:
             raise ValueError(f"Can't get doc_data for doc_key={doc_key} target={target_version}")
-        
