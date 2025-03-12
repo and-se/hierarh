@@ -1,0 +1,19 @@
+{% extends "edit/base-edit.html" %}
+{% block content %}
+<main>
+    <form class="search" method="get">
+        <input name="query" value="{{query}}">
+        <button type="submit">Поиск</button>
+        <a class="button" href="/edit/{{item_type}}/new">Новая</a>
+    </form>
+
+    <ul class="items">
+    {% for doc in items %}
+        <li><a href="/edit/{{item_type}}/{{doc.key}}" class="{{'obnovl' if doc.is_obn()}}">{{doc.header()}}</a></li>
+    {% endfor %}
+    </ul>
+
+
+
+</main>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "edit/base-edit.html" %}
+{% block pagetitle %}
+История: {{cur_doc.header()}}
+{% endblock %}
+{% block content %}
+<main class="hierarh-history">
+    <h1>{{cur_doc.header()}}</h1>
+    <div>Текущая версия: {{time_convert(cur_doc.reg_data)}}
+    {%set cur_com = cur_doc.reg_data.get('comment') %}
+    {%if cur_com%}
+    <q>{{cur_com}}</q>
+    {%endif%}
+    </div>
+
+    <h2>История правок</h2>
+    {% if (items) %}
+    <ul class="items">
+    {% for ver in items %}
+        <li>
+            <details class="version">
+                <summary>
+                    {{time_convert(ver.reg_data)}}
+                    {% set ver_com = ver.reg_data.get('comment')%}
+                    {%if  ver_com %}
+                    <q>{{ver_com}}</q>
+                    {%endif%}
+                    
+                    <div class="dropdown version-compare-menu">
+                        <span class="dropdown-header">cравнить⇩</span>
+                        <div class="dropdown-items">
+                            <div><a href="/edit/cafedra/{{cur_doc.key}}/diff/cur/v{{loop.index0 + 1}}" target="_blank">
+                                с актуальной версией
+                            </a></div>
+                            <div><a href="/edit/cafedra/{{cur_doc.key}}/diff/v{{loop.index0 + 1}}/v{{loop.index0 + 2}}" target="_blank">
+                                с предыдущей версией
+                            </a></div>
+                        </div>
+                    </div>
+                </summary>
+                <div>
+                    {% autoescape false %}
+                    {{ver.html}}
+                    {% endautoescape%}
+                </div>
+            </details>
+        </li>
+    {% endfor %}
+
+    {%else%}
+    <div>Пока правок не было...</div>
+    {%endif%}
+    </ul>
+
+
+
+</main>
+{% endblock %}

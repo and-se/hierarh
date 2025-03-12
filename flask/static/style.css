@@ -46,7 +46,7 @@ h2.main-header {
 	display: table;
 	margin-top: 20px;
 	background: #2767A0;
-	border-radius: 5px;	
+	border-radius: 5px;
 }
 .menu ul {
 	display: table-row;
@@ -161,3 +161,8 @@ li .obnovl {
     flex-grow: 1;
 }
 
+.for-editors a {
+    text-decoration: none;
+    color: gray;
+    float: right;
+}

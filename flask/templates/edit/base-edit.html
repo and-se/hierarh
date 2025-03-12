@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>{% block pagetitle %}История иерархии Русской Православной Церкви с 862 г.{% endblock %}</title>
+
+
+<link rel="stylesheet" type="text/css" href="/static/simple.css" >
+<link rel="stylesheet" type="text/css" href="/static/style.css" >
+<link rel="stylesheet" type="text/css" href="/static/edit/edit-style.css" >
+
+</head>
+
+<body>
+    <header>
+        <nav>
+          <ul class="collections">
+              <li><a class="{{'current' if item_type=='cafedra'}}" href="{{url_for('.list_cafedra_edit')}}">Кафедры</a></li>
+              <!--<li><a class="{{'current' if item_type=='episkop'}}" href="/episkop">Епископы</a></li>-->
+          </ul>
+        </nav>
+    </header>
+    {% block content required %}
+    {% endblock content %}
+
+    <footer>
+        Вы вошли под пользователем <strong>{{current_user.title}}</strong>. <a href='/logout'>Выйти</a>
+    </footer>
+</body>

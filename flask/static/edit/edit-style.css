@@ -1,0 +1,208 @@
+#menu {
+    position: sticky;
+    top: 0px;
+    background-color: #008899;
+    border-bottom: 1px solid gray;
+    padding: 0 15px;
+    border-radius: 5px;
+}
+
+.he-table-menu-inaccurate {
+/*
+ * Нужно, чтобы чекбокс был невыбираемым, иначе он снимает выделение из текста
+ * и уже непонятно, с какой строкой таблицы мы работаем
+*/
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: -moz-none;
+    -o-user-select: none;
+    user-select: none;
+
+    color: white;
+}
+
+/*[contenteditable=true] {
+    white-space: pre-wrap;
+}*/
+
+.download-buttons {
+    float: right;
+}
+
+
+.edit-comment {
+    width: 100%;
+}
+
+.he-edit-form {
+    background-color: white;
+}
+
+.he-edit-form .header {
+    font-weight: bold;
+    font-size: xx-large;
+    display: inline-block;
+    width: 70%;
+}
+
+.he-edit-form .text, .version .text, .diff .text {
+    text-indent: 10px each-line;
+}
+
+.he-edit-form .text br, .version .text br {
+    margin-bottom: 15px;
+}
+
+.version .header, .diff .header {
+    font-weight: bold;
+}
+
+.he-edit-form .he-props {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.he-edit-form details, .version details, .diff details {
+    display:inline;
+    border: none;
+    margin-bottom: 0;
+}
+
+.he-edit-form details summary, .version details summary, .diff details summary {
+    padding: 0;
+    list-style-type: none;
+}
+
+.he-edit-form details summary .he-delete-button {
+    display: none;
+}
+
+.he-edit-form details[open], .version details[open], .diff details[open] {
+    display: block;
+}
+
+.he-edit-form details[open] summary, .version details[open] summary, .diff details[open] summary {
+    list-style-type: disclosure-open;
+}
+
+.he-edit-form details[open] summary .he-delete-button {
+    display: inline;
+    padding: 4px;
+    margin-left: 10px;
+}
+
+.he-edit-form details div, .version details div, .diff details div {
+    border-left: 1px solid gray;
+    padding-left: 5px;
+    border-radius: 10px;
+}
+
+.he-undo-button {
+    margin-left: 60px;
+    background-color: gray;
+}
+
+
+.he-edit-form tr.header-row, .version tr.header-row, .diff tr.header-row {
+    font-weight: bold;
+    font-size: x-large;
+}
+
+.he-edit-form tr.inaccurate {
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+.he-edit-form tr.inaccurate td:first-of-type:before {
+    content: '(';
+}
+
+.he-edit-form tr.inaccurate td:last-of-type:after {
+    content: ')';
+}
+
+.he-edit-form td {
+    height: 40px; /* it is min height */
+    border: 1px solid #DDDDDD;
+}
+
+
+
+/*
+td:empty:before {
+  content: 'введите текст';
+  color: gray;
+  position: relative;
+}*/ /*attr(data-text)*/
+
+:root {
+    --diff-ins: #A3FE65; /*#93EE55;*/
+    --diff-del: #FEDBDB;
+}
+
+
+.version-compare-menu {
+    float: right;
+    font-weight: normal;
+}
+
+.hierarh-diff .old, .hierarh-diff .new {
+    background-color: var(--accent-bg);
+    padding: 5px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+}
+
+.old .header {
+    background-color: var(--diff-del);
+}
+
+.new .header {
+    background-color: var(--diff-ins);
+}
+
+.hierarh-diff .diff > *{
+    background-color: var(--accent-bg);
+    
+}
+
+.diff ins article, .diff del article {
+    /* вырожденные случаи, когда сравниваем с пустотой */
+    background-color: inherit;
+}
+
+.hierarh-diff .diff ins, .diff ins details {
+    background-color: var(--diff-ins);
+    text-decoration: none;
+    border-radius: 5px;
+}
+
+.hierarh-diff .diff del, .diff del details {
+    background-color: var(--diff-del);
+    text-decoration: none;
+    border-radius: 5px;
+}
+
+
+
+/* ui controls */
+
+
+.dropdown-items {
+    display: none;
+    position: absolute;
+    z-index: 1;
+    background-color: #f1f1f1;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    padding: 4px;
+    border-radius: 3px;
+}
+
+.dropdown:hover .dropdown-items {
+    display: block;
+}
+
+.dropdown:hover .dropdown-items > *:hover {
+    background-color: #ddd;
+
+}

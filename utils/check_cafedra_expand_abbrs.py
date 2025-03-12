@@ -69,10 +69,15 @@ import json
 import re
 from pprint import pprint
 
-caf_origin_file = '../data/cafedra_articles.json'
-caf_expand_file = '../data/cafedra_articles_expand_abbrs.json'
+#CAF_origin_file = '../data/cafedra_articles.json'
+#CAF_expand_file = '../data/cafedra_articles_expand_abbrs.json'
 
-def main():
+CAF_origin_file = '../data/edit-init/cafedra-edit.json'
+CAF_expand_file = '../data/edit-init/cafedra-exp-abbrs-edit.json'
+
+def main(caf_origin_file, caf_expand_file):
+    ok = True
+    
     origin, expand = load_data(caf_origin_file, caf_expand_file)
 
     assert len(origin) == len(expand)
@@ -84,25 +89,29 @@ def main():
         if not header_like(o, e):
             print(f'NOT LIKE: {o}  <-> {e}')
             not_eq += 1
-
-    print('Расхождения в названиях:', not_eq)
+    
+    if not_eq:
+        print('Расхождения в названиях:', not_eq)
+        ok = False
 
     for i in range(len(origin)):
         o, e = origin[i], expand[i]
 
         # убираем дублирующуюся сноску из оригинала
-        if o['header'] == 'МЦХЕТСКАЯ':
-            assert o['notes'][17] == o['notes'][16]
-            del o['notes'][17]
+        #if o['header'] == 'МЦХЕТСКАЯ':
+            #assert o['notes'][17] == o['notes'][16]
+            #del o['notes'][17]
 
         if len(o['notes']) != len(e['notes']):
+            ok = False
             print(f'''Разное колич. сносок {o['header']} / {e['header']}: {len(o['notes'])} <-> {len(e['notes'])}''')
 
         oni = build_note_index(o)
         eni = build_note_index(e)
 
         if oni != eni:
-            skip_check = [
+            skip_check = []
+            '''skip_check = [
                 'ФЕОДОСИЙСКАЯ', 'НИЖНЕУДИНСКАЯ, обновленческая', 'САРАПУЛЬСКАЯ, обновленческая',
                 'АМЕРИКАНСКАЯ', 'АРХАНГЕЛЬСКАЯ', 'АСТРАХАНСКАЯ', 'ВЛАДИМИРО-ВОЛЫНСКАЯ', 'КИЕВСКАЯ',
                 'КОЛОМЕНСКАЯ', 'КРУТИЦКАЯ', 'ЛАДОЖСКАЯ', 'ЛУЦКАЯ', 'ЛЬВОВСКАЯ', 'МИНСКАЯ', 'МОЖАЙСКАЯ',
@@ -111,23 +120,25 @@ def main():
 
                 'Викариатство Псковской епархии', 'ВЛАДИМИРСКАЯ (Суздальско-Владимирская)',
                 'Московский и всея России Патриархат',
-            ]
+            ]'''
             print(f'''Разная расстановка сносок {o['header']} / {e['header']}''')
             if e['header'] in skip_check:
                 shift = oni[-1][0] - eni[-1][0]
                 print(f'\t - проверь вручную или пропусти, т.к. были ручные правки и номера сносок поехали (факт. на {shift})')
                 print()
                 continue
-
+            
+            ok = False
             print('Origin:')
             print(oni)
             print('Expand:')
             print(eni)
             print()
 
-        # TODO находится много несогласованностей между список сносок статьи и ссылками на сноски и статьи
-        # check_notes_integrity(o['header'], o['notes'], oni)
-        # check_notes_integrity(e['header'], e['notes'], eni)
+        
+        ok = ok and check_notes_integrity(o['header'], o['notes'], oni, "в оригинальном тексте")
+        ok = ok and check_notes_integrity(e['header'], e['notes'], eni, "в тексте с раскрытыми сокращениями")
+        return ok
 
 
 def header_like(origin_header, expanded_header):
@@ -210,24 +221,30 @@ def build_note_index(article):
 
     for i, ep in enumerate(article['episkops']):
         if isinstance(ep, str):
-            r.append(('ep subheader', expand_abbrs(ep).replace(' )', ')') ))
+            t, notes = extract_notes(ep)
+            r.append(('ep subheader ' + expand_abbrs(t).replace(' )', ')'), notes ))
             continue
-
-        t, notes = extract_notes(ep['text'])
+        
+        txt = ep['text']
+        if isinstance(txt, list):
+            txt = " – ".join(x or '' for x in txt)
+        t, notes = extract_notes(txt)
         if notes:
             r.append((i, notes))
     return r
 
-def check_notes_integrity(caf, notes, notes_index):
+def check_notes_integrity(caf, notes, notes_index, msg_tail):
     ns1 = sorted([int(x['num']) for x in notes])
     ns2 = []
     for h, notes in notes_index:
-        if h != 'ep subheader':
-            ns2.extend([int(x) for x in notes])
+        #if h != 'ep subheader':
+        ns2.extend([int(x) for x in notes])
     ns2 = sorted(ns2)
 
     if ns1 != ns2:
-        print(f'''Несогласованные сноски {caf}:\n\tnotes: {ns1}\n\t refs: {ns2}\n''')
+        print(f'''Несогласованные сноски {msg_tail} {caf}:\n\tnotes: {ns1}\n\t refs: {ns2}\n''')
+        return False
+    return True
 
 # Выписка кода из article_parser.py
 # - лучше выпишем маленький кусок, чем создавать лишнюю связь и головную боль при переработке основных классов.
@@ -250,4 +267,4 @@ def load_data(f1, f2):
     return r
 
 if __name__ == '__main__':
-    main()
+    main(CAF_origin_file, CAF_expand_file)
