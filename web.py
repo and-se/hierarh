@@ -47,6 +47,11 @@ login_manager.login_message = None
 db = PeeweeHistHierarhStorage()
 comments_db = PeeweeUserCommentsStorage()
 
+from datetime import datetime
+@app.context_processor
+def inject_now():
+    return {'time_now': datetime.utcnow()}
+
 @app.route('/')
 def index():
     #return redirect('/cafedra')
@@ -77,6 +82,10 @@ def episkop_article(key):
 @app.route('/files/<path:name>')
 def get_file(name):
     return send_from_directory('data/hierarh-files', name)
+
+@app.route('/aboutproject')
+def about_project():
+    return render_template('about.html')
 
 @app.post('/comments')
 def add_comment():

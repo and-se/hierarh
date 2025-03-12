@@ -75,11 +75,17 @@ h2.main-header {
 }
 
 .copyright {
+    background-color: #799CBF;
 	margin-top: 50px;
 	position: fixed center;
 	bottom: 0;
 	text-align: center;
 	color: #244667;
+    
+    font-weight: bold;
+    font-size: smaller;
+    line-height: 28px;
+    padding-bottom: 2px;
 }
 .div .copyright {
 	margin-top: 15 px;
@@ -126,8 +132,7 @@ h2.main-header {
 	top: 0;
 }
 
-.footer {
-	background-color: #799CBF;
+.footer {	
 	position: inherit;
 	right: 0;
 	left: 0;
@@ -147,8 +152,8 @@ h2.main-header {
 
 /*остальное*/
 
-.collections .current {
-    color: red;
+.menu .current {
+    color: #FF1111;
 }
 
 
@@ -242,5 +247,5 @@ li .obnovl {
 .for-editors a {
     text-decoration: none;
     color: gray;
-    float: right;
+    /*float: right;*/
 }
