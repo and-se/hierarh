@@ -9,17 +9,21 @@ p {
 /*main*/
 
 .main-header {
+	background-color: #799CBF;
+}
+
+.main-header-row {
 	text-align: center;
 	line-height: 1.5;
 	margin-top: 10px;
 	margin-bottom: 10px;
 }
 
-h1.main-header {
+h1.main-header-row {
 	font-size: 24pt;
 }
 
-h2.main-header {
+h2.main-header-row {
 	font-size: 15pt;
 }
 
@@ -39,7 +43,7 @@ h2.main-header {
 	color: #244667;
 }
 
-.main-header a {
+.main-header-row a {
 	text-decoration: none;
 	color: #244667;
 }
@@ -124,13 +128,6 @@ h2.main-header {
 	text-indent: 30px;
 }
 
-.header {
-	background-color: #799CBF;
-	position: inherit;
-	right: 0;
-	left: 0;
-	top: 0;
-}
 
 .footer {	
 	position: inherit;
