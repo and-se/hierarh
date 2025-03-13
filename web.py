@@ -20,6 +20,8 @@ from time import time as unix_now
 
 from urllib.parse import urlsplit
 
+from pathlib import Path
+
 app = Flask(__name__, static_folder='flask/static',
             template_folder='flask/templates')
 
@@ -79,13 +81,31 @@ def episkop_article(key):
     d = db.get_episkop_data(key)
     return render_template('episkop_article.html', data=d, item_type='episkop')
 
+# TODO Оставлено для картинок в меню и приложения 11 (картинка-схема)
 @app.route('/files/<path:name>')
 def get_file(name):
     return send_from_directory('data/hierarh-files', name)
 
+
+@app.route('/material/<string:name>')
+def get_material(name):
+    try:
+        name = name.replace('/', '').replace('\\', '')
+        html = Path(app.root_path) \
+                    .joinpath('data/hierarh-files') \
+                    .joinpath(name) \
+                    .read_text(encoding="utf8")
+        return render_template('material.html', html=html, header=name)
+    except Exception as ex:
+        print(ex)
+        return abort(404, "Такого материала нет")
+        
+        
+
 @app.route('/aboutproject')
 def about_project():
-    return render_template('about.html')
+    return get_material('О проекте.html')
+    #return render_template('about.html')
 
 @app.post('/comments')
 def add_comment():

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block pagetitle %}
+{{header}}
+{% endblock %}
+
+{% block content %}
+
+
+<style>
+
+h1 {
+    font-size: 20pt;
+}
+
+h2 {
+    font-size: 18pt;
+}
+
+.fnote {
+    cursor: pointer;
+}
+
+.fnote > sup {
+    font-size: small;
+}
+
+.fnote > span {
+    display: none; 
+    text-indent: 0;
+    padding-left: 10px;
+}
+
+.fnote.open > span {
+    display: block;
+    font-style: italic;
+    border-left: 1px solid gray;
+    border-radius: 10px;
+    margin-left: 40px;
+}
+</style>
+
+<script>
+window.addEventListener('load', function() {
+    i=0;
+    for (let l of document.querySelectorAll('.fnote')) {
+        l.addEventListener('click', function() {            
+            l.classList.toggle('open');
+        });
+        i+=1;
+    }
+    
+    console.log('Alived', i, 'footnotes');
+});
+</script>
+
+
+
+<main>
+{% autoescape false %}
+{{html}}
+{% endautoescape %}
+</main>
+{% endblock %}
