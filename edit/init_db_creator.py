@@ -8,7 +8,7 @@ from dataclasses import dataclass
 sys.path.append(os.getcwd())
 from article_parser import divide_episkop_row
 from parsers.fail import ParseFail
-from utils import check_cafedra_expand_abbrs as check_util
+from utils import check_cafedra_expand_abbrs as cafedra_check_util
 
 from edit import storage
 
@@ -18,59 +18,18 @@ from typing import List
 
 CSS_NOTE_ERROR = 'error-note'
 
-ORIGINAL_DATA_FILE = 'data/edit-init/cafedra-edit.json'
-EXPANDED_DATA_FILE = 'data/edit-init/cafedra-exp-abbrs-edit.json'
+ORIGINAL_CAFEDRA_JSON = 'data/edit-init/cafedra-edit.json'
+EXPANDED_CAFEDRA_JSON = 'data/edit-init/cafedra-exp-abbrs-edit.json'
 
-MAP_FILE = 'data/edit-init/map-origin-expanded-cafedra.json'
+CAFEDRA_MAP_FILE = 'data/edit-init/map-origin-expanded-cafedra.json'
 
 def main():
     if len(sys.argv) != 2:
-        print("добавьте параметр json для преобразования json во входной html,\n" + \
+        print("добавьте параметр json для преобразования json во входные html,\n" + \
               "либо db для построения БД на основе html")
         return 1
     if sys.argv[1] == 'json':
-        print('\n\n============================')
-        print('Конвертируем исходный текст книги (с сокращениями)\n')
-
-        html_o = process_json(ORIGINAL_DATA_FILE)
-        if not html_o: return 2
-
-        print('\n\n============================')
-        print("Конвертируем текст с раскрытыми сокращениями\n")
-        html_e = process_json(EXPANDED_DATA_FILE)
-        if not html_e: return 2
-        
-        print('\n\n============================')
-        print("Проверяем согласованность двух упомянутых текстов...")
-        
-        ok = check_util.main(ORIGINAL_DATA_FILE, EXPANDED_DATA_FILE)
-        if ok: print("OK")
-        else:
-            print("Fail")
-            return 3
-        
-        print('\n\n============================')
-        print("Соотносим заголовки в двух текстах")
-        caf_origin: List[storage.TextCafedra] = load_html(html_o)
-        caf_expand: List[storage.TextCafedra] = load_html(html_e)
-        
-        map_data = {}
-        assert len(caf_origin) == len(caf_expand), "Разное количество статей"
-        for (co, ce) in zip(caf_origin, caf_expand):
-            head1, head2 = co.header(), ce.header()
-            ok = True
-            if not check_util.header_like(head1, head2):
-                print(f'Разные кафедры? {head1}  <-> {head2}')
-                ok = False
-            else:
-                map_data[head1] = head2
-            if not ok:
-                return 4
-                
-        with open(MAP_FILE, 'w', encoding="utf8") as f:
-            json.dump(map_data, f, ensure_ascii=False, indent=2)
-        print("Соотнесение заголовков в файле", MAP_FILE)
-        
+        make_cafedra_html()
 
     elif sys.argv[1] == 'old-json':
         # сборка json из оригинального текста книги
@@ -93,16 +52,16 @@ def main():
         ch.process(source_file)
 
     elif sys.argv[1] == 'db':
-        file1 = Path(ORIGINAL_DATA_FILE).with_suffix('.html')
-        file2 = Path(EXPANDED_DATA_FILE).with_suffix('.html')
+        file1 = Path(ORIGINAL_CAFEDRA_JSON).with_suffix('.html')
+        file2 = Path(EXPANDED_CAFEDRA_JSON).with_suffix('.html')
         print("Загружаем данные из файлов", file1, "и", file2, "в БД", storage.DbName)
         
-        articles1: List[storage.TextCafedra] = load_html(file1)
-        articles2: List[storage.TextCafedra] = load_html(file2)
+        articles1: List[storage.TextCafedra] = load_cafedra_html(file1)
+        articles2: List[storage.TextCafedra] = load_cafedra_html(file2)
         assert len(articles1) == len(articles2), "Разное количество статей"
         print(f"Всего {len(articles1)} статей")
         
-        with open(MAP_FILE, encoding='utf8') as f:
+        with open(CAFEDRA_MAP_FILE, encoding='utf8') as f:
             header_map = json.load(f)
 
         print("Создаём БД", storage.DbName)
@@ -114,7 +73,7 @@ def main():
                 storage.init_edit_db()
             else:
                 print("Тогда ничего не делаем")
-                return 4
+                return 4        
 
         stor = storage.HierarhEditStorage()
         with stor.atomic():
@@ -142,7 +101,51 @@ def main():
         print("Готово!")
 
 
-def process_json(filename):
+def make_cafedra_html():
+    print('\n\n============================')
+    print('Конвертируем исходный текст книги (с сокращениями)\n')
+
+    html_o = process_cafedra_json(ORIGINAL_CAFEDRA_JSON)
+    if not html_o: return 2
+
+    print('\n\n============================')
+    print("Конвертируем текст с раскрытыми сокращениями\n")
+    html_e = process_cafedra_json(EXPANDED_CAFEDRA_JSON)
+    if not html_e: return 2
+    
+    print('\n\n============================')
+    print("Проверяем согласованность двух упомянутых текстов...")
+    
+    ok = cafedra_check_util.main(ORIGINAL_CAFEDRA_JSON, EXPANDED_CAFEDRA_JSON)
+    if ok: print("OK")
+    else:
+        print("Fail")
+        return 3
+    
+    print('\n\n============================')
+    print("Соотносим заголовки в двух текстах")
+    caf_origin: List[storage.TextCafedra] = load_cafedra_html(html_o)
+    caf_expand: List[storage.TextCafedra] = load_cafedra_html(html_e)
+    
+    map_data = {}
+    assert len(caf_origin) == len(caf_expand), "Разное количество статей"
+    for (co, ce) in zip(caf_origin, caf_expand):
+        head1, head2 = co.header(), ce.header()
+        ok = True
+        if not cafedra_check_util.header_like(head1, head2):
+            print(f'Разные кафедры? {head1}  <-> {head2}')
+            ok = False
+        else:
+            map_data[head1] = head2
+        if not ok:
+            return 4
+            
+    with open(CAFEDRA_MAP_FILE, 'w', encoding="utf8") as f:
+        json.dump(map_data, f, ensure_ascii=False, indent=2)
+    print("Соотнесение заголовков в файле", CAFEDRA_MAP_FILE)
+    
+
+def process_cafedra_json(filename):
     print("Конвертируем файл", filename, "во входной html")
 
     if filename.endswith(".json"):
@@ -158,9 +161,6 @@ def process_json(filename):
         return filename
     else:
         raise ValueError("Expected json file")
-
-
-
 
 
 def article_json_to_html_edit(filename):
@@ -392,7 +392,7 @@ def build_bad_notes(mode, notes):
     return ''
 
 
-def load_html(filename):
+def load_cafedra_html(filename):
     #from bs4 import BeautifulSoup --- too slow!
     #res = []
     with open(filename, encoding="utf8") as f:        
