@@ -21,6 +21,8 @@ CSS_NOTE_ERROR = 'error-note'
 ORIGINAL_CAFEDRA_JSON = 'data/edit-init/cafedra-edit.json'
 EXPANDED_CAFEDRA_JSON = 'data/edit-init/cafedra-exp-abbrs-edit.json'
 
+EPISKOP_JSON = 'data/edit-init/episkop-edit.json'
+
 CAFEDRA_MAP_FILE = 'data/edit-init/map-origin-expanded-cafedra.json'
 
 def main():
@@ -29,7 +31,11 @@ def main():
               "либо db для построения БД на основе html")
         return 1
     if sys.argv[1] == 'json':
-        make_cafedra_html()
+        er = make_cafedra_html()
+        if er: return er
+        
+        er = make_episkop_html()
+        if er: return er
 
     elif sys.argv[1] == 'old-json':
         # сборка json из оригинального текста книги
@@ -149,7 +155,7 @@ def process_cafedra_json(filename):
     print("Конвертируем файл", filename, "во входной html")
 
     if filename.endswith(".json"):
-        filename, error = article_json_to_html_edit(filename)
+        filename, error = cafedra_json_to_html_edit(filename)
         if error:
             print(f"""\nNB!!!\tПри конвертации данных есть ошибки!!!
             Результат конвертации лежит в {filename},
@@ -163,17 +169,17 @@ def process_cafedra_json(filename):
         raise ValueError("Expected json file")
 
 
-def article_json_to_html_edit(filename):
+def cafedra_json_to_html_edit(filename):
     result_file = Path(filename).with_suffix(".html")
     errs = []
     with open(filename) as f, open(result_file, 'w', encoding="utf8") as t:
         data = json.load(f)
         assert isinstance(data, list)
         for d in data:
-            r, err = convert_cafedra_json_to_html(d)
+            r, err = convert_cafedra_to_html(d)
             t.write(r)
             if err:
-                r, err = convert_cafedra_json_to_html(d, mode='error_report')
+                r, err = convert_cafedra_to_html(d, mode='error_report')
 
                 errs.append(r)
 
@@ -235,7 +241,7 @@ class Note:
     text: str
     touched: bool = False
 
-def convert_cafedra_json_to_html(caf: dict, mode="normal"):
+def convert_cafedra_to_html(caf: dict, mode="normal"):
     has_err = False
     notes = [Note(int(x['num']), x['text']) for x in caf['notes']]
 
@@ -361,6 +367,7 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
 
     return result, has_err
 
+
 def build_bad_notes(mode, notes):
     unused_notes = '\n'.join([f'''<li class="{CSS_NOTE_ERROR}" style="color:red">{x.num}. {x.text}</li>''' for x in notes if not x.touched])
 
@@ -390,6 +397,96 @@ def build_bad_notes(mode, notes):
         </ul>
         </div>'''
     return ''
+
+
+def make_episkop_html():
+    print('\n\n============================')
+    print('Конвертируем данные о епископах\n')
+    
+    filename = EPISKOP_JSON    
+    print("Конвертируем файл", filename, "во входной html")
+
+    with open(filename, encoding="utf8") as f:
+        json_e = json.load(f)
+    
+    result_file = Path(filename).with_suffix(".html")
+    
+    assert isinstance(json_e, list), 'Ожидается список епископов'
+    
+    with result_file.open('w', encoding='utf8') as out:
+        for ep in json_e:
+            try:
+                ep_html = convert_episkop_to_html(ep)
+            except Exception as e:
+                print("Ошибка с епископом")
+                print(ep)
+                raise
+            else:    
+                out.write(ep_html)
+    
+    print(f"Успешно сконвертированный html в файле {result_file}")
+
+
+def convert_episkop_to_html(ep: dict):
+    b = lambda v: "true" if v else "false"
+    
+    name = ep['name'].strip()
+    # имя есть и туда не попало что-то не то
+    assert name and re.match('.*[а-яА-ЯN]', name)
+    
+    cafs = ep['appointments']
+    #assert len(cafs) > 0  # есть см!!!!
+    if not len(cafs):
+        print("!Link?", name)
+        return "LINK " + name
+    
+    # Статья о епископе в скобках - условные (легендарные) личности
+    legendary = False
+    tail = cafs[-1]['dates'].strip()
+    skip = ['(Св. ?) Ефрем I', '(Св.?) Иоанн III', '(Св.?) Прохор']
+    if name.startswith('(') and name not in skip:
+        if not tail.endswith(')'):
+            raise Exception('Статья о епископе в скобках или нет?')
+        legendary = True
+        # убираем скобки
+        name = name[1:]
+        cafs[-1]['dates'] = tail[:-1]        
+    
+    html_cafs = []
+    for caf in ep['appointments']:
+        cafedra = caf['department']
+        assert cafedra
+        start, end, inaccurate = divide_dating_start_end(caf['dates'])
+        html_cafs.append(f'''<tr><td>{start}</td><td>{end}</td><td>{cafedra}</td></tr>''')
+    
+    html_cafs = '\n'.join(html_cafs)
+    
+    return f'''
+<article class="episkop_article" data-is-obn="{b(ep['isRenovator'])}" data-is-dubious="{b(legendary)}">
+<div class="header">{name}</div>
+<div class="text">
+<br>
+</div>
+<table class="cafedras">
+<thead>
+<tr><th>начало</th><th>окончание</th><th>кафедра</th></tr>
+</thead>
+<tbody>
+{html_cafs}
+</tbody>
+</table>
+</article>
+'''
+
+def divide_dating_start_end(dating):
+    if re.match(r'^\s*\([^)]+\)\s*$', dating):
+        return dating, None, True
+    
+    d = dating.split('–')
+    #assert len(d) == 2, dating
+    if not len(d) == 2:
+        print("!!!!!!!!!!!", dating)
+    return d[0], d[1] if len(d)>1 else None, False
 
 
 def load_cafedra_html(filename):

@@ -9,6 +9,7 @@ EPISKOP_XML = '../data/full_episkops.xml'
 
 # результат работы парсера
 EPISKOP_JSON = '../data/full_episkops.json'
+#EPISKOP_JSON = '../data/edit-init/episkop-edit.json'
 
 import sys
 from pathlib import Path
