@@ -435,10 +435,18 @@ def convert_episkop_to_html(ep: dict):
     assert name and re.match('.*[а-яА-ЯN]', name)
     
     cafs = ep['appointments']
-    #assert len(cafs) > 0  # есть см!!!!
-    if not len(cafs):
-        print("!Link?", name)
-        return "LINK " + name
+    
+    is_link = ' см.'   in name or '(см.' in name
+    
+    assert (not is_link and len(cafs) > 0) or (is_link and len(cafs) == 0), name
+    
+    if is_link:
+            return f'''
+<article class="episkop_article" data-is-obn="{b(ep['isRenovator'])}" data-is-dubious="false" data-is-link="true">
+<div class="header">{name}</div>
+<div class="text"><br></div>
+</article>
+'''
     
     # Статья о епископе в скобках - условные (легендарные) личности
     legendary = False
@@ -457,19 +465,19 @@ def convert_episkop_to_html(ep: dict):
         cafedra = caf['department']
         assert cafedra
         start, end, inaccurate = divide_dating_start_end(caf['dates'])
-        html_cafs.append(f'''<tr><td>{start}</td><td>{end}</td><td>{cafedra}</td></tr>''')
+        html_cafs.append(f'''<tr><td>{cafedra}</td><td>{start}</td><td>{end}</td></tr>''')
     
     html_cafs = '\n'.join(html_cafs)
     
     return f'''
-<article class="episkop_article" data-is-obn="{b(ep['isRenovator'])}" data-is-dubious="{b(legendary)}">
+<article class="episkop_article" data-is-obn="{b(ep['isRenovator'])}" data-is-dubious="{b(legendary)}" data-is-link="false">
 <div class="header">{name}</div>
 <div class="text">
 <br>
 </div>
 <table class="cafedras">
 <thead>
-<tr><th>начало</th><th>окончание</th><th>кафедра</th></tr>
+<tr><th>кафедра</th><th>начало</th><th>окончание</th></tr>
 </thead>
 <tbody>
 {html_cafs}
@@ -478,15 +486,46 @@ def convert_episkop_to_html(ep: dict):
 </article>
 '''
 
-def divide_dating_start_end(dating):
-    if re.match(r'^\s*\([^)]+\)\s*$', dating):
-        return dating, None, True
+manual_dating_divide = {
+    '–(1441 – 1442)' : (None, '(1441–1442)'),
+    'XIII в.': ('XIII в.', None),
+    '–(1569 – 1596)': (None, '(1569–1596)'),
+    '–(в 1630–1640-е годы)': ('(в 1630–1640-е годы)', None),    
+    'XVI в.' : ('XVI в.', None),
+    '16(29)02.1924–1928–1929 (?)': ('16(29)02.1924', '1928–1929 (?)'),
+    '–(1447–1451)': (None, '(1447–1451)'),
+    '(1533–1534)–05.08.1535': ('(1533–1534)', '05.08.1535'),
+    'XII в.' : ('XII в.', None),
+    '(XII–XIII в.)–' : ('(XII–XIII в.)', None),
+    '–(1345– 1347)' : (None, '(1345– 1347)'),
+    'XI в.' : ('XI в.', None),
+    '–24.04.1339 (1327–1331)' : (None, '24.04.1339 (1327–1331)'),
+    '26.04.1135–(1147–1167)' : ('26.04.1135', '(1147–1167)'),
+    '–(1929–1930)' : (None, '(1929–1930)'),
+    '01(14)02.1928–04.1928 – 04.1929' : ('01(14)02.1928', '04.1928 – 04.1929'),
+    'XIII–XIV вв.–' : ('XIII–XIV вв.', None),
+    '–08.06.1023(1010 – 1014)' : (None, '08.06.1023(1010 – 1014)'),
     
-    d = dating.split('–')
+    
+    
+}
+
+def divide_dating_start_end(dating):
+    def r(f, t, i):
+        return (f or '', t or '', i)
+        
+    if not dating:
+        return r(None, None, False)
+        
+    if re.match(r'^\s*\([^)]+\)\s*$', dating):
+        return r(dating, None, True)
+    
+    d = manual_dating_divide.get(dating) or dating.split('–')    
     #assert len(d) == 2, dating
-    if not len(d) == 2:
-        print("!!!!!!!!!!!", dating)
-    return d[0], d[1] if len(d)>1 else None, False
+    if not len(d) == 2:        
+        print(f"!!!!!!!!!!! Fail parse date | {dating} |")
+        
+    return r(d[0], d[1] if len(d)>1 else None, False)
 
 
 def load_cafedra_html(filename):
