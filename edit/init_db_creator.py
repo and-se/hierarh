@@ -58,54 +58,66 @@ def main():
         ch.process(source_file)
 
     elif sys.argv[1] == 'db':
-        file1 = Path(ORIGINAL_CAFEDRA_JSON).with_suffix('.html')
-        file2 = Path(EXPANDED_CAFEDRA_JSON).with_suffix('.html')
-        print("Загружаем данные из файлов", file1, "и", file2, "в БД", storage.DbName)
+        load_result_html_into_db()
+
+
+def load_result_html_into_db():    
+    file1 = Path(ORIGINAL_CAFEDRA_JSON).with_suffix('.html')
+    file2 = Path(EXPANDED_CAFEDRA_JSON).with_suffix('.html')
+    print("Загружаем кафедры из файлов", file1, "и", file2, "в БД", storage.DbName)
+    
+    articles1: List[storage.TextCafedra] = load_cafedra_html(file1)
+    articles2: List[storage.TextCafedra] = load_cafedra_html(file2)
+    assert len(articles1) == len(articles2), "Разное количество статей"
+    
+    with open(CAFEDRA_MAP_FILE, encoding='utf8') as f:
+        header_map = json.load(f)        
+    
+    file_ep = Path(EPISKOP_JSON).with_suffix('.html')
+    print(f"Загружаем епископов из файла {file_ep}")
+    
+    articles_ep: List[storage.TextEpiskop] = load_episkop_html(file_ep)
+
+    print("Создаём БД", storage.DbName)
+    if os.path.exists(storage.DbName):
+        ans = input("БД уже существует. Удалить? ")
+        if ans.lower().strip() in ['1', 'true', 'yes', 'да']:
+            os.remove(storage.DbName)
+            print("Create new edit db")
+            storage.init_edit_db()
+        else:
+            print("Тогда ничего не делаем")
+            return 4        
+
+    stor = storage.HierarhEditStorage()
+    with stor.atomic():
+        reg_data_orig = {
+            'who': 'admin',
+            'when': datetime.fromisoformat('2019-03-03T12:00:00+00:00').timestamp(),
+            'comment': 'текст книги'
+        }
         
-        articles1: List[storage.TextCafedra] = load_cafedra_html(file1)
-        articles2: List[storage.TextCafedra] = load_cafedra_html(file2)
-        assert len(articles1) == len(articles2), "Разное количество статей"
-        print(f"Всего {len(articles1)} статей")
+        reg_data_exp = {
+            'who': 'admin',
+            'when': datetime.fromisoformat('2024-06-01T09:00:00+00:00').timestamp(),
+            'comment': 'автоматически раскрыты сокращения'
+        }
         
-        with open(CAFEDRA_MAP_FILE, encoding='utf8') as f:
-            header_map = json.load(f)
-
-        print("Создаём БД", storage.DbName)
-        if os.path.exists(storage.DbName):
-            ans = input("БД уже существует. Удалить? ")
-            if ans.lower().strip() in ['1', 'true', 'yes', 'да']:
-                os.remove(storage.DbName)
-                print("Create new edit db")
-                storage.init_edit_db()
-            else:
-                print("Тогда ничего не делаем")
-                return 4        
-
-        stor = storage.HierarhEditStorage()
-        with stor.atomic():
-            reg_data_orig = {
-                'who': 'admin',
-                'when': datetime.fromisoformat('2019-03-03T12:00:00+00:00').timestamp(),
-                'comment': 'текст книги'
-            }
+        print(f"Загружаем кафедры - {len(articles1)} статей")
+        for i, art in enumerate(articles1):                
+            art = stor.cafedra.upsert(art, reg_data=reg_data_orig, fix_reg_data=False)
             
-            reg_data_exp = {
-                'who': 'admin',
-                'when': datetime.fromisoformat('2024-06-01T09:00:00+00:00').timestamp(),
-                'comment': 'автоматически раскрыты сокращения'
-            }
+            assert header_map[art.header()] == articles2[i].header()
             
-            for i, art in enumerate(articles1):                
-                art = stor.cafedra.upsert(art, reg_data=reg_data_orig, fix_reg_data=False)
-                
-                assert header_map[art.header()] == articles2[i].header()
-                
-                art.html = articles2[i].html
-                art = stor.cafedra.upsert(art, reg_data=reg_data_exp, fix_reg_data=False)
+            art.html = articles2[i].html
+            art = stor.cafedra.upsert(art, reg_data=reg_data_exp, fix_reg_data=False)
             
+        print(f"Загружаем епископов - {len(articles_ep)} статей")
+        for i, art in enumerate(articles_ep):
+            art = stor.episkop.upsert(art, reg_data = reg_data_orig, fix_reg_data=False)
+        
 
-        print("Готово!")
-
+    print("Готово!")
 
 def make_cafedra_html():
     print('\n\n============================')
@@ -529,6 +541,12 @@ def divide_dating_start_end(dating):
 
 
 def load_cafedra_html(filename):
+    return load_html_result_file(storage.TextCafedra, 'cafedra_article', filename)
+    
+def load_episkop_html(filename):
+    return load_html_result_file(storage.TextEpiskop, 'episkop_article', filename)
+    
+def load_html_result_file(text_model_class, css_class, filename):
     #from bs4 import BeautifulSoup --- too slow!
     #res = []
     with open(filename, encoding="utf8") as f:        
@@ -539,11 +557,12 @@ def load_cafedra_html(filename):
 
     articles = [x.strip() + '</article>' for x in html.split('</article>') if x.strip().startswith('<article')]
 
-    check = html.count('<article class="cafedra_article')
+    check = html.count(f'<article class="{css_class}')
     assert len(articles) == check, f"Должно быть {check} статей, а получилось {len(articles)}"
 
-    res = [storage.TextCafedra.from_html(None, x) for x in articles]
+    res = [text_model_class.from_html(None, x) for x in articles]
     return res
+
 
 if __name__ == '__main__':
     main()

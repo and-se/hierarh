@@ -1,0 +1,19 @@
+{% extends "edit/base-edit.html" %}
+
+{% block pagetitle %}
+{{doc.header()}}
+{% endblock %}
+
+{% block content %}
+{% autoescape false %}
+<main>
+
+<div id="data">
+{{doc.html}}
+</div>
+
+{% endautoescape %}
+
+</main>
+
+{% endblock %}

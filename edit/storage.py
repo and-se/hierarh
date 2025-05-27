@@ -120,16 +120,7 @@ def text_model_from_html(model_class, key, html):
     return doc
 
 
-class TextCafedra(TextBase):
-    def __init__(self):
-        super().__init__()        
-        self.html = """
-        <article class="cafedra_article" data-is-obn="false">
-            <div class="header">Заголовок...</div>
-            <div class="text">Текст статьи...</div>
-            <table class="episkops"></table>
-        </article>
-        """
+class BaseCafEp(TextBase):
     def header(self):
         m = re.search(r'<div class="header">([^<]+)', self.html)
         return m.group(1) if m else self.html.strip().split('\n')[0]
@@ -143,12 +134,24 @@ class TextCafedra(TextBase):
                 return True
         return False
 
-    @staticmethod
-    def from_html(key, html):
-        return text_model_from_html(TextCafedra, key, html)
+    @classmethod
+    def from_html(cls, key, html):
+        return text_model_from_html(cls, key, html)
+    
 
+class TextCafedra(BaseCafEp):
+    def __init__(self):
+        super().__init__()        
+        self.html = """
+        <article class="cafedra_article" data-is-obn="false">
+            <div class="header">Заголовок...</div>
+            <div class="text">Текст статьи...</div>
+            <table class="episkops"></table>
+        </article>
+        """
+   
         
-class TextEpiskop(TextBase):    
+class TextEpiskop(BaseCafEp):    
     def __init__(self):
         super().__init__()        
         self.html = f'''
@@ -158,16 +161,7 @@ class TextEpiskop(TextBase):
             <table class="cafedras"></table>
         </article>
         '''
-        
-    def header(self):
-        m = re.search(r'<div class="header">([^<]+)', self.html)
-        return m.group(1) if m else self.html.strip().split('\n')[0]
-
-        
-    @staticmethod
-    def from_html(key, html):
-        return text_model_from_html(TextEpiskop, key, html)
-        
+    
 class TextVersion:
     def __init__(self, coll, key, html, reg_data: dict):
         self.collection = coll
