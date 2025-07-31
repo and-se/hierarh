@@ -8,11 +8,53 @@
 {% autoescape false %}
 <main>
 
+<script src="/static/edit/textform.js"></script>
+
+<script>
+
+let hform = null;
+window.onload = initForm;
+
+function initForm(){
+    try {
+        let doc = document.querySelector('#data article.episkop_article');
+        
+        hform = new TextForm(doc);
+        hform.setMenu(new MenuPanel(document.querySelector('#menu')));
+
+        hform.addEditor('.header', new TextEditor())
+        
+        let notePlugin = new NotePlugin()
+        hform.addEditor('.text', new TextEditor().withPlugin(notePlugin))
+        hform.addEditor('table.cafedras', new HierarhTableEditor().withPlugin(notePlugin));
+        
+        hform.start();
+    } catch (ex) {
+        //showError(ex.message);
+        console.log(ex);
+    }
+}
+
+
+
+/*
+вот так можно отслеживать изменения selection
+document.addEventListener("selectionchange", () => {
+  console.log(document.getSelection());
+});
+*/
+
+</script>
+
+<div id="menu"></div>
+
 <div id="data">
 {{doc.html}}
 </div>
 
 {% endautoescape %}
+
+<div id="message"></div>
 
 </main>
 
