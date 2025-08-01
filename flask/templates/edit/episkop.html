@@ -26,7 +26,7 @@ function initForm(){
         
         let notePlugin = new NotePlugin()
         hform.addEditor('.text', new TextEditor().withPlugin(notePlugin))
-        hform.addEditor('table.cafedras', new HierarhTableEditor().withPlugin(notePlugin));
+        hform.addEditor('table.cafedras', new HierarhTableEditor('епископ').withPlugin(notePlugin));
         
         hform.start();
     } catch (ex) {

@@ -62,6 +62,41 @@
     vertical-align: top;
 }
 
+/* based on material.html template */
+
+.fnote {
+    cursor: pointer;
+}
+
+.fnote > sup {
+    font-size: small;
+}
+
+.fnote > sup > .he-delete-button {
+    display: none;
+}
+
+.fnote.open > sup > .he-delete-button {
+    display: inline;
+    padding: 4px;
+    margin-left: 10px;
+}
+
+.fnote > span {
+    display: none; 
+    text-indent: 0;
+    padding-left: 10px;
+}
+
+.fnote.open > span {
+    display: block;
+    font-style: italic;
+    border-left: 1px solid gray;
+    border-radius: 10px;
+    margin-left: 40px;
+}
+
+/* #region OLD TO REMOVE */
 .he-edit-form details, .version details, .diff details {
     display:inline;
     border: none;
@@ -96,6 +131,8 @@
     padding-left: 5px;
     border-radius: 10px;
 }
+
+/*#end region*/
 
 .he-undo-button {
     margin-left: 60px;

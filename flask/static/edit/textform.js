@@ -17,53 +17,96 @@ function TextForm(root) {
         this.editors.push(editor)
     }
     
+    this.pluginsMap = new Map()
+    
     this.start = function() {
         root.classList.add('he-edit-form');
         this.menu.init()
+        
         for (let ed of this.editors) {
             if (ed.init) {
                 let slot = null
-                if (this.menu)
-                    slot = this.menu.createSlot()
+                if (this.menu) {
+                    console.log('create MenuSlot for editor', ed.__proto__.constructor.name)
+                    slot = this.menu.createSlot()                
+                    slot.hide()                   
+                } else slot = new MenuSlot(document.createElement('fake'))
                 
                 ed.menuSlot = slot
-                slot.targetEditor = ed
+                //slot.targetEditor = ed                    
                 
-                slot.hide()
-                ed.init(slot)
+                ed.init(slot)                
+                initEditorPlugins(this, ed)
             }
             else console.log("Not init() for", ed)
         }
-    }
-    
-    document.addEventListener("selectionchange", () => {        
-        let r = getSelectionRange()
-        if (!r) return        
-        for (let ed of this.editors) {
-            if (ed.root.contains(r.commonAncestorContainer)) {
-                if (ed.isActive) continue
-                //ed.activate(r)
-                // todo update menu
-                ed.isActive = true
-                ed.menuSlot.show()
-            } else {
-                //ed.deactivate()
-                ed.isActive = false
-                ed.menuSlot.hide()
+        
+        function initEditorPlugins(form, editor) {        
+            for (let plug of editor.plugins || []) {                        
+                if (form.pluginsMap.has(plug)) {
+                    form.pluginsMap.get(plug).push(editor)
+                    plug.registerEditor(editor)
+                    continue
+                } else {
+                    form.pluginsMap.set(plug, [editor])
+                    let slot = null
+                    if (form.menu) {
+                        slot = form.menu.createSlot()                
+                        console.log('create MenuSlot for plugin', plug.__proto__.constructor.name)
+                        slot.hide()                    
+                    } else slot = new MenuSlot(document.createElement('fake'))
+                    
+                    plug.menuSlot = slot                    
+                    plug.init(slot)
+                    plug.registerEditor(editor)        
+                }
+            }
+        }
+        
+        //console.log('FORM PLUGINS MAP', this.pluginsMap)
+        
+        // в зависимсоти от текущей позиции в документе
+        // обновляем доступные в меню опции
+        document.addEventListener("selectionchange", () => {        
+            let r = getSelectionRange()
+            if (!r) return
+            
+            let activePlugins = new Set()
+            
+            for (let ed of this.editors) {
+                if (ed.root.contains(r.commonAncestorContainer)) {
+                    //if (ed.isActive) continue
+                    //ed.activate(r)                
+                    ed.isActive = true
+                    ed.menuSlot.show()                    
+                    if (ed.plugins) {
+                        ed.plugins.forEach(plug => activePlugins.add(plug))
+                    }
+                } else {
+                    //ed.deactivate()
+                    ed.isActive = false
+                    ed.menuSlot.hide()
+                }
+                
+                //console.log("find active", ed, ed.isActive)
             }
             
-            //console.log("find active", ed, ed.isActive)
-        }
-    });
-    
-    
+            for (let plug of this.pluginsMap.keys()) {
+                if (activePlugins.has(plug)) {
+                    plug.menuSlot.show()
+                } else {
+                    plug.menuSlot.hide()
+                }
+            }
+        });
+    }
 }
 
 function MenuPanel(containerElem) {
     if (!containerElem) throw new Error("Empty menu container elem");        
     
     let MENU_TEMPLATE = `
-    <div class="he-menu">        
+    <div class="he-menu">
         <button class="he-undo-button">отмена (Ctrl+Z)</button>
     </div>
     `;
@@ -78,7 +121,9 @@ function MenuPanel(containerElem) {
     
     this.createSlot = function() {
         let elem = createElementByHtml('<span class="he-menu-slot"></span>')
-        this.root.prepend(elem)
+        const undo = this.root.querySelector('.he-undo-button')        
+        undo.before(elem)
+        //this.root.prepend(elem)
         
         return new MenuSlot(elem)
     }
@@ -87,8 +132,21 @@ function MenuPanel(containerElem) {
 function MenuSlot(root) {
     this.root = root
     this.setHtmlElem = function(elem) { this.root.innerHtml = ''; this.root.append(elem) }
-    this.hide = function() { this.root.style.display = "none" }
-    this.show = function(mode) { this.root.style.display = (mode || "inline") }
+    this.isVisible = true
+    
+    this.hide = function() { 
+        if (this.isVisible) {
+            this.root.style.display = "none" 
+            this.isVisible = false
+        }
+    }
+    
+    this.show = function(mode) {
+        if (!this.isVisible) {
+            this.root.style.display = (mode || "inline")
+            this.isVisible = true
+        }
+    }
 }
 
 /* EDITORS */
@@ -102,7 +160,7 @@ let EDITOR_BASE = {
         this.root = elem
     },
 
-    init(editor) {
+    init(editor) {        
         // пройти по элементам, убрать contenteditable везде - расставим правильно далее
         processAllChildren(editor.root, (ch) => {
                 if (ch.hasAttribute('contenteditable')) ch.removeAttribute('contenteditable');
@@ -115,40 +173,44 @@ let EDITOR_BASE = {
         CONTENT_EDITABLE_TOOLS.insertOnlyTextFromClipboard(editor.root);
         
         // <br> между строками вместо тегов <div> для каждой строки
-        CONTENT_EDITABLE_TOOLS.insertBrOnEnterInsteadOfDiv(editor.root);
+        CONTENT_EDITABLE_TOOLS.insertBrOnEnterInsteadOfDiv(editor.root);        
+    },
+    
+    addPlugin(plugin) {
+        if (!this.plugins) this.plugins = []
+        this.plugins.push(plugin)
+        
+        return this    
     }
 }
 
 //// text editor
-function TextEditor(options = {}) {
+function TextEditor() {
     this.bind = EDITOR_BASE.bind;
     
-    /*this.activate = function(selectionRange) {        
-    }
-    
-    this.deactivate = function() = {}*/
-    
+    this.withPlugin = EDITOR_BASE.addPlugin
+        
     this.init = function() {
         EDITOR_BASE.init(this)        
         this.root.setAttribute('contenteditable', 'true');        
     }
-    
-    
-    this.withPlugin = function(plugin) {
-        //todo
-        return this
-    }
 }
 
-
-function HierarhTableEditor() {
-    this.bind = EDITOR_BASE.bind
-    
-    let TABLE_HEAD_TEMPLATE = `
-    <thead class="he-table-head">
-        <tr><th>начало</th><th>окончание</th><th>епископ</th></tr>
-    </thead>
-    `;
+//// Таблица епископов или кафедр
+function HierarhTableEditor(itemType /*кафедра или епископ*/) {
+    if (itemType == 'епископ') {
+        let TABLE_HEAD_TEMPLATE = `
+        <thead class="he-table-head">
+            <tr><th>начало</th><th>окончание</th><th>епископ</th></tr>
+        </thead>
+        `;
+    } else if (itemType == 'кафедра') {
+        TABLE_HEAD_TEMPLATE = `
+        <thead class="he-table-head">
+            <tr><th>кафедра</th><th>начало</th><th>окончание</th></tr>
+        </thead>
+        `;
+    } else throw new Error("unexpected itemType", itemType)
     
     // обычная строка таблицы (от, до, кто).
     let TABLE_ROW_TEMPLATE = `
@@ -183,6 +245,10 @@ function HierarhTableEditor() {
     
     let INACCURATE_ROW_CLASS = "inaccurate";
     
+    this.bind = EDITOR_BASE.bind
+        
+    this.withPlugin = EDITOR_BASE.addPlugin 
+       
     this.init = function(menuSlot) {
         EDITOR_BASE.init(this)
         
@@ -238,12 +304,7 @@ function HierarhTableEditor() {
         })
         
         menuSlot.setHtmlElem(menu)
-    }
-    
-    this.withPlugin = function(plugin) {
-        //todo
-        return this
-    }
+    }    
     
     /* menu buttons */
     
@@ -344,8 +405,8 @@ function HierarhTableEditor() {
 
         let p = r.startContainer;
         if (!this.root.contains(p)) {
-            // выделение не относится к текущей таблице!
-            console.log("Selection", p, "not in table" ,this.root)
+            // выделение не относится к текущей таблице
+            // console.log("Selection", p, "not in table", this.root)
             return null;
         }
         
@@ -369,7 +430,132 @@ function HierarhTableEditor() {
 
 
 function NotePlugin() {
-    // ? prepareNotes(text);
+    let NOTE_MENU_TEMPLATE = `
+    <button class="he-add-note-button" title="добавить сноску">сноска</button>
+    `
+    
+    let DELETE_BTN_TEMPLATE = `<button class="he-delete-button he-tmp">удалить</button>`;
+    
+    let NOTE_HEADER_TEMPLATE = `<sup>[сноска]</sup>`
+    
+    let NOTE_TEMPLATE = `
+    <span class="fnote" contenteditable="false">
+    ${NOTE_HEADER_TEMPLATE}<span contenteditable="true">текст сноски...</span></span>`;
+    
+    this.init = function(menuSlot) {
+        menu = createElementByHtml(NOTE_MENU_TEMPLATE)
+        //console.log('note init menu', menu)
+        menu.addEventListener('click', () => this.addNote())        
+        menuSlot.setHtmlElem(menu)
+    }
+    
+    this.registerEditor = function(editor) {
+        // TODO обработать имеющиеся в editor.root сноски span.fnote:
+        // - восстановить <sup>[сноска]</sup> если нет
+        // - убрать .open или оставить, но тогда ещё добавить кнопку удаления
+        
+        
+        // чиним редактирование если сноска находится в конце текста,
+        // а курсор стоит на её нередактируемой части.
+        // в этом случае мышкой курсор в конец текста уже не ставится
+        // (клавиатурой можно)
+        editor.root.addEventListener("beforeinput", (ev) => {            
+            let r = getSelectionRange()
+            // если при попытке ввода курсор стоит на 
+            // нередактируемой части сноски,
+            // то переставляем его после сноски
+            if (r && !canUserEditRange(r)) {
+                let elem = r.endContainer
+                if (elem.nodeType == Node.TEXT_NODE) {
+                    elem = elem.parentNode
+                }
+        
+                let fnote = elem.closest('span.fnote')
+                if (fnote) {
+                    setCursorAfter(fnote)
+                }
+            }
+        });
+    }
+    
+    this.addNote = function() {        
+        let sl = window.getSelection();
+        if (!sl.rangeCount) return;
+
+        let r = sl.getRangeAt(0);
+        r.collapse();
+        
+        // TODO По-хорошему надо спросить у editor, можно ли это
+        // место редактировать. Но как найти нужного editor?
+        // - в общем случае их может быть несколько вложенных...
+        if (!canUserEditRange(r)) {
+            console.log("Can't add note to not-editable area", r);
+            return;
+        }
+
+        let n = createElementByHtml(NOTE_TEMPLATE);
+        openNote(n)     
+        
+        // открытие/закрытие сноски кликом по заголовку
+        n.querySelector('sup').addEventListener('click', () => {            
+            if (n.classList.contains('open')) {
+                closeNote(n)
+            } else {
+                openNote(n)
+            }
+        })
+        
+
+        r.insertNode(n);
+        //addEofIfRequired();
+
+        // выделяем текст сноски - там Placeholder "текст сноски..."
+        sl.empty();
+        sl.selectAllChildren(n.querySelector("span[contenteditable='true']"));
+    }
+    
+    function openNote(n) {
+        let btn = n.querySelector('sup > .he-delete-button')
+        if (!btn) {
+            btn = createElementByHtml(DELETE_BTN_TEMPLATE)
+            btn.addEventListener('click', (ev) => {            
+                deleteWithUndo(ev.target.closest('span.fnote'))            
+            })
+            
+            n.querySelector('sup').append(btn)            
+        }
+        
+        n.classList.add('open')
+    }
+    
+    function closeNote(n) {
+        let btn = n.querySelector('sup > .he-delete-button')
+        if (btn) {
+            btn.remove()
+        }
+        n.classList.remove('open')
+        
+        setCursorAfter(n)        
+    }
+    
+    function canUserEditRange(r) {
+        let tag = r.startContainer;        
+        if (tag.nodeType == Node.TEXT_NODE) {
+            tag = tag.parentElement;
+        }
+
+        while (tag) {
+            if(tag.getAttribute('contenteditable') == "false") {
+                return false;
+            } else if (tag.getAttribute('contenteditable') == "true") {
+                return true;
+            }
+
+            tag = tag.parentElement;
+        }
+
+        return false;
+    }
 }
 
 
@@ -436,6 +622,14 @@ function getSelectionRange() {
     return sl.getRangeAt(0);
 }
 
+function setCursorAfter(elem) {        
+    let r = new Range()
+    r.setStartAfter(elem)
+            
+    let sl = window.getSelection()
+    sl.empty()
+    sl.addRange(r)
+}
 
 function doUndo() {
     document.execCommand('undo', false, null);
@@ -452,4 +646,5 @@ function deleteWithUndo(tag) {
     // благодаря этому будет работать отмена execCommand('undo')
     document.execCommand('delete', false, null);
 }
+
 
