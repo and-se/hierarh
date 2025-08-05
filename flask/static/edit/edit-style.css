@@ -70,6 +70,7 @@
 
 .fnote > sup {
     font-size: small;
+    font-weight: bold;
 }
 
 .fnote > sup > .he-delete-button {
@@ -86,6 +87,10 @@
     display: none; 
     text-indent: 0;
     padding-left: 10px;
+}
+
+.fnote > span:empty::before {
+    content: "Текст сноски..."
 }
 
 .fnote.open > span {

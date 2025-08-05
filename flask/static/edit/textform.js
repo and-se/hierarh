@@ -440,10 +440,10 @@ function NotePlugin() {
     
     let NOTE_TEMPLATE = `
     <span class="fnote" contenteditable="false">
-    ${NOTE_HEADER_TEMPLATE}<span contenteditable="true">текст сноски...</span></span>`;
+    ${NOTE_HEADER_TEMPLATE}<span contenteditable="true"></span></span>`;
     
     this.init = function(menuSlot) {
-        menu = createElementByHtml(NOTE_MENU_TEMPLATE)
+        let menu = createElementByHtml(NOTE_MENU_TEMPLATE)
         //console.log('note init menu', menu)
         menu.addEventListener('click', () => this.addNote())        
         menuSlot.setHtmlElem(menu)
@@ -496,6 +496,8 @@ function NotePlugin() {
         let n = createElementByHtml(NOTE_TEMPLATE);
         openNote(n)     
         
+        n.removeClickController = new AbortController();
+        
         // открытие/закрытие сноски кликом по заголовку
         n.querySelector('sup').addEventListener('click', () => {            
             if (n.classList.contains('open')) {
@@ -503,7 +505,7 @@ function NotePlugin() {
             } else {
                 openNote(n)
             }
-        })
+        }, {signal: n.removeClickController.signal})
         
 
         r.insertNode(n);
@@ -518,8 +520,11 @@ function NotePlugin() {
         let btn = n.querySelector('sup > .he-delete-button')
         if (!btn) {
             btn = createElementByHtml(DELETE_BTN_TEMPLATE)
-            btn.addEventListener('click', (ev) => {            
-                deleteWithUndo(ev.target.closest('span.fnote'))            
+            btn.addEventListener('click', (ev) => {
+                // удаляем обработчик раскрытия/закрытия сноски. Если он сработает после удаления,
+                // будет ошибка.
+                n.removeClickController.abort()              
+                deleteWithUndo(ev.target.closest('span.fnote'))                
             })
             
             n.querySelector('sup').append(btn)            
@@ -528,7 +533,7 @@ function NotePlugin() {
         n.classList.add('open')
     }
     
-    function closeNote(n) {
+    function closeNote(n) {        
         let btn = n.querySelector('sup > .he-delete-button')
         if (btn) {
             btn.remove()
@@ -586,8 +591,25 @@ let CONTENT_EDITABLE_TOOLS = {
                 document.execCommand('insertHTML', false, '<br/>');
                 //document.execCommand('insertLineBreak');
                 ev.preventDefault();
-                // TODO В конце текста <br> добавляется, но курсор перед ним - надо переставить его принудительно.
-                // Пока приходится два раза нажимать Enter
+                
+                // В конце текста <br> по нажатию Enter добавляется, 
+                // но курсор остаётся в предыдущей строке.
+                // А в Chrome вообще на конце текста Enter не работает.
+                let r = getSelectionRange();                
+                //console.log("Enter with selection", r)
+                // Отлавливаем ситуацию нажатия Enter в конце текста
+                if (r.collapsed && r.startContainer.nodeType == Node.TEXT_NODE && r.startOffset != 0) {
+                    console.log("Enter on end of", root)
+                    // Chrome надо два <br> вставить - один пропадёт при вводе
+                    if (window.chrome) {
+                        document.execCommand('insertHTML', false, '<br/><br/>');
+                    } else {
+                        document.execCommand('insertHTML', false, '<br/>');
+                    }
+                }
+                
+                // TODO В Chrome при нажатии Enter в конце строки внутри текста новая строка не добавляется.
+                // вместо этого курсор переносится на следующую строку и этого даже не видно пока не начнёшь набирать.                
             }
         });
     }
@@ -624,6 +646,7 @@ function getSelectionRange() {
 
 function setCursorAfter(elem) {        
     let r = new Range()
+    console.log("set cursor after", elem)
     r.setStartAfter(elem)
             
     let sl = window.getSelection()
