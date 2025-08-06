@@ -5,7 +5,6 @@
 {% endblock %}
 
 {% block content %}
-{% autoescape false %}
 <main>
 
 <script src="/static/edit/textform.js"></script>
@@ -15,14 +14,14 @@
 let hform = null;
 window.onload = initForm;
 
-function initForm(){
+function initForm() {
     try {
         let doc = document.querySelector('#data article.episkop_article');
         
         hform = new TextForm(doc);
         hform.setMenu(new MenuPanel(document.querySelector('#menu')));
 
-        hform.addEditor('.header', new TextEditor())
+        hform.addEditor('.header', new TextEditor())        
         
         let notePlugin = new NotePlugin()
         hform.addEditor('.text', new TextEditor().withPlugin(notePlugin))
@@ -30,23 +29,16 @@ function initForm(){
         
         hform.start();
     } catch (ex) {
-        //showError(ex.message);
-        console.log(ex);
+        showError(ex.message);
+        //console.log(ex);
     }
 }
-
-
-
-/*
-вот так можно отслеживать изменения selection
-document.addEventListener("selectionchange", () => {
-  console.log(document.getSelection());
-});
-*/
 
 </script>
 
 <div id="menu"></div>
+
+{% autoescape false %}
 
 <div id="data">
 {{doc.html}}
@@ -54,7 +46,123 @@ document.addEventListener("selectionchange", () => {
 
 {% endautoescape %}
 
-<div id="message"></div>
+<div class="he-save-form-panel">
+    <div id="message"></div>
+    <script>
+        function showMessage(msg) {
+            let tag = document.getElementById('message');
+            tag.innerHTML = msg;
+        }
+
+        function showError(msg) {
+            showMessage(`<p style="color:red">ERROR: ${msg}</p>`);
+        }
+    </script>
+    
+    <button onclick="saveData('{{key}}', '{{post_url}}')">Сохранить</button>
+    <span class="download-buttons">
+        <button onclick="downloadData(hform.root.querySelector('.header').innerText)">Скачать</button>
+        <button onclick="document.getElementById('dupl').click()">Загрузить из файла</button>
+        <input id="dupl" type="file" accept=".hh.html" style="display: none;" onchange="loadDataFromFile()">
+    </span>
+
+    <br>
+    <input id="commit-message" class="edit-comment" placeholder="При желании кратко опишите здесь изменения">
+
+    {% if last_edit%}
+    <div>последняя правка <em>{{last_edit}}</em>.
+        {%if comment %}
+        <q>{{comment}}</q>
+        {%endif%}
+        <a href="{{doc.key}}/versions" target="_blank">Просмотреть историю правок</a>
+    </div>
+    {% endif %}
+    
+    <script>
+        async function saveData(doc_key, save_url) {
+            let d = hform.getData();
+            //console.log(d);
+
+            let msg = document.getElementById('commit-message').value;
+            let problemMsg = "Не удалось сохранить данные! Попробуйте ещё раз или воспользуйтесь кнопкой Скачать.\n";
+
+            try {
+                let resp = await fetch(save_url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json;charset=utf-8'
+                    },
+                    body: JSON.stringify({
+                        key: doc_key,
+                        html: d,
+                        comment: msg
+                    }),
+                    credentials: 'include'
+                });
+
+                if (resp.ok) {
+                    let j = await resp.json();
+
+                    if (j.success) {
+                        showMessage('Изменения сохранены. Дождитесь обновления страницы');
+                        setTimeout(() =>  window.location.href = '/edit/{{item_type}}/' + j.key, 500);
+                    } else {
+                        showError(j.message);
+                    }
+
+                } else {
+                    showError(problemMsg + resp.text());
+                }
+            } catch(e) {
+                showError(problemMsg + e);
+            }
+        }
+
+        function downloadData(saveFilename) {
+            var bl = new Blob([hform.getData()], {type: 'text/plain'});
+
+            var a = document.createElement('a');
+            document.body.appendChild(a);
+
+            a.href = URL.createObjectURL(bl);
+            if (!saveFilename.endsWith('.hh.html')) {
+                saveFilename = saveFilename + '.hh.html'
+            }
+            a.download = saveFilename
+            a.click();
+
+            document.body.removeChild(a);
+        }
+
+        function loadDataFromFile() {
+            showMessage("TODO Загрузку надо доделать")
+            return;
+            
+            /*
+            старый код
+            var file = document.getElementById('dupl').files[0];
+            if (!file) {
+                return;
+            }
+
+            let reader = new FileReader();
+            reader.readAsText(file);
+
+            reader.onload = () => {
+                document.getElementById('data').innerHTML = reader.result;
+                document.getElementById('menu').innerHTML = '';
+                initForm(); // TODO remove old event handlers???
+                showMessage('Данные успешно загружены');
+            }
+
+            reader.onerror = () => {
+                showError("Ошибка загрузки данных файла. Попробуйте ещё раз");
+            }
+            */
+        }
+    </script>
+
+</div>
 
 </main>
 

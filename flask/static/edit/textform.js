@@ -100,6 +100,35 @@ function TextForm(root) {
             }
         });
     }
+    
+    this.getData = function() {
+        let data = this.root.cloneNode(true);
+        data.classList.remove('he-edit-form');
+
+        processAllChildren(data, (ch) => {
+            if (ch.hasAttribute('contenteditable')) ch.removeAttribute('contenteditable');
+            // todo удалять ли class  "open" у сносок или пусть запоминается, что сноски открыты?
+            if (ch.classList.contains('he-tmp')) {
+                //console.log('remove', ch);
+                ch.remove();
+                return true; // -> skip children nodes
+            }
+            
+            let toDel = [];
+            for (let cl of ch.classList) {
+                if (cl.startsWith('he-')) {
+                    toDel.push(cl);
+                }
+            }
+
+            for(let cl of toDel) {
+                ch.classList.remove(cl);
+            }
+            if(ch.classList.length == 0) ch.removeAttribute('class');
+        });
+
+        return data.outerHTML;
+    }
 }
 
 function MenuPanel(containerElem) {
@@ -450,10 +479,8 @@ function NotePlugin() {
     }
     
     this.registerEditor = function(editor) {
-        // TODO обработать имеющиеся в editor.root сноски span.fnote:
-        // - восстановить <sup>[сноска]</sup> если нет
-        // - убрать .open или оставить, но тогда ещё добавить кнопку удаления
-        
+        // Настраиваем уже имеющиеся в editor.root сноски span.fnote
+        initExistingNotes(editor.root)
         
         // чиним редактирование если сноска находится в конце текста,
         // а курсор стоит на её нередактируемой части.
@@ -476,6 +503,11 @@ function NotePlugin() {
                 }
             }
         });
+        
+        editor.root.addEventListener("input", (ev) => {
+            // нельзя ставить сноску в начале строки
+            dontAllowNotesAtStartOfLine(editor.root);
+        });
     }
     
     this.addNote = function() {        
@@ -495,18 +527,9 @@ function NotePlugin() {
 
         let n = createElementByHtml(NOTE_TEMPLATE);
         openNote(n)     
-        
-        n.removeClickController = new AbortController();
-        
+                
         // открытие/закрытие сноски кликом по заголовку
-        n.querySelector('sup').addEventListener('click', () => {            
-            if (n.classList.contains('open')) {
-                closeNote(n)
-            } else {
-                openNote(n)
-            }
-        }, {signal: n.removeClickController.signal})
-        
+        n.querySelector('sup').addEventListener('click', noteClickHandler)        
 
         r.insertNode(n);
         //addEofIfRequired();
@@ -516,16 +539,20 @@ function NotePlugin() {
         sl.selectAllChildren(n.querySelector("span[contenteditable='true']"));
     }
     
+    function noteClickHandler(ev) {
+        let n = ev.target.closest(".fnote")
+        if (n.classList.contains('open')) {
+            closeNote(n)
+        } else {
+            openNote(n)
+        }
+    }
+    
     function openNote(n) {
         let btn = n.querySelector('sup > .he-delete-button')
         if (!btn) {
             btn = createElementByHtml(DELETE_BTN_TEMPLATE)
-            btn.addEventListener('click', (ev) => {
-                // удаляем обработчик раскрытия/закрытия сноски. Если он сработает после удаления,
-                // будет ошибка.
-                n.removeClickController.abort()              
-                deleteWithUndo(ev.target.closest('span.fnote'))                
-            })
+            btn.addEventListener('click', deleteNoteHandler)
             
             n.querySelector('sup').append(btn)            
         }
@@ -541,6 +568,14 @@ function NotePlugin() {
         n.classList.remove('open')
         
         setCursorAfter(n)        
+    }
+    
+    function deleteNoteHandler(ev) {
+        let n = ev.target.closest(".fnote")
+        // удаляем обработчик раскрытия/закрытия сноски.
+        // Если он сработает после удаления, будет ошибка.                           
+        n.querySelector('sup').removeEventListener('click', noteClickHandler)
+        deleteWithUndo(ev.target.closest('span.fnote'))  
     }
     
     function canUserEditRange(r) {
@@ -560,6 +595,66 @@ function NotePlugin() {
         }
 
         return false;
+    }
+    
+    
+    // Настраиваем уже имеющиеся в tag сноски:
+    // - должен быть заголовок <sup>[сноска]</sup> с обработкой клика
+    // - если сноска была открыта, добавляем кнопку удаления
+    function initExistingNotes(tag) {
+        // Отключаем редактирование сносок, но оставляем для текста пояснения
+        for (let nt of tag.querySelectorAll('.fnote')) {
+            nt.setAttribute('contenteditable', 'false');
+
+            // Загловок сноски [сноска]
+            let sup = nt.querySelector('sup');
+            if (!sup) {
+                console.log('repair <sup> for', nt);
+                sup = createElementByHtml(NOTE_HEADER_TEMPLATE);
+                nt.prepend(sup);
+            }
+            
+            // удаляем отсебятину
+            // и за одно кнопку удаления (но getData() её должна удалять) 
+            sup.innerText='[сноска]'
+            sup.addEventListener('click', noteClickHandler)
+            
+            // если сноска открыта, добавляем кнопку удаления
+            if (nt.classList.contains("open")) {                
+                let btn = createElementByHtml(DELETE_BTN_TEMPLATE)
+                btn.addEventListener('click', deleteNoteHandler)            
+                sup.append(btn)
+            }
+            
+            if (nt.childElementCount < 2) {
+                console.log('add empty note content for', nt);
+                let nn = document.createElement('sup');
+                nn.innerText = '...';
+                nt.append(nn);
+            }
+            for (let el of nt.children) {
+                if (el != sup) el.setAttribute('contenteditable', 'true');            
+            }
+        }
+    }
+    
+    // Сноска не может быть в начале строки, иначе курсор перед ней не ставится
+    // Если такое случилось, удаляем перенос строки перед сноской либо вставляем троеточие
+    function dontAllowNotesAtStartOfLine(root) {        
+        for (let tag of root.querySelectorAll('.fnote')) {        
+            let pr = tag.previousSibling;
+            if (pr && pr.nodeType == Node.ELEMENT_NODE && pr.tagName == 'BR') {
+                console.log('remove', pr, 'before', tag);
+                // сноска не может быть с новой строки - она всегда после текста
+                pr.remove();
+            }
+
+            pr = tag.previousSibling;
+            if (!pr || (pr.nodeType == Node.TEXT_NODE && pr.textContent.trim()=='')) {
+                console.log('add ... before', tag, pr);
+                tag.before("...");
+            }
+        }
     }
 }
 

@@ -240,15 +240,15 @@ def new_episkop_ui():
 @login_required
 def create_cafedra():
     d = request.json
-    # print("NEW", d)
-    return _do_upsert(db_edit.cafedra, html, key, comment)
+    # print("NEW", d)    
+    return _do_upsert(db_edit.cafedra, d['html'], d['key'], d['comment'])
     
 @ed.post('/episkop')
 @login_required
 def create_episkop():
     d = request.json
     # print("NEW", d)
-    return _do_upsert(db_edit.episkop, html, key, comment)
+    return _do_upsert(db_edit.episkop, d['html'], d['key'], d['comment'])
 
 def _do_upsert(db_coll, html, key, comment):
     try:
@@ -279,14 +279,14 @@ def _do_upsert(db_coll, html, key, comment):
 @ed.route('/cafedra/<int:key>', methods=['GET', 'POST'])
 @login_required
 def update_cafedra(key):
-    return _do_update(db_edit.cafedra, key)
+    return _do_doc_request(db_edit.cafedra, key)
     
 @ed.route('/episkop/<int:key>', methods=['GET', 'POST'])
 @login_required
 def update_episkop(key):
-    return _do_update(db_edit.episkop, key)
+    return _do_doc_request(db_edit.episkop, key)
 
-def _do_update(db_coll, key):
+def _do_doc_request(db_coll, key):
     if request.method == 'POST':
         d = request.json
         # print("UPDATE", d)
@@ -324,24 +324,45 @@ def build_editor_info(reg_data, if_none="<нет данных>"):
 @ed.get('/cafedra/<int:key>/versions')
 @login_required
 def cafedra_history(key):
-    caf = db_edit.cafedra.get(key)
-    if not caf: abort(404, 'Такой статьи нет, нет и её истории')
+    return _do_versions_request(db_edit.cafedra, key)
 
-    hist = db_edit.cafedra.versions(key, take=10**7, reverse=True)
-    return render_template('edit/cafedra_history.html', cur_doc=caf, items=hist, item_type='cafedra', time_convert=build_editor_info)
-    
+@ed.get('/episkop/<int:key>/versions')
+@login_required
+def episkop_history(key):
+    return _do_versions_request(db_edit.episkop, key)
+
+def _do_versions_request(db_coll, key):
+    doc = db_coll.get(key)
+    if not doc: abort(404, 'Такой статьи нет, нет и её истории')
+
+    if db_coll.name == 'cafedra':        
+        item_type = 'cafedra'        
+    elif db_coll.name == 'episkop':        
+        item_type = 'episkop'
+
+    hist = db_coll.versions(key, take=10**7, reverse=True)
+    return render_template('edit/doc_history.html', cur_doc=doc, items=hist, item_type=item_type, time_convert=build_editor_info)
+
+
 @ed.get('/cafedra/<int:key>/diff/<string:new>/<string:old>')
 @login_required
 def cafedra_diff(key, new, old):  
     header, new_reg_data, old_reg_data, diff = diff_service.make_html_diff('cafedra', key, new, old)
     
-    return render_template('edit/cafedra_diff.html', diff=diff, header=header, new_reg_data=new_reg_data, old_reg_data=old_reg_data,
+    return render_template('edit/doc_diff.html', diff=diff, header=header, new_reg_data=new_reg_data, old_reg_data=old_reg_data,
                             time_convert=build_editor_info, item_type='cafedra')
 
 
+@ed.get('/episkop/<int:key>/diff/<string:new>/<string:old>')
+@login_required
+def episkop_diff(key, new, old):  
+    header, new_reg_data, old_reg_data, diff = diff_service.make_html_diff('episkop', key, new, old)
+    
+    return render_template('edit/doc_diff.html', diff=diff, header=header, new_reg_data=new_reg_data, old_reg_data=old_reg_data,
+                            time_convert=build_editor_info, item_type='episkop')
+
 
 app.register_blueprint(ed, url_prefix='/edit')
-
 
 
 if __name__ == '__main__':

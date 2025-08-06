@@ -69,7 +69,7 @@
 }
 
 .fnote > sup {
-    font-size: small;
+    /*font-size: small;*/
     font-weight: bold;
 }
 
@@ -87,6 +87,7 @@
     display: none; 
     text-indent: 0;
     padding-left: 10px;
+    cursor: text;
 }
 
 .fnote > span:empty::before {

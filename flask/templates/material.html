@@ -41,21 +41,9 @@ h2 {
 }
 </style>
 
-<script>
-window.addEventListener('load', function() {
-    i=0;
-    for (let l of document.querySelectorAll('.fnote')) {
-        l.addEventListener('click', function() {            
-            l.classList.toggle('open');
-        });
-        i+=1;
-    }
-    
-    console.log('Alived', i, 'footnotes');
-});
-</script>
 
-
+{% import 'lib.html' as lib %}
+{{ lib.init_read_only_foot_notes() }}
 
 <main>
 {% autoescape false %}

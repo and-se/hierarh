@@ -77,3 +77,22 @@
     f.addEventListener("submit", send_comment, true);
 </script>
 {%- endmacro %}
+
+<!--Настраиваем для span.fnote раскрытие и закрытие по клику.
+Этот скрипт нельзя использовать в контектсе формы редактирования - она реализует свою логику сама!
+-->
+{% macro init_read_only_foot_notes() %}
+<script>
+window.addEventListener('load', function() {
+    i=0;
+    for (let l of document.querySelectorAll('.fnote')) {
+        l.addEventListener('click', function() {            
+            l.classList.toggle('open');
+        });
+        i+=1;
+    }
+    
+    console.log('Alived', i, 'footnotes');
+});
+</script>
+{%- endmacro %}

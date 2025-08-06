@@ -1,0 +1,34 @@
+{% extends "edit/base-edit.html" %}
+{% block pagetitle %}
+Сравнение {{header}}
+{% endblock %}
+{% block content %}
+<main class="hierarh-diff">
+    <h1>Просмотр отличий {{header}}</h1>
+    <div class="new">
+        <strong class="header">Новая версия:</strong> {{time_convert(new_reg_data)}} 
+
+        {%if new_reg_data and new_reg_data.get('comment') %}
+        <q>{{new_reg_data.get('comment')}}</q>
+        {%endif%}
+    </div>
+    <div class="old">
+        <strong class="header">Старая версия:</strong> {{time_convert(old_reg_data)}}
+        {%if old_reg_data and old_reg_data.get('comment') %}
+        <q>{{old_reg_data.get('comment')}}</q>
+        {%endif%}
+    </div>
+
+    <div class="diff">
+        {% autoescape false %}
+        {{diff}}
+        {% endautoescape %}
+    </div>
+
+</main>
+
+{% import 'lib.html' as lib %}
+{{ lib.init_read_only_foot_notes() }}
+
+
+{% endblock %}
