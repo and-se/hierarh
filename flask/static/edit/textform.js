@@ -19,15 +19,23 @@ function TextForm(root) {
     
     this.pluginsMap = new Map()
     
-    this.start = function() {
+    this.start = function() {        
         root.classList.add('he-edit-form');
-        this.menu.init()
+        
+        // Для организации автоматического удаления обработчиков событий
+        // в форме, редакторах и плагинах
+        this.eventController = new AbortController()
+        
+        if (this.menu) {
+            console.log('Init menu', object_name(this.menu))
+            this.menu.init()
+        }
         
         for (let ed of this.editors) {
             if (ed.init) {
                 let slot = null
                 if (this.menu) {
-                    console.log('create MenuSlot for editor', ed.__proto__.constructor.name)
+                    console.log('create MenuSlot for editor', object_name(ed))
                     slot = this.menu.createSlot()                
                     slot.hide()                   
                 } else slot = new MenuSlot(document.createElement('fake'))
@@ -36,6 +44,7 @@ function TextForm(root) {
                 //slot.targetEditor = ed                    
                 
                 ed.init(slot)                
+                console.log('init editor', object_name(ed))
                 initEditorPlugins(this, ed)
             }
             else console.log("Not init() for", ed)
@@ -52,12 +61,13 @@ function TextForm(root) {
                     let slot = null
                     if (form.menu) {
                         slot = form.menu.createSlot()                
-                        console.log('create MenuSlot for plugin', plug.__proto__.constructor.name)
+                        console.log('create MenuSlot for plugin', object_name(plug))
                         slot.hide()                    
                     } else slot = new MenuSlot(document.createElement('fake'))
                     
                     plug.menuSlot = slot                    
                     plug.init(slot)
+                    console.log('init plugin', object_name(plug))
                     plug.registerEditor(editor)        
                 }
             }
@@ -67,7 +77,7 @@ function TextForm(root) {
         
         // в зависимсоти от текущей позиции в документе
         // обновляем доступные в меню опции
-        document.addEventListener("selectionchange", () => {        
+        document.addEventListener("selectionchange", () => {            
             let r = getSelectionRange()
             if (!r) return
             
@@ -97,8 +107,12 @@ function TextForm(root) {
                 } else {
                     plug.menuSlot.hide()
                 }
-            }
-        });
+            }        
+        },
+        // автоматическое удаление обработчика при вызове eventController.abort() 
+        {signal: this.eventController.signal} );
+        
+        console.log('Started form TextForm', this)
     }
     
     this.getData = function() {
@@ -129,6 +143,32 @@ function TextForm(root) {
 
         return data.outerHTML;
     }
+
+    this.stop = function() {
+        console.log('stopping form TextForm', this)
+        
+        for (let ed of this.editors) {
+            if (ed.destroy) {
+                console.log('Destroy editor', object_name(ed))
+                ed.destroy()
+            }
+        }
+        
+        for (let plug of this.pluginsMap.keys()) {
+            if (plug.destroy) {
+                console.log('Destroy plugin', object_name(plug))
+                plug.destroy()
+            }
+        }
+        
+        if (this.menu && this.menu.destroy) {
+            console.log('Destroy menu', object_name(this.menu))
+            this.menu.destroy()
+        }
+        
+        // удаляем обработчики событий
+        this.eventController.abort()
+    }
 }
 
 function MenuPanel(containerElem) {
@@ -145,7 +185,7 @@ function MenuPanel(containerElem) {
         menu.querySelector('.he-undo-button')
             .addEventListener('click', doUndo);  
         containerElem.appendChild(menu);
-        this.root = menu
+        this.root = menu        
     }
     
     this.createSlot = function() {
@@ -155,6 +195,10 @@ function MenuPanel(containerElem) {
         //this.root.prepend(elem)
         
         return new MenuSlot(elem)
+    }
+    
+    this.destroy = function() {
+        this.root.remove()
     }
 }
 
@@ -323,17 +367,20 @@ function HierarhTableEditor(itemType /*кафедра или епископ*/) {
             if (!r) ev.preventDefault()
         })
         // Обновление чекбокса при выборе другой строки
-        document.addEventListener("selectionchange", () => {
+        document.addEventListener("selectionchange", () => {            
             let row = this.getCurrentRow()
             if (row) {
                 inaccurateCheckBox.checked = row.classList.contains(INACCURATE_ROW_CLASS)
             } else {
                 inaccurateCheckBox.checked = false
             }
-        })
+        },
+        // Обработчик автоматически удалится при останове формы TextForm.stop()
+        // Что касется обработчиков кнопок меню, то при останове формы удаляется само меню
+        {signal: this.form.eventController.signal})
         
         menuSlot.setHtmlElem(menu)
-    }    
+    }
     
     /* menu buttons */
     
@@ -763,6 +810,13 @@ function deleteWithUndo(tag) {
     // просим браузер нажать клавишу delete
     // благодаря этому будет работать отмена execCommand('undo')
     document.execCommand('delete', false, null);
+}
+
+function object_name(obj) {
+    if (obj && obj.__proto__ && obj.__proto__.constructor)
+        return obj.__proto__.constructor.name
+    
+    return obj.toString();
 }
 
 

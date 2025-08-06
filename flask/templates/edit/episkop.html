@@ -11,26 +11,26 @@
 
 <script>
 
-let hform = null;
+let H_FORM = null;
 window.onload = initForm;
 
 function initForm() {
     try {
         let doc = document.querySelector('#data article.episkop_article');
         
-        hform = new TextForm(doc);
-        hform.setMenu(new MenuPanel(document.querySelector('#menu')));
+        H_FORM = new TextForm(doc);
+        H_FORM.setMenu(new MenuPanel(document.querySelector('#menu')));
 
-        hform.addEditor('.header', new TextEditor())        
+        H_FORM.addEditor('.header', new TextEditor())        
         
         let notePlugin = new NotePlugin()
-        hform.addEditor('.text', new TextEditor().withPlugin(notePlugin))
-        hform.addEditor('table.cafedras', new HierarhTableEditor('епископ').withPlugin(notePlugin));
+        H_FORM.addEditor('.text', new TextEditor().withPlugin(notePlugin))
+        H_FORM.addEditor('table.cafedras', new HierarhTableEditor('епископ').withPlugin(notePlugin));
         
-        hform.start();
+        H_FORM.start();
     } catch (ex) {
         showError(ex.message);
-        //console.log(ex);
+        console.log(ex);
     }
 }
 
@@ -61,7 +61,7 @@ function initForm() {
     
     <button onclick="saveData('{{key}}', '{{post_url}}')">Сохранить</button>
     <span class="download-buttons">
-        <button onclick="downloadData(hform.root.querySelector('.header').innerText)">Скачать</button>
+        <button onclick="downloadData(H_FORM.root.querySelector('.header').innerText)">Скачать</button>
         <button onclick="document.getElementById('dupl').click()">Загрузить из файла</button>
         <input id="dupl" type="file" accept=".hh.html" style="display: none;" onchange="loadDataFromFile()">
     </span>
@@ -80,7 +80,7 @@ function initForm() {
     
     <script>
         async function saveData(doc_key, save_url) {
-            let d = hform.getData();
+            let d = H_FORM.getData();
             //console.log(d);
 
             let msg = document.getElementById('commit-message').value;
@@ -119,7 +119,7 @@ function initForm() {
         }
 
         function downloadData(saveFilename) {
-            var bl = new Blob([hform.getData()], {type: 'text/plain'});
+            var bl = new Blob([H_FORM.getData()], {type: 'text/plain'});
 
             var a = document.createElement('a');
             document.body.appendChild(a);
@@ -135,11 +135,6 @@ function initForm() {
         }
 
         function loadDataFromFile() {
-            showMessage("TODO Загрузку надо доделать")
-            return;
-            
-            /*
-            старый код
             var file = document.getElementById('dupl').files[0];
             if (!file) {
                 return;
@@ -149,16 +144,18 @@ function initForm() {
             reader.readAsText(file);
 
             reader.onload = () => {
+                H_FORM.stop()
+                                
+                // заменяем старые данные новыми
                 document.getElementById('data').innerHTML = reader.result;
-                document.getElementById('menu').innerHTML = '';
-                initForm(); // TODO remove old event handlers???
+                // Заново создаём форму, чтобы она была привязана к новым данным
+                initForm();
                 showMessage('Данные успешно загружены');
             }
 
             reader.onerror = () => {
                 showError("Ошибка загрузки данных файла. Попробуйте ещё раз");
-            }
-            */
+            }            
         }
     </script>
 
