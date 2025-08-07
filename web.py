@@ -27,6 +27,18 @@ app = Flask(__name__, static_folder='flask/static',
 
 app.json.ensure_ascii = False
 
+from jinja2 import StrictUndefined
+# шаблоны должны падать при обращении к неизвестной переменной
+app.jinja_env.undefined = StrictUndefined
+
+@app.context_processor
+def inject_error_raise_into_template():
+    def raise_error(msg):        
+        raise Exception(msg)
+    
+    return {'raise_error': raise_error}
+    
+
 #import secrets
 #app.secret_key = secrets.token_bytes(20)
 #from werkzeug.security import generate_password_hash
