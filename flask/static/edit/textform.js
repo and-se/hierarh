@@ -10,8 +10,13 @@ function TextForm(root) {
     
     this.editors = []
     this.addEditor = function(selector, editor) {
-        let ed_root = this.root.querySelector(selector)
-        if (!ed_root) throw new Error("Can't find elem", selector, "for editor", editor)
+        let ed_root
+        if (selector == "$FORM_ROOT")
+            ed_root = this.root
+        else
+            ed_root = this.root.querySelector(selector)
+            
+        if (!ed_root) throw new Error("Can't find elem " + selector + " for editor " + objectName(editor))
         
         editor.bind(this, ed_root);
         this.editors.push(editor)
@@ -27,7 +32,7 @@ function TextForm(root) {
         this.eventController = new AbortController()
         
         if (this.menu) {
-            console.log('Init menu', object_name(this.menu))
+            console.debug('Init menu', objectName(this.menu))
             this.menu.init()
         }
         
@@ -35,7 +40,7 @@ function TextForm(root) {
             if (ed.init) {
                 let slot = null
                 if (this.menu) {
-                    console.log('create MenuSlot for editor', object_name(ed))
+                    console.debug('create MenuSlot for editor', objectName(ed))
                     slot = this.menu.createSlot()                
                     slot.hide()                   
                 } else slot = new MenuSlot(document.createElement('fake'))
@@ -44,10 +49,10 @@ function TextForm(root) {
                 //slot.targetEditor = ed                    
                 
                 ed.init(slot)                
-                console.log('init editor', object_name(ed))
+                console.debug('init editor', objectName(ed))
                 initEditorPlugins(this, ed)
             }
-            else console.log("Not init() for", ed)
+            else console.debug("No init() for", ed)
         }
         
         function initEditorPlugins(form, editor) {        
@@ -61,19 +66,19 @@ function TextForm(root) {
                     let slot = null
                     if (form.menu) {
                         slot = form.menu.createSlot()                
-                        console.log('create MenuSlot for plugin', object_name(plug))
+                        console.debug('create MenuSlot for plugin', objectName(plug))
                         slot.hide()                    
                     } else slot = new MenuSlot(document.createElement('fake'))
                     
                     plug.menuSlot = slot                    
                     plug.init(slot)
-                    console.log('init plugin', object_name(plug))
+                    console.debug('init plugin', objectName(plug))
                     plug.registerEditor(editor)        
                 }
             }
         }
         
-        //console.log('FORM PLUGINS MAP', this.pluginsMap)
+        //console.debug('FORM PLUGINS MAP', this.pluginsMap)
         
         // в зависимсоти от текущей позиции в документе
         // обновляем доступные в меню опции
@@ -98,7 +103,7 @@ function TextForm(root) {
                     ed.menuSlot.hide()
                 }
                 
-                //console.log("find active", ed, ed.isActive)
+                //console.debug("find active", ed, ed.isActive)
             }
             
             for (let plug of this.pluginsMap.keys()) {
@@ -112,18 +117,32 @@ function TextForm(root) {
         // автоматическое удаление обработчика при вызове eventController.abort() 
         {signal: this.eventController.signal} );
         
+        // изменены ли данные в форме
+        this.isDataModified = false;
+        
+        // начинаем следить за изменениями html разметки
+        this.modifyObserver = new MutationObserver((/*m*/) => {
+            //console.debug('Data modified', m)
+            this.isDataModified=true
+            // TODO Раскрытие/закрытие сноски - тоже модификация...
+        })
+        this.modifyObserver.observe(this.root, {
+            subtree: true, childList: true,
+            attributes: true, characterData:true 
+        })
+        
         console.log('Started form TextForm', this)
     }
     
-    this.getData = function() {
+    this.getData = function(resetIsDataModified = true) {
         let data = this.root.cloneNode(true);
         data.classList.remove('he-edit-form');
 
         processAllChildren(data, (ch) => {
             if (ch.hasAttribute('contenteditable')) ch.removeAttribute('contenteditable');
-            // todo удалять ли class  "open" у сносок или пусть запоминается, что сноски открыты?
+            
             if (ch.classList.contains('he-tmp')) {
-                //console.log('remove', ch);
+                //console.debug('remove', ch);
                 ch.remove();
                 return true; // -> skip children nodes
             }
@@ -140,6 +159,10 @@ function TextForm(root) {
             }
             if(ch.classList.length == 0) ch.removeAttribute('class');
         });
+        
+        if (resetIsDataModified) {
+            this.isDataModified = false;
+        }
 
         return data.outerHTML;
     }
@@ -147,22 +170,25 @@ function TextForm(root) {
     this.stop = function() {
         console.log('stopping form TextForm', this)
         
+        // перестаём следить за изменениями html документа
+        this.modifyObserver.disconnect()
+        
         for (let ed of this.editors) {
             if (ed.destroy) {
-                console.log('Destroy editor', object_name(ed))
+                console.debug('Destroy editor', objectName(ed))
                 ed.destroy()
             }
         }
         
         for (let plug of this.pluginsMap.keys()) {
             if (plug.destroy) {
-                console.log('Destroy plugin', object_name(plug))
+                console.debug('Destroy plugin', objectName(plug))
                 plug.destroy()
             }
         }
         
         if (this.menu && this.menu.destroy) {
-            console.log('Destroy menu', object_name(this.menu))
+            console.debug('Destroy menu', objectName(this.menu))
             this.menu.destroy()
         }
         
@@ -269,6 +295,79 @@ function TextEditor() {
     }
 }
 
+function CheckBoxProperty(dataAttrName, title, description) {
+    
+    /*if (!dataAttrName || dataAttrName.search('-') != -1) {
+        throw new Error('attr must be JS identifier, got ' + dataAttrName)
+    }*/
+    
+    this.attr = dataAttrName
+    this.title = title
+    this.description = description
+    
+    this.bind = EDITOR_BASE.bind
+    
+    let PROPS_EDIT_TEMPLATE = `
+    <div class="he-props he-tmp"></div>    `
+    
+    
+    this.init = function() {
+        let pr = this.root.querySelector(':scope > .he-props');
+        if (!pr) {
+            pr = createElementByHtml(PROPS_EDIT_TEMPLATE)
+            this.root.prepend(pr)
+        }
+        
+        this.cbId = makeUniqueId(this.attr + "-checkbox")
+        
+        //onclick="this.hfroot.dataset.isObn = this.checked"
+        
+        let ed = createElementByHtml(`
+        <span>  
+        <input type="checkbox" id="${this.cbId}"/>
+        <label for="${this.cbId}"></label>
+        </span>
+        `)
+        
+        ed.querySelector('label').innerText = this.title
+        if (this.description) {
+            ed.setAttribute('title', this.description)
+        }
+        
+        pr.append(ed)
+        
+        let cb = ed.querySelector('input')
+        cb.checked = (['true', '1', 'yes', 'да']
+                       .indexOf(                                               
+                        this.root.getAttribute('data-'+this.attr) || 'false'
+                        //this.root.dataset[this.attr] || 'false'
+                     ) != -1);
+        
+        
+        this.root.dataset[this.attr]
+        cb.addEventListener('click',() => {
+            this.root.setAttribute('data-' + this.attr, cb.checked)
+            // требует this.attr как JS идентификатор, например '-' недопустим
+            //this.root.dataset[this.attr] = cb.checked
+            
+        }, {signal: this.form.eventController.signal})
+    }
+    
+    this.destroy = function() {
+        let cb = document.getElementById(this.cbId);
+        if (!this.root.contains(cb)) {
+            console.error("id", this.cbId, "not in root", this.root)
+            return
+        }
+        cb.parentElement.remove()
+        
+        let pr = this.root.querySelector(':scope > .he-props');
+        if (pr.childElementCount == 0) {
+            pr.remove()
+        }
+    }
+}
+
 //// Таблица епископов или кафедр
 function HierarhTableEditor(itemType /*кафедра или епископ*/) {
     if (itemType == 'епископ') {
@@ -283,7 +382,7 @@ function HierarhTableEditor(itemType /*кафедра или епископ*/) {
             <tr><th>кафедра</th><th>начало</th><th>окончание</th></tr>
         </thead>
         `;
-    } else throw new Error("unexpected itemType", itemType)
+    } else throw new Error("unexpected itemType " + itemType)
     
     // обычная строка таблицы (от, до, кто).
     let TABLE_ROW_TEMPLATE = `
@@ -332,7 +431,7 @@ function HierarhTableEditor(itemType /*кафедра или епископ*/) {
         // заголовок таблицы
         let th = table.querySelector('thead');
         if (!th) {
-            console.log('Restore header in table', table);            
+            console.info('Restore header in table', table);            
             th = createElementByHtml(TABLE_HEAD_TEMPLATE);
             table.insertBefore(th, table.firstElementChild);
         }
@@ -343,7 +442,7 @@ function HierarhTableEditor(itemType /*кафедра или епископ*/) {
         // ? prepareNotes(table);
         // TODO проверить, что у заголовков tr.header-row стоит colspan=3
         if (!table.querySelector('tbody')) {
-            console.log('Add data row to empty table', table);
+            console.info('Add data row to empty table', table);
 
             let tb = document.createElement('tbody');
             tb.appendChild(createElementByHtml(TABLE_ROW_TEMPLATE));
@@ -399,7 +498,7 @@ function HierarhTableEditor(itemType /*кафедра или епископ*/) {
         if (curRow) {
             curRow.parentNode.insertBefore(ntr, curRow.nextElementSibling);
         } else if (!table.querySelector('tbody tr')) {
-            console.log('Create row for empty table', table);
+            console.info('Create row for empty table', table);
             table.querySelector('tbody').appendChild(ntr);
         } else {
             return
@@ -461,14 +560,14 @@ function HierarhTableEditor(itemType /*кафедра или епископ*/) {
         let curRow = this.getCurrentRow();
         if (curRow) {
             if (curRow.classList.contains('header-row')) {
-                console.log("Can't set header-row inaccurate");
+                console.warn("Can't set header-row inaccurate");
                 return false;
             }
             curRow.classList.toggle(INACCURATE_ROW_CLASS);
 
             return true;
         } else {
-            console.log('No row to set inaccurate!');
+            console.warn('No row to set inaccurate!');
             return false;
         }
     }
@@ -482,7 +581,7 @@ function HierarhTableEditor(itemType /*кафедра или епископ*/) {
         let p = r.startContainer;
         if (!this.root.contains(p)) {
             // выделение не относится к текущей таблице
-            // console.log("Selection", p, "not in table", this.root)
+            // console.debug("Selection", p, "not in table", this.root)
             return null;
         }
         
@@ -520,7 +619,7 @@ function NotePlugin() {
     
     this.init = function(menuSlot) {
         let menu = createElementByHtml(NOTE_MENU_TEMPLATE)
-        //console.log('note init menu', menu)
+        //console.debug('note init menu', menu)
         menu.addEventListener('click', () => this.addNote())        
         menuSlot.setHtmlElem(menu)
     }
@@ -568,7 +667,7 @@ function NotePlugin() {
         // место редактировать. Но как найти нужного editor?
         // - в общем случае их может быть несколько вложенных...
         if (!canUserEditRange(r)) {
-            console.log("Can't add note to not-editable area", r);
+            console.warn("Can't add note to not-editable area", r);
             return;
         }
 
@@ -656,7 +755,7 @@ function NotePlugin() {
             // Загловок сноски [сноска]
             let sup = nt.querySelector('sup');
             if (!sup) {
-                console.log('repair <sup> for', nt);
+                console.info('repair <sup> for', nt);
                 sup = createElementByHtml(NOTE_HEADER_TEMPLATE);
                 nt.prepend(sup);
             }
@@ -674,7 +773,7 @@ function NotePlugin() {
             }
             
             if (nt.childElementCount < 2) {
-                console.log('add empty note content for', nt);
+                console.info('add empty note content for', nt);
                 let nn = document.createElement('sup');
                 nn.innerText = '...';
                 nt.append(nn);
@@ -691,14 +790,14 @@ function NotePlugin() {
         for (let tag of root.querySelectorAll('.fnote')) {        
             let pr = tag.previousSibling;
             if (pr && pr.nodeType == Node.ELEMENT_NODE && pr.tagName == 'BR') {
-                console.log('remove', pr, 'before', tag);
+                console.info('remove', pr, 'before', tag);
                 // сноска не может быть с новой строки - она всегда после текста
                 pr.remove();
             }
 
             pr = tag.previousSibling;
             if (!pr || (pr.nodeType == Node.TEXT_NODE && pr.textContent.trim()=='')) {
-                console.log('add ... before', tag, pr);
+                console.info('add ... before', tag, pr);
                 tag.before("...");
             }
         }
@@ -738,10 +837,10 @@ let CONTENT_EDITABLE_TOOLS = {
                 // но курсор остаётся в предыдущей строке.
                 // А в Chrome вообще на конце текста Enter не работает.
                 let r = getSelectionRange();                
-                //console.log("Enter with selection", r)
+                //console.debug("Enter with selection", r)
                 // Отлавливаем ситуацию нажатия Enter в конце текста
                 if (r.collapsed && r.startContainer.nodeType == Node.TEXT_NODE && r.startOffset != 0) {
-                    console.log("Enter on end of", root)
+                    console.debug("Enter on end of", root)
                     // Chrome надо два <br> вставить - один пропадёт при вводе
                     if (window.chrome) {
                         document.execCommand('insertHTML', false, '<br/><br/>');
@@ -788,7 +887,7 @@ function getSelectionRange() {
 
 function setCursorAfter(elem) {        
     let r = new Range()
-    console.log("set cursor after", elem)
+    console.debug("set cursor after", elem)
     r.setStartAfter(elem)
             
     let sl = window.getSelection()
@@ -812,11 +911,26 @@ function deleteWithUndo(tag) {
     document.execCommand('delete', false, null);
 }
 
-function object_name(obj) {
+function objectName(obj) {
     if (obj && obj.__proto__ && obj.__proto__.constructor)
         return obj.__proto__.constructor.name
     
-    return obj.toString();
+    return String(obj)
 }
 
-
+function makeUniqueId(prefix) {
+    if (prefix && !document.getElementById(prefix)) {
+        return prefix
+    }
+    
+    if (!prefix) prefix = "id_";
+    let i = 0
+    
+    let res = prefix + i;
+    while(document.getElementById(res)) {
+        i++
+        res = prefix+i
+    }
+    
+    return res
+}

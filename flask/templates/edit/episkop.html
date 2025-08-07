@@ -14,17 +14,39 @@
 let H_FORM = null;
 window.onload = initForm;
 
+window.onbeforeunload = function(ev) {
+    if (H_FORM && H_FORM.isDataModified) {
+        console.log('SAVE!')
+        ev.preventDefault();
+        let msg = "Всё ли Вы сохранили?";
+        ev.returnValue = msg;
+        return msg;
+    }
+}
+
 function initForm() {
     try {
         let doc = document.querySelector('#data article.episkop_article');
         
         H_FORM = new TextForm(doc);
         H_FORM.setMenu(new MenuPanel(document.querySelector('#menu')));
-
+        
+        // Свойства уровня всего документа
+        H_FORM.addEditor('$FORM_ROOT', 
+            new CheckBoxProperty('is-obn', 'раскольничий', 'обновленец или иной раскол'))
+        H_FORM.addEditor('$FORM_ROOT', 
+            new CheckBoxProperty('is-dubious', '"легендарный"', 'есть сомнения, что это реальное лицо'))
+        
+        // Заголовок
         H_FORM.addEditor('.header', new TextEditor())        
         
+        // Плагин для вставки сносок в последующие разделы
         let notePlugin = new NotePlugin()
+        
+        // Текста статьи
         H_FORM.addEditor('.text', new TextEditor().withPlugin(notePlugin))
+        
+        // Таблица кафедр
         H_FORM.addEditor('table.cafedras', new HierarhTableEditor('епископ').withPlugin(notePlugin));
         
         H_FORM.start();
@@ -80,7 +102,7 @@ function initForm() {
     
     <script>
         async function saveData(doc_key, save_url) {
-            let d = H_FORM.getData();
+            let d = H_FORM.getData(true /*reset isDataModified*/);
             //console.log(d);
 
             let msg = document.getElementById('commit-message').value;
@@ -119,7 +141,7 @@ function initForm() {
         }
 
         function downloadData(saveFilename) {
-            var bl = new Blob([H_FORM.getData()], {type: 'text/plain'});
+            var bl = new Blob([H_FORM.getData(false /* NOT reset isDataModified */)], {type: 'text/plain'});
 
             var a = document.createElement('a');
             document.body.appendChild(a);
@@ -150,6 +172,8 @@ function initForm() {
                 document.getElementById('data').innerHTML = reader.result;
                 // Заново создаём форму, чтобы она была привязана к новым данным
                 initForm();
+                // выставляем флаг того, что данные изменены
+                H_FORM.isDataModified = true
                 showMessage('Данные успешно загружены');
             }
 
