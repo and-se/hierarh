@@ -125,7 +125,7 @@ window.onbeforeunload = function(ev) {
     
     <script>
         async function saveData(doc_key, save_url) {
-            let d = H_FORM.getData(true /*reset isDataModified*/);
+            let d = H_FORM.getData();
             //console.log(d);
 
             let msg = document.getElementById('commit-message').value;
@@ -150,6 +150,7 @@ window.onbeforeunload = function(ev) {
 
                     if (j.success) {
                         showMessage('Изменения сохранены. Дождитесь обновления страницы');
+                        H_FORM.isDataModified = false; // неважно - всё равно перезагрузка страницы
                         setTimeout(() =>  window.location.href = '/edit/{{item_type}}/' + j.key, 500);
                     } else {
                         showError(j.message);
@@ -164,7 +165,7 @@ window.onbeforeunload = function(ev) {
         }
 
         function downloadData(saveFilename) {
-            var bl = new Blob([H_FORM.getData(false /* NOT reset isDataModified */)], {type: 'text/plain'});
+            var bl = new Blob([H_FORM.getData()], {type: 'text/plain'});
 
             var a = document.createElement('a');
             document.body.appendChild(a);

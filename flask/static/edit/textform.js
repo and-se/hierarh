@@ -134,7 +134,7 @@ function TextForm(root) {
         console.log('Started form TextForm', this)
     }
     
-    this.getData = function(resetIsDataModified = true) {
+    this.getData = function() {
         let data = this.root.cloneNode(true);
         data.classList.remove('he-edit-form');
 
@@ -159,10 +159,6 @@ function TextForm(root) {
             }
             if(ch.classList.length == 0) ch.removeAttribute('class');
         });
-        
-        if (resetIsDataModified) {
-            this.isDataModified = false;
-        }
 
         return data.outerHTML;
     }
