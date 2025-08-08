@@ -289,7 +289,7 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
             if mode=="error_report":
                 return f'''<sup data-note-num="{m.group('note_num')}">{m.group('note_num')}</sup>'''
             else:
-                return f'''<details><summary><sup>[сноска]</sup></summary><div>{r.text}</div></details>'''
+                return f'''<span class="fnote"><sup>[сноска]</sup><span>{r.text}</span></span>'''
         else:
             has_err=True
 
@@ -300,7 +300,7 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
 </sup>'''
             else:
                 return f'''<sup class="{CSS_NOTE_ERROR}" style="color:red" title="сноска БЕЗ ТЕКСТА"><b>{m.group('note_num')}</b>???</sup>''' + \
-                f'''<details><div>??? нет текста сноски ???</div></details>'''
+                f'''<span class="fnote"><sup>[сноска]</sup><span>??? нет текста сноски ???</span></span>'''
 
     def convert_notes(txt):
         if not txt: return ''

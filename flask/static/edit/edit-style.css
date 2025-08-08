@@ -40,9 +40,29 @@
 
 .he-edit-form .header {
     font-weight: bold;
-    font-size: xx-large;
+    font-size: 1.5em;
     display: inline-block;
-    width: 70%;
+}
+
+/* заголовок для обновленцев и проч. */
+.he-edit-form[data-is-obn='true'] .header {
+    font-style: italic;
+    font-size: 1.4em;
+    text-decoration-style: dashed;
+    text-decoration-line: underline;
+}
+
+/* заголовок для "легендарных" епископов */
+.he-edit-form[data-is-dubious='true'] .header {
+    font-style: italic;    
+}
+
+.he-edit-form[data-is-dubious='true'] .header:before {
+    content: "( ";    
+}
+
+.he-edit-form[data-is-dubious='true'] .header:after {
+    content: " )";
 }
 
 .he-edit-form .text, .version .text, .diff .text {
@@ -55,11 +75,6 @@
 
 .version .header, .diff .header {
     font-weight: bold;
-}
-
-.he-edit-form .he-props {
-    display: inline-block;
-    vertical-align: top;
 }
 
 /* based on material.html template */
@@ -102,43 +117,6 @@
     margin-left: 40px;
 }
 
-/* #region OLD TO REMOVE */
-.he-edit-form details, .version details, .diff details {
-    display:inline;
-    border: none;
-    margin-bottom: 0;
-}
-
-.he-edit-form details summary, .version details summary, .diff details summary {
-    padding: 0;
-    list-style-type: none;
-}
-
-.he-edit-form details summary .he-delete-button {
-    display: none;
-}
-
-.he-edit-form details[open], .version details[open], .diff details[open] {
-    display: block;
-}
-
-.he-edit-form details[open] summary, .version details[open] summary, .diff details[open] summary {
-    list-style-type: disclosure-open;
-}
-
-.he-edit-form details[open] summary .he-delete-button {
-    display: inline;
-    padding: 4px;
-    margin-left: 10px;
-}
-
-.he-edit-form details div, .version details div, .diff details div {
-    border-left: 1px solid gray;
-    padding-left: 5px;
-    border-radius: 10px;
-}
-
-/*#end region*/
 
 .he-undo-button {
     margin-left: 60px;

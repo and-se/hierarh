@@ -25,7 +25,7 @@ function initForm() {
         H_FORM.addEditor('.text', new TextEditor().withPlugin(notePlugin))
         
         // Таблица кафедр
-        H_FORM.addEditor('table.cafedras', new HierarhTableEditor('епископ').withPlugin(notePlugin));
+        H_FORM.addEditor('table.cafedras', new HierarhTableEditor('кафедры').withPlugin(notePlugin));
         
         H_FORM.start();
     } catch (ex) {

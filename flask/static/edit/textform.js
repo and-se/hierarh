@@ -369,16 +369,18 @@ function CheckBoxProperty(dataAttrName, title, description) {
 }
 
 //// Таблица епископов или кафедр
-function HierarhTableEditor(itemType /*кафедра или епископ*/) {
-    if (itemType == 'епископ') {
-        let TABLE_HEAD_TEMPLATE = `
-        <thead class="he-table-head">
+function HierarhTableEditor(itemType /*кафедры или епископы*/) {
+    let TABLE_HEAD_TEMPLATE
+    
+    if (itemType == 'епископы') {
+        TABLE_HEAD_TEMPLATE = `
+        <thead>
             <tr><th>начало</th><th>окончание</th><th>епископ</th></tr>
         </thead>
         `;
-    } else if (itemType == 'кафедра') {
+    } else if (itemType == 'кафедры') {
         TABLE_HEAD_TEMPLATE = `
-        <thead class="he-table-head">
+        <thead>
             <tr><th>кафедра</th><th>начало</th><th>окончание</th></tr>
         </thead>
         `;
@@ -434,10 +436,22 @@ function HierarhTableEditor(itemType /*кафедра или епископ*/) {
             console.info('Restore header in table', table);            
             th = createElementByHtml(TABLE_HEAD_TEMPLATE);
             table.insertBefore(th, table.firstElementChild);
+        } else {
+            // берём Html без пробелов
+            let thHtml = th.outerHTML.replace(/\s|\n/g, '')
+            let expectedHtml = TABLE_HEAD_TEMPLATE.replace(/\s|\n/g, '')            
+            //console.debug(thHtml, expectedHtml)
+            
+            if (thHtml != expectedHtml) {
+                console.warn('Bad table header:')
+                console.warn('fact:', th.outerHTML)
+                console.warn('expected:', TABLE_HEAD_TEMPLATE)
+                // заголовок не соответствует itemType
+                // throw new Error("Заголовок таблицы не соответствует типу строки: " + itemType)
+            }
         }
         
         th.setAttribute('contenteditable', false);
-        th.classList.add('he-table-head');
         
         // ? prepareNotes(table);
         // TODO проверить, что у заголовков tr.header-row стоит colspan=3
