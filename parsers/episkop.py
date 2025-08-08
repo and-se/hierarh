@@ -58,7 +58,7 @@ SaintTitle = Regex(r'''(Св\.(\s+муч\.)?)|(Сщмч\.)|(Блаж\.)|
                        блаженный
                        ''',
                    flags=re.I | re.X)('saint_title')
-Temp = ((Char('в') + '/' + 'у') | Regex("временно\s+управляющий")|"заместитель временно управляющего") + Opt(Question)
+Temp = ((Char('в') + '/' + 'у') | Regex(r"временно\s+управляющий")|"заместитель временно управляющего") + Opt(Question)
 Temp |= Char('(') + Temp + ')'
 Temp = original_text_for(Temp)('temp_status')
 
