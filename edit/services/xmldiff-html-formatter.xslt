@@ -71,7 +71,7 @@ https://github.com/Shoobx/xmldiff/blob/master/docs/source/static/htmlformatter.x
     </xsl:template>
 
     <!-- Put diff markup in marked paragraph formatting tags. -->
-    <xsl:template match="span|b|i|u|strike|sub|sup">
+    <xsl:template match="span[not(contains(@class, 'fnote'))]|b|i|u|strike|sub|sup">
         <xsl:choose>
             <xsl:when test="@diff:insert">
                 <xsl:copy>
@@ -101,12 +101,13 @@ https://github.com/Shoobx/xmldiff/blob/master/docs/source/static/htmlformatter.x
         </xsl:choose>
     </xsl:template>
     
-    <!-- Сноски разбираем отдельно, чтобы diff не ломал их структуру-->
-    <xsl:template match="details">
+    <!-- FIXME Сноски разбираем отдельно, чтобы diff не ломал их структуру-->
+    <xsl:template match="span[contains(@class, 'fnote')]">
         <xsl:choose>
             <xsl:when test="@diff:insert">
                 <ins>
                     <xsl:copy>
+                        <xsl:attribute name="class">fnote</xsl:attribute>   
                         <xsl:apply-templates />
                     </xsl:copy>
                 </ins>
@@ -114,16 +115,16 @@ https://github.com/Shoobx/xmldiff/blob/master/docs/source/static/htmlformatter.x
             <xsl:when test="@diff:delete">
                 <del>
                     <xsl:copy>
+                        <xsl:attribute name="class">fnote</xsl:attribute>   
                         <xsl:apply-templates />
                     </xsl:copy>
                 </del>
             </xsl:when>
             <xsl:otherwise>                
-                <xsl:copy>
-                    <summary>
-                        <sup>[сноска]</sup>
-                    </summary>
-                    <xsl:apply-templates select="*[local-name() != 'summary']"/>
+                <xsl:copy>                                   
+                    <xsl:attribute name="class">fnote</xsl:attribute>   
+                    <sup>[сноска]</sup>
+                    <xsl:apply-templates select="*[local-name() != 'sup']"/>
                 </xsl:copy>
             </xsl:otherwise>
         </xsl:choose>

@@ -13,8 +13,8 @@
 <body>
     <div class="menu">        
           <ul class="menu">
-              <li><a class="{{'current' if item_type=='cafedra'}}" href="/cafedra">Кафедры</a></li>
-              <li><a class="{{'current' if item_type=='episkop'}}" href="/episkop">Епископы</a></li>
+              <li><a class="{{'current' if item_type is defined and item_type=='cafedra'}}" href="/cafedra">Кафедры</a></li>
+              <li><a class="{{'current' if item_type is defined and item_type=='episkop'}}" href="/episkop">Епископы</a></li>
               <li><a href="/">На главную</a></li>
           </ul>
     </div>

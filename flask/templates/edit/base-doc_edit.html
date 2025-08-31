@@ -1,0 +1,214 @@
+{% extends "edit/base-edit.html" %}
+
+{% block pagetitle %}
+{{doc.header()}}
+{% endblock %}
+
+{#
+Для редактирования документа в шаблон надо передать следующие переменные:
+
+doc - данные для редактирвоания - объект edit.storageTextBase
+key - ключ документа (может быть пустым если документ новый)
+
+post_url - куда отправлять данные документа при сохранении
+item_type - тип документа (episkop или cafedra). Используется для построения URL сохранённого документа
+
+необязательные:
+
+last-edit - строка сведений о том, кто и когда отредактировал документ в последний раз
+comment - комментарий к изменениям, внесённый при последней правке документа
+#}
+
+
+{% block content %}
+
+
+{% if not doc or not post_url or not item_type %}
+    {{ raise_error("В шаблон редактирования не переданы необходимые переменные!") }}
+{% endif %}
+
+
+<main>
+
+<script src="/static/edit/textform.js"></script>
+
+<script>
+
+let H_FORM = null;
+
+</script>
+
+{% block initFormJsFunc required %}
+
+{# В этот блок нужно поместить тег <script/> с функцией initForm,
+   которая создаёт и запускает форму H_FORM и выглядит как-то так:
+function initForm() {
+    try {
+        // данные для редактирования
+        let doc = document.querySelector('#data article...');
+        
+        // создаём форму
+        H_FORM = new TextForm(doc);
+        
+        ... настроить меню, редакторы и плагины внутри H_FORM
+        
+        H_FORM.start()
+    } catch (ex) {
+        showError(ex.message);
+        console.log(ex);
+    }   
+}
+#}
+
+{% endblock initFormJsFunc %}
+
+
+<script>
+window.onload = initForm;
+
+window.onbeforeunload = function(ev) {
+    if (H_FORM && H_FORM.isDataModified) {
+        console.info('На форме есть несохранённые изменения')        
+        ev.preventDefault();
+        let msg = "Всё ли Вы сохранили?";
+        ev.returnValue = msg;
+        return msg;
+    }
+}
+
+</script>
+
+
+
+
+<div id="menu"></div>
+
+{% autoescape false %}
+
+<div id="data">
+{{doc.html}}
+</div>
+
+{% endautoescape %}
+
+<div class="he-save-form-panel">
+    <div id="message"></div>
+    <script>
+        function showMessage(msg) {
+            let tag = document.getElementById('message');
+            tag.innerHTML = msg;
+        }
+
+        function showError(msg) {
+            showMessage(`<p style="color:red">ERROR: ${msg}</p>`);
+        }
+    </script>
+    
+    <button onclick="saveData('{{key}}', '{{post_url}}')">Сохранить</button>
+    <span class="download-buttons">
+        <button onclick="downloadData(H_FORM.root.querySelector('.header').innerText)">Скачать</button>
+        <button onclick="document.getElementById('dupl').click()">Загрузить из файла</button>
+        <input id="dupl" type="file" accept=".hh.html" style="display: none;" onchange="loadDataFromFile()">
+    </span>
+
+    <br>
+    <input id="commit-message" class="edit-comment" placeholder="При желании кратко опишите здесь изменения">
+
+    {% if last_edit%}
+    <div>последняя правка <em>{{last_edit}}</em>.
+        {%if comment %}
+        <q>{{comment}}</q>
+        {%endif%}
+        <a href="{{doc.key}}/versions" target="_blank">Просмотреть историю правок</a>
+    </div>
+    {% endif %}
+    
+    <script>
+        async function saveData(doc_key, save_url) {
+            let d = H_FORM.getData();
+            //console.log(d);
+
+            let msg = document.getElementById('commit-message').value;
+            let problemMsg = "Не удалось сохранить данные! Попробуйте ещё раз или воспользуйтесь кнопкой Скачать.\n";
+
+            try {
+                let resp = await fetch(save_url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json;charset=utf-8'
+                    },
+                    body: JSON.stringify({
+                        key: doc_key,
+                        html: d,
+                        comment: msg
+                    }),
+                    credentials: 'include'
+                });
+
+                if (resp.ok) {
+                    let j = await resp.json();
+
+                    if (j.success) {
+                        showMessage('Изменения сохранены. Дождитесь обновления страницы');
+                        H_FORM.isDataModified = false; // неважно - всё равно перезагрузка страницы
+                        setTimeout(() =>  window.location.href = '/edit/{{item_type}}/' + j.key, 500);
+                    } else {
+                        showError(j.message);
+                    }
+
+                } else {
+                    showError(problemMsg + resp.text());
+                }
+            } catch(e) {
+                showError(problemMsg + e);
+            }
+        }
+
+        function downloadData(saveFilename) {
+            var bl = new Blob([H_FORM.getData()], {type: 'text/plain'});
+
+            var a = document.createElement('a');
+            document.body.appendChild(a);
+
+            a.href = URL.createObjectURL(bl);
+            if (!saveFilename.endsWith('.hh.html')) {
+                saveFilename = saveFilename + '.hh.html'
+            }
+            a.download = saveFilename
+            a.click();
+
+            document.body.removeChild(a);
+        }
+
+        function loadDataFromFile() {
+            var file = document.getElementById('dupl').files[0];
+            if (!file) {
+                return;
+            }
+
+            let reader = new FileReader();
+            reader.readAsText(file);
+
+            reader.onload = () => {
+                H_FORM.stop()
+                                
+                // заменяем старые данные новыми
+                document.getElementById('data').innerHTML = reader.result;
+                // Заново создаём форму, чтобы она была привязана к новым данным
+                initForm();
+                // выставляем флаг того, что данные изменены
+                H_FORM.isDataModified = true
+                showMessage('Данные успешно загружены');
+            }
+
+            reader.onerror = () => {
+                showError("Ошибка загрузки данных файла. Попробуйте ещё раз");
+            }            
+        }
+    </script>
+
+</div>
+
+</main>
+
+{% endblock %}

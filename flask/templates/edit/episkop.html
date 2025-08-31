@@ -4,14 +4,16 @@
 <script>
 function initForm() {
     try {
-        let doc = document.querySelector('#data article.cafedra_article');
+        let doc = document.querySelector('#data article.episkop_article');
         
         H_FORM = new TextForm(doc);
         H_FORM.setMenu(new MenuPanel(document.querySelector('#menu')));
         
         // Свойства уровня всего документа
         H_FORM.addEditor('$FORM_ROOT', 
-            new CheckBoxProperty('is-obn', 'раскольничья', 'обновленческая или иной раскол'))
+            new CheckBoxProperty('is-obn', 'раскольничий', 'обновленец или иной раскол'))
+        H_FORM.addEditor('$FORM_ROOT', 
+            new CheckBoxProperty('is-dubious', '"легендарный"', 'есть сомнения, что это реальное лицо'))
         
         // Заголовок
         H_FORM.addEditor('.header', new TextEditor())        
@@ -23,7 +25,7 @@ function initForm() {
         H_FORM.addEditor('.text', new TextEditor().withPlugin(notePlugin))
         
         // Таблица кафедр
-        H_FORM.addEditor('table.episkops', new HierarhTableEditor('епископы').withPlugin(notePlugin));
+        H_FORM.addEditor('table.cafedras', new HierarhTableEditor('кафедры').withPlugin(notePlugin));
         
         H_FORM.start();
     } catch (ex) {

@@ -15,8 +15,8 @@
 <body>
     <div class="menu">        
           <ul class="menu">
-              <li><a class="{{'current' if item_type=='cafedra'}}" href="{{url_for('.list_cafedra_edit')}}">Кафедры</a></li>
-              <!--<li><a class="{{'current' if item_type=='episkop'}}" href="{{url_for('.list_cafedra_edit')}}">Епископы</a></li>-->
+              <li><a class="{{'current' if item_type is defined and item_type=='cafedra'}}" href="{{url_for('.list_cafedra_edit')}}">Кафедры</a></li>
+              <li><a class="{{'current' if item_type is defined and item_type=='episkop'}}" href="{{url_for('.list_episkop_edit')}}">Епископы</a></li>
               <li><a href="/">На главную</a></li>
           </ul>
     </div>

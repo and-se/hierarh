@@ -10,22 +10,28 @@ EditDb = None  # БД редактирования, инициализирует
 class HierarhEditStorage:
     def __init__(self):
         self.cafedra = TextCollectionDb('cafedra', CafedraEditOrm)
+        self.episkop = TextCollectionDb('episkop', EpiskopEditOrm)
 
     def atomic(self):
         return EditDb.atomic()
 
 
-
 class TextCollectionDb:
     def __init__(self, name, orm_model):
         self.name = name
-        self.orm = orm_model
+        self.orm = orm_model        
+        self.text_model = self.orm._meta.target_text_model
 
     def new(self):
-        doc = TextCafedra()
-        return doc
-
-    def upsert(self, doc: 'TextCafedra', reg_data:dict=None, fix_reg_data=True) -> 'TextCafedra':
+        return self.text_model()
+        
+    def _convert_orm_to_text(self, orm_item):
+        return self.orm.to_text_model(orm_item)
+    
+    def upsert(self, doc: 'TextBase', reg_data:dict=None, fix_reg_data=True) -> 'TextBase':
+        if not isinstance(doc, self.text_model):
+            raise ValueError(f'Expected doc of type {type(self.text_model)} got {type(doc)}')
+            
         # create new or update current item
         if reg_data is not None:
             if not isinstance(reg_data, dict):
@@ -41,10 +47,10 @@ class TextCollectionDb:
         if doc.key:
             with EditDb.atomic(lock_type = 'IMMEDIATE'):
                 doc.key = int(doc.key)
-                old = self.orm.get(doc.key)
+                old = self.orm.get_or_none(doc.key)
                 if old:
                     num = self.version_count(doc.key) or 0
-                    hist = old.toVersionOrm(coll_name = self.name, num=num + 1)
+                    hist = old.to_version_orm(coll_name = self.name, num=num + 1)
                     hist.save()
 
                 key2 = self.orm.replace(id=doc.key, header=doc.header(), html=doc.html, reg_data=rgd).execute()
@@ -55,13 +61,12 @@ class TextCollectionDb:
         doc.reg_data = reg_data
 
         return doc
-
-    def get(self, key):
-        # get from db
+        
+    def get(self, key):        
         r = self.orm.get_or_none(key)
         if r:
-            return r.toTextCafedra()
-
+            return self._convert_orm_to_text(r)
+    
     def _portion_query(self, query):
         return self.orm.select() \
                     .where(orm_all_words_search_condition(query, self.orm.header)) \
@@ -70,7 +75,7 @@ class TextCollectionDb:
         q = self._portion_query(query) \
                     .order_by(self.orm.header) \
                     .limit(take).offset(skip)
-        return [x.toTextCafedra() for x in q]
+        return [self._convert_orm_to_text(x) for x in q]
 
     def count(self, query=None):
         return self._portion_query(query).count()
@@ -84,34 +89,38 @@ class TextCollectionDb:
         q = self._version_query(key) \
                       .order_by(so(VersionOrm.num), so(VersionOrm.id)) \
                       .limit(take).offset(skip)
-        return [x.toTextVersion() for x in q]
+        return [x.to_text_version() for x in q]
 
     def version_count(self, key):
         return self._version_query(key).count()
 
 
 
-class TextCafedra:
+class TextBase:
     def __init__(self):
         self.key = None
-        self.html = """
-        <article class="cafedra_article" data-is-obn="false">
-            <div class="header">Заголовок...</div>
-            <div class="text">Текст статьи...</div>
-            <table class="episkops"></table>
-        </article>
-        """
-        self.reg_data = {}
+        self.html = ""
+        self.reg_data = {}    
 
-    @staticmethod
-    def from_html(key, html):
-        doc = TextCafedra()
-        if key:
-            key = int(key)
-        doc.key = key
-        doc.html = html
-        return doc
+    def header(self):
+        raise NotImplementedError('implement header method')
 
+    def __repr__(self):
+        return f"Text~model({self.key}, {self.header()})"
+
+    def __str__(self):
+        return repr(self)
+
+def text_model_from_html(model_class, key, html):
+    doc = model_class()
+    if key:
+        key = int(key)
+    doc.key = key
+    doc.html = html
+    return doc
+
+
+class BaseCafEp(TextBase):
     def header(self):
         m = re.search(r'<div class="header">([^<]+)', self.html)
         return m.group(1) if m else self.html.strip().split('\n')[0]
@@ -125,12 +134,34 @@ class TextCafedra:
                 return True
         return False
 
-    def __repr__(self):
-        return f"TextCafedra({self.key}, {self.header()})"
+    @classmethod
+    def from_html(cls, key, html):
+        return text_model_from_html(cls, key, html)
+    
 
-    def __str__(self):
-        return repr(self)
-
+class TextCafedra(BaseCafEp):
+    def __init__(self):
+        super().__init__()        
+        self.html = """
+        <article class="cafedra_article" data-is-obn="false">
+            <div class="header">Заголовок...</div>
+            <div class="text">Текст статьи...</div>
+            <table class="episkops"></table>
+        </article>
+        """
+   
+        
+class TextEpiskop(BaseCafEp):    
+    def __init__(self):
+        super().__init__()        
+        self.html = f'''
+        <article class="episkop_article" data-is-obn="false">
+            <div class="header">Имя...</div>
+            <div class="text">Текст...</div>            
+            <table class="cafedras"></table>
+        </article>
+        '''
+    
 class TextVersion:
     def __init__(self, coll, key, html, reg_data: dict):
         self.collection = coll
@@ -153,26 +184,43 @@ class TextVersion:
 
 ### ORM ###
 
-class CafedraEditOrm(Model):
-    class Meta:
-        table_name = 'CafedraEdit'
-
+class _BaseEditOrm(Model):
     id = AutoField()
     header = TextField(index=True)
     html = TextField()
     reg_data = TextField()
-
-    def toTextCafedra(self):
-        r = TextCafedra.from_html(self.id, self.html)
-        r.reg_data = json.loads(self.reg_data)
-        assert isinstance(r.reg_data, dict)
-        return r
-
-    def toVersionOrm(self, coll_name, num: int):
+    
+    
+    def to_version_orm(self, coll_name, num: int):
         return VersionOrm(collection = coll_name, doc_key = self.id, \
                           doc_data = self.html, \
                           doc_reg_data = self.reg_data,
                           num = num)
+    
+
+class CafedraEditOrm(_BaseEditOrm):
+    class Meta:
+        table_name = 'CafedraEdit'
+        target_text_model = TextCafedra
+    
+    def to_text_model(self):
+        r = TextCafedra.from_html(self.id, self.html)
+        r.reg_data = json.loads(self.reg_data)
+        assert isinstance(r.reg_data, dict)
+        return r
+        
+
+class EpiskopEditOrm(_BaseEditOrm):
+    class Meta:
+        table_name = 'EpiskopEdit'
+        target_text_model = TextEpiskop
+    
+    def to_text_model(self):
+        r = TextEpiskop.from_html(self.id, self.html)
+        r.reg_data = json.loads(self.reg_data)
+        assert isinstance(r.reg_data, dict)
+        return r
+        
 
 class VersionOrm(Model):
     class Meta:
@@ -186,7 +234,7 @@ class VersionOrm(Model):
 
     num = IntegerField()
 
-    def toTextVersion(self):
+    def to_text_version(self):
         return TextVersion(self.collection, self.doc_key, \
                            self.doc_data, json.loads(self.doc_reg_data))
 
@@ -197,8 +245,8 @@ VersionOrm.add_index(VersionOrm.collection, VersionOrm.doc_key)
 def init_edit_db():
     global EditDb
     EditDb = get_db(settings.EditDbName)
-    EditDb.bind([CafedraEditOrm, VersionOrm])
-    EditDb.create_tables([CafedraEditOrm, VersionOrm])
+    EditDb.bind([CafedraEditOrm, EpiskopEditOrm, VersionOrm])
+    EditDb.create_tables([CafedraEditOrm, EpiskopEditOrm, VersionOrm])
     return EditDb
 
 init_edit_db()

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 sys.path.append(os.getcwd())
 from article_parser import divide_episkop_row
 from parsers.fail import ParseFail
-from utils import check_cafedra_expand_abbrs as check_util
+from utils import check_cafedra_expand_abbrs as cafedra_check_util
 
 from edit import storage
 
@@ -18,59 +18,24 @@ from typing import List
 
 CSS_NOTE_ERROR = 'error-note'
 
-ORIGINAL_DATA_FILE = 'data/edit-init/cafedra-edit.json'
-EXPANDED_DATA_FILE = 'data/edit-init/cafedra-exp-abbrs-edit.json'
+ORIGINAL_CAFEDRA_JSON = 'data/edit-init/cafedra-edit.json'
+EXPANDED_CAFEDRA_JSON = 'data/edit-init/cafedra-exp-abbrs-edit.json'
 
-MAP_FILE = 'data/edit-init/map-origin-expanded-cafedra.json'
+EPISKOP_JSON = 'data/edit-init/episkop-edit.json'
+
+CAFEDRA_MAP_FILE = 'data/edit-init/map-origin-expanded-cafedra.json'
 
 def main():
     if len(sys.argv) != 2:
-        print("добавьте параметр json для преобразования json во входной html,\n" + \
+        print("добавьте параметр json для преобразования json во входные html,\n" + \
               "либо db для построения БД на основе html")
         return 1
     if sys.argv[1] == 'json':
-        print('\n\n============================')
-        print('Конвертируем исходный текст книги (с сокращениями)\n')
-
-        html_o = process_json(ORIGINAL_DATA_FILE)
-        if not html_o: return 2
-
-        print('\n\n============================')
-        print("Конвертируем текст с раскрытыми сокращениями\n")
-        html_e = process_json(EXPANDED_DATA_FILE)
-        if not html_e: return 2
+        er = make_cafedra_html()
+        if er: return er
         
-        print('\n\n============================')
-        print("Проверяем согласованность двух упомянутых текстов...")
-        
-        ok = check_util.main(ORIGINAL_DATA_FILE, EXPANDED_DATA_FILE)
-        if ok: print("OK")
-        else:
-            print("Fail")
-            return 3
-        
-        print('\n\n============================')
-        print("Соотносим заголовки в двух текстах")
-        caf_origin: List[storage.TextCafedra] = load_html(html_o)
-        caf_expand: List[storage.TextCafedra] = load_html(html_e)
-        
-        map_data = {}
-        assert len(caf_origin) == len(caf_expand), "Разное количество статей"
-        for (co, ce) in zip(caf_origin, caf_expand):
-            head1, head2 = co.header(), ce.header()
-            ok = True
-            if not check_util.header_like(head1, head2):
-                print(f'Разные кафедры? {head1}  <-> {head2}')
-                ok = False
-            else:
-                map_data[head1] = head2
-            if not ok:
-                return 4
-                
-        with open(MAP_FILE, 'w', encoding="utf8") as f:
-            json.dump(map_data, f, ensure_ascii=False, indent=2)
-        print("Соотнесение заголовков в файле", MAP_FILE)
-        
+        er = make_episkop_html()
+        if er: return er
 
     elif sys.argv[1] == 'old-json':
         # сборка json из оригинального текста книги
@@ -93,60 +58,116 @@ def main():
         ch.process(source_file)
 
     elif sys.argv[1] == 'db':
-        file1 = Path(ORIGINAL_DATA_FILE).with_suffix('.html')
-        file2 = Path(EXPANDED_DATA_FILE).with_suffix('.html')
-        print("Загружаем данные из файлов", file1, "и", file2, "в БД", storage.DbName)
+        load_result_html_into_db()
+
+
+def load_result_html_into_db():    
+    file1 = Path(ORIGINAL_CAFEDRA_JSON).with_suffix('.html')
+    file2 = Path(EXPANDED_CAFEDRA_JSON).with_suffix('.html')
+    print("Загружаем кафедры из файлов", file1, "и", file2, "в БД", storage.DbName)
+    
+    articles1: List[storage.TextCafedra] = load_cafedra_html(file1)
+    articles2: List[storage.TextCafedra] = load_cafedra_html(file2)
+    assert len(articles1) == len(articles2), "Разное количество статей"
+    
+    with open(CAFEDRA_MAP_FILE, encoding='utf8') as f:
+        header_map = json.load(f)        
+    
+    file_ep = Path(EPISKOP_JSON).with_suffix('.html')
+    print(f"Загружаем епископов из файла {file_ep}")
+    
+    articles_ep: List[storage.TextEpiskop] = load_episkop_html(file_ep)
+
+    print("Создаём БД", storage.DbName)
+    if os.path.exists(storage.DbName):
+        ans = input("БД уже существует. Удалить? ")
+        if ans.lower().strip() in ['1', 'true', 'yes', 'да']:
+            os.remove(storage.DbName)
+            print("Create new edit db")
+            storage.init_edit_db()
+        else:
+            print("Тогда ничего не делаем")
+            return 4        
+
+    stor = storage.HierarhEditStorage()
+    with stor.atomic():
+        reg_data_orig = {
+            'who': 'admin',
+            'when': datetime.fromisoformat('2019-03-03T12:00:00+00:00').timestamp(),
+            'comment': 'текст книги'
+        }
         
-        articles1: List[storage.TextCafedra] = load_html(file1)
-        articles2: List[storage.TextCafedra] = load_html(file2)
-        assert len(articles1) == len(articles2), "Разное количество статей"
-        print(f"Всего {len(articles1)} статей")
+        reg_data_exp = {
+            'who': 'admin',
+            'when': datetime.fromisoformat('2024-06-01T09:00:00+00:00').timestamp(),
+            'comment': 'автоматически раскрыты сокращения'
+        }
         
-        with open(MAP_FILE, encoding='utf8') as f:
-            header_map = json.load(f)
-
-        print("Создаём БД", storage.DbName)
-        if os.path.exists(storage.DbName):
-            ans = input("БД уже существует. Удалить? ")
-            if ans.lower().strip() in ['1', 'true', 'yes', 'да']:
-                os.remove(storage.DbName)
-                print("Create new edit db")
-                storage.init_edit_db()
-            else:
-                print("Тогда ничего не делаем")
-                return 4
-
-        stor = storage.HierarhEditStorage()
-        with stor.atomic():
-            reg_data_orig = {
-                'who': 'admin',
-                'when': datetime.fromisoformat('2019-03-03T12:00:00+00:00').timestamp(),
-                'comment': 'текст книги'
-            }
+        print(f"Загружаем кафедры - {len(articles1)} статей")
+        for i, art in enumerate(articles1):                
+            art = stor.cafedra.upsert(art, reg_data=reg_data_orig, fix_reg_data=False)
             
-            reg_data_exp = {
-                'who': 'admin',
-                'when': datetime.fromisoformat('2024-06-01T09:00:00+00:00').timestamp(),
-                'comment': 'автоматически раскрыты сокращения'
-            }
+            assert header_map[art.header()] == articles2[i].header()
             
-            for i, art in enumerate(articles1):                
-                art = stor.cafedra.upsert(art, reg_data=reg_data_orig, fix_reg_data=False)
-                
-                assert header_map[art.header()] == articles2[i].header()
-                
-                art.html = articles2[i].html
-                art = stor.cafedra.upsert(art, reg_data=reg_data_exp, fix_reg_data=False)
+            art.html = articles2[i].html
+            art = stor.cafedra.upsert(art, reg_data=reg_data_exp, fix_reg_data=False)
             
+        print(f"Загружаем епископов - {len(articles_ep)} статей")
+        for i, art in enumerate(articles_ep):
+            art = stor.episkop.upsert(art, reg_data = reg_data_orig, fix_reg_data=False)
+        
 
-        print("Готово!")
+    print("Готово!")
 
+def make_cafedra_html():
+    print('\n\n============================')
+    print('Конвертируем исходный текст книги (с сокращениями)\n')
 
-def process_json(filename):
+    html_o = process_cafedra_json(ORIGINAL_CAFEDRA_JSON)
+    if not html_o: return 2
+
+    print('\n\n============================')
+    print("Конвертируем текст с раскрытыми сокращениями\n")
+    html_e = process_cafedra_json(EXPANDED_CAFEDRA_JSON)
+    if not html_e: return 2
+    
+    print('\n\n============================')
+    print("Проверяем согласованность двух упомянутых текстов...")
+    
+    ok = cafedra_check_util.main(ORIGINAL_CAFEDRA_JSON, EXPANDED_CAFEDRA_JSON)
+    if ok: print("OK")
+    else:
+        print("Fail")
+        return 3
+    
+    print('\n\n============================')
+    print("Соотносим заголовки в двух текстах")
+    caf_origin: List[storage.TextCafedra] = load_cafedra_html(html_o)
+    caf_expand: List[storage.TextCafedra] = load_cafedra_html(html_e)
+    
+    map_data = {}
+    assert len(caf_origin) == len(caf_expand), "Разное количество статей"
+    for (co, ce) in zip(caf_origin, caf_expand):
+        head1, head2 = co.header(), ce.header()
+        ok = True
+        if not cafedra_check_util.header_like(head1, head2):
+            print(f'Разные кафедры? {head1}  <-> {head2}')
+            ok = False
+        else:
+            map_data[head1] = head2
+        if not ok:
+            return 4
+            
+    with open(CAFEDRA_MAP_FILE, 'w', encoding="utf8") as f:
+        json.dump(map_data, f, ensure_ascii=False, indent=2)
+    print("Соотнесение заголовков в файле", CAFEDRA_MAP_FILE)
+    
+
+def process_cafedra_json(filename):
     print("Конвертируем файл", filename, "во входной html")
 
     if filename.endswith(".json"):
-        filename, error = article_json_to_html_edit(filename)
+        filename, error = cafedra_json_to_html_edit(filename)
         if error:
             print(f"""\nNB!!!\tПри конвертации данных есть ошибки!!!
             Результат конвертации лежит в {filename},
@@ -160,20 +181,17 @@ def process_json(filename):
         raise ValueError("Expected json file")
 
 
-
-
-
-def article_json_to_html_edit(filename):
+def cafedra_json_to_html_edit(filename):
     result_file = Path(filename).with_suffix(".html")
     errs = []
     with open(filename) as f, open(result_file, 'w', encoding="utf8") as t:
         data = json.load(f)
         assert isinstance(data, list)
         for d in data:
-            r, err = convert_cafedra_json_to_html(d)
+            r, err = convert_cafedra_to_html(d)
             t.write(r)
             if err:
-                r, err = convert_cafedra_json_to_html(d, mode='error_report')
+                r, err = convert_cafedra_to_html(d, mode='error_report')
 
                 errs.append(r)
 
@@ -235,7 +253,7 @@ class Note:
     text: str
     touched: bool = False
 
-def convert_cafedra_json_to_html(caf: dict, mode="normal"):
+def convert_cafedra_to_html(caf: dict, mode="normal"):
     has_err = False
     notes = [Note(int(x['num']), x['text']) for x in caf['notes']]
 
@@ -271,7 +289,7 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
             if mode=="error_report":
                 return f'''<sup data-note-num="{m.group('note_num')}">{m.group('note_num')}</sup>'''
             else:
-                return f'''<details><summary><sup>[сноска]</sup></summary><div>{r.text}</div></details>'''
+                return f'''<span class="fnote"><sup>[сноска]</sup><span>{r.text}</span></span>'''
         else:
             has_err=True
 
@@ -282,7 +300,7 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
 </sup>'''
             else:
                 return f'''<sup class="{CSS_NOTE_ERROR}" style="color:red" title="сноска БЕЗ ТЕКСТА"><b>{m.group('note_num')}</b>???</sup>''' + \
-                f'''<details><div>??? нет текста сноски ???</div></details>'''
+                f'''<span class="fnote"><sup>[сноска]</sup><span>??? нет текста сноски ???</span></span>'''
 
     def convert_notes(txt):
         if not txt: return ''
@@ -361,6 +379,7 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
 
     return result, has_err
 
+
 def build_bad_notes(mode, notes):
     unused_notes = '\n'.join([f'''<li class="{CSS_NOTE_ERROR}" style="color:red">{x.num}. {x.text}</li>''' for x in notes if not x.touched])
 
@@ -392,7 +411,142 @@ def build_bad_notes(mode, notes):
     return ''
 
 
-def load_html(filename):
+def make_episkop_html():
+    print('\n\n============================')
+    print('Конвертируем данные о епископах\n')
+    
+    filename = EPISKOP_JSON    
+    print("Конвертируем файл", filename, "во входной html")
+
+    with open(filename, encoding="utf8") as f:
+        json_e = json.load(f)
+    
+    result_file = Path(filename).with_suffix(".html")
+    
+    assert isinstance(json_e, list), 'Ожидается список епископов'
+    
+    with result_file.open('w', encoding='utf8') as out:
+        for ep in json_e:
+            try:
+                ep_html = convert_episkop_to_html(ep)
+            except Exception as e:
+                print("Ошибка с епископом")
+                print(ep)
+                raise
+            else:    
+                out.write(ep_html)
+    
+    print(f"Успешно сконвертированный html в файле {result_file}")
+
+
+def convert_episkop_to_html(ep: dict):
+    b = lambda v: "true" if v else "false"
+    
+    name = ep['name'].strip()
+    # имя есть и туда не попало что-то не то
+    assert name and re.match('.*[а-яА-ЯN]', name)
+    
+    cafs = ep['appointments']
+    
+    is_link = ' см.'   in name or '(см.' in name
+    
+    assert (not is_link and len(cafs) > 0) or (is_link and len(cafs) == 0), name
+    
+    if is_link:
+            return f'''
+<article class="episkop_article" data-is-obn="{b(ep['isRenovator'])}" data-is-dubious="false" data-is-link="true">
+<div class="header">{name}</div>
+<div class="text"><br></div>
+</article>
+'''
+    
+    # Статья о епископе в скобках - условные (легендарные) личности
+    legendary = False
+    tail = cafs[-1]['dates'].strip()
+    skip = ['(Св. ?) Ефрем I', '(Св.?) Иоанн III', '(Св.?) Прохор']
+    if name.startswith('(') and name not in skip:
+        if not tail.endswith(')'):
+            raise Exception('Статья о епископе в скобках или нет?')
+        legendary = True
+        # убираем скобки
+        name = name[1:]
+        cafs[-1]['dates'] = tail[:-1]        
+    
+    html_cafs = []
+    for caf in ep['appointments']:
+        cafedra = caf['department']
+        assert cafedra
+        start, end, inaccurate = divide_dating_start_end(caf['dates'])
+        html_cafs.append(f'''<tr><td>{cafedra}</td><td>{start}</td><td>{end}</td></tr>''')
+    
+    html_cafs = '\n'.join(html_cafs)
+    
+    return f'''
+<article class="episkop_article" data-is-obn="{b(ep['isRenovator'])}" data-is-dubious="{b(legendary)}" data-is-link="false">
+<div class="header">{name}</div>
+<div class="text">
+<br>
+</div>
+<table class="cafedras">
+<thead>
+<tr><th>кафедра</th><th>начало</th><th>окончание</th></tr>
+</thead>
+<tbody>
+{html_cafs}
+</tbody>
+</table>
+</article>
+'''
+
+manual_dating_divide = {
+    '–(1441 – 1442)' : (None, '(1441–1442)'),
+    'XIII в.': ('XIII в.', None),
+    '–(1569 – 1596)': (None, '(1569–1596)'),
+    '–(в 1630–1640-е годы)': ('(в 1630–1640-е годы)', None),    
+    'XVI в.' : ('XVI в.', None),
+    '16(29)02.1924–1928–1929 (?)': ('16(29)02.1924', '1928–1929 (?)'),
+    '–(1447–1451)': (None, '(1447–1451)'),
+    '(1533–1534)–05.08.1535': ('(1533–1534)', '05.08.1535'),
+    'XII в.' : ('XII в.', None),
+    '(XII–XIII в.)–' : ('(XII–XIII в.)', None),
+    '–(1345– 1347)' : (None, '(1345– 1347)'),
+    'XI в.' : ('XI в.', None),
+    '–24.04.1339 (1327–1331)' : (None, '24.04.1339 (1327–1331)'),
+    '26.04.1135–(1147–1167)' : ('26.04.1135', '(1147–1167)'),
+    '–(1929–1930)' : (None, '(1929–1930)'),
+    '01(14)02.1928–04.1928 – 04.1929' : ('01(14)02.1928', '04.1928 – 04.1929'),
+    'XIII–XIV вв.–' : ('XIII–XIV вв.', None),
+    '–08.06.1023(1010 – 1014)' : (None, '08.06.1023(1010 – 1014)'),
+    
+    
+    
+}
+
+def divide_dating_start_end(dating):
+    def r(f, t, i):
+        return (f or '', t or '', i)
+        
+    if not dating:
+        return r(None, None, False)
+        
+    if re.match(r'^\s*\([^)]+\)\s*$', dating):
+        return r(dating, None, True)
+    
+    d = manual_dating_divide.get(dating) or dating.split('–')    
+    #assert len(d) == 2, dating
+    if not len(d) == 2:        
+        print(f"!!!!!!!!!!! Fail parse date | {dating} |")
+        
+    return r(d[0], d[1] if len(d)>1 else None, False)
+
+
+def load_cafedra_html(filename):
+    return load_html_result_file(storage.TextCafedra, 'cafedra_article', filename)
+    
+def load_episkop_html(filename):
+    return load_html_result_file(storage.TextEpiskop, 'episkop_article', filename)
+    
+def load_html_result_file(text_model_class, css_class, filename):
     #from bs4 import BeautifulSoup --- too slow!
     #res = []
     with open(filename, encoding="utf8") as f:        
@@ -403,11 +557,12 @@ def load_html(filename):
 
     articles = [x.strip() + '</article>' for x in html.split('</article>') if x.strip().startswith('<article')]
 
-    check = html.count('<article class="cafedra_article')
+    check = html.count(f'<article class="{css_class}')
     assert len(articles) == check, f"Должно быть {check} статей, а получилось {len(articles)}"
 
-    res = [storage.TextCafedra.from_html(None, x) for x in articles]
+    res = [text_model_class.from_html(None, x) for x in articles]
     return res
+
 
 if __name__ == '__main__':
     main()

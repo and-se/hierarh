@@ -70,6 +70,7 @@ class DiffService:
             return coll.get(doc_key)
         elif target_version.startswith('v'):
             version_num = int(target_version[1:])
+            print("Get version", version_num, "for key", doc_key, "in collection", coll.name)
             v = coll.versions(doc_key, skip=version_num-1, take=1, reverse=True)
             if v:
                 vv = v[0]
