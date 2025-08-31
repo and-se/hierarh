@@ -8,7 +8,7 @@ from flask_login import login_required
 from db import PeeweeHistHierarhStorage, PeeweeUserCommentsStorage, \
                StorageException
 
-from edit.storage import HierarhEditStorage
+from edit.storage import HierarhEditStorage, TextCollectionDb
 from edit.services.diff import DiffService
 
 from models import UserComment
@@ -262,7 +262,7 @@ def create_episkop():
     # print("NEW", d)
     return _do_upsert(db_edit.episkop, d['html'], d['key'], d['comment'])
 
-def _do_upsert(db_coll, html, key, comment):
+def _do_upsert(db_coll: TextCollectionDb, html, key, comment):
     try:
         reg_data = {
             'who': flask_login.current_user.title,

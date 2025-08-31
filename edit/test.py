@@ -116,6 +116,8 @@ class TestStorage(unittest.TestCase):
             
         n1 = load_caf_file('caf-1.html')
         self.cafedra.upsert(n1)
+        wh1 = n1.reg_data['when']
+        self.assertIsNotNone(wh1)
         
         n1_copy = self.cafedra.get(n1.key)
         self.assertTrue(isinstance(n1_copy, TextCafedra))
@@ -125,13 +127,22 @@ class TestStorage(unittest.TestCase):
 
         n2 = load_caf_file('caf-1-div.html')
         n2.reg_data['who'] = 'editor'
-        n2.key = n1.key
+        n2.key = n1.key        
         self.cafedra.upsert(n2)
 
         v = self.cafedra.versions(n1.key)
 
         self.assertEqual(len(v), 1)
         checkCafVerEqual(n1, v[0])
+
+        # получение версии по дате
+        v_wh = self.cafedra.version(n1.key, wh1)
+        checkCafVerEqual(n1, v_wh)
+        # проверяем баг, что если дата строка (а не число) - не находится
+        self.assertIsInstance(wh1, float)
+        v_wh = self.cafedra.version(n1.key, str(wh1))
+        self.assertIsNotNone(v_wh, 'По строковой дате версия не нашлась!')
+        checkCafVerEqual(n1, v_wh)
         
         self.assertEqual([], self.cafedra.versions(n1.key, skip=1))
 
@@ -139,17 +150,25 @@ class TestStorage(unittest.TestCase):
         n3.html += 'UPDATED3'
         n3.reg_data['who'] = 'admin'
         n3.reg_data['comment'] = 'restore db'
+        
         self.cafedra.upsert(n3, fix_reg_data=False)
-
         v = self.cafedra.versions(n1.key)
         self.assertEqual(len(v), 2)
         checkCafVerEqual(n2, v[-1])
+        # FIXME Здесь плохой момент - reg_data.when у двух версий совпадает,
+        # т.к. последняя версия документа создана при помощи upsert(fix_reg_data=False).
+        # Сейчас cafedra.version в таком случае возвращает последнюю версию
+        checkCafVerEqual(n2, self.cafedra.version(n2.key, n2.reg_data['when']))
 
-        old_when = n1.reg_data['when']
+        old_when = n1.reg_data['when']        
         self.cafedra.upsert(n1)
         v = self.cafedra.versions(n3.key)
         self.assertEqual(len(v), 3)
         checkCafVerEqual(n3, v[-1])
+        
+        vv = self.cafedra.version(n3.key, n3.reg_data['when'])
+        
+        checkCafVerEqual(n3, self.cafedra.version(n3.key, n3.reg_data['when']))
 
         self.assertGreater(n1.reg_data['when'], old_when)
         
@@ -187,6 +206,7 @@ class TestStorage(unittest.TestCase):
         self.assertIsInstance(n2, TextEpiskop)
         self.assertTrue(n2.key is not None)
         self.assertTrue(id(n2) == id(n))
+        when = n2.reg_data['when']
 
         n3 = self.episkop.get(n2.key)
         self.checkTextEqual(n2, n3)
@@ -216,6 +236,9 @@ class TestStorage(unittest.TestCase):
         
         self.checkTextVerEqual('episkop', n3, vs[0])
         self.assertIsInstance(n3, TextEpiskop)
+        
+        ver = self.episkop.version(n2.key, when)
+        self.checkTextVerEqual('episkop', n3, ver)
         
         vs2 = self.episkop.versions(n222.key)
         self.assertEqual(len(vs2), 0)

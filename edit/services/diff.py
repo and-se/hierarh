@@ -68,15 +68,11 @@ class DiffService:
     def get_doc_data(self, coll: TextCollectionDb, doc_key, target_version) -> TextCafedra:
         if target_version=='cur':
             return coll.get(doc_key)
-        elif target_version.startswith('v'):
-            version_num = int(target_version[1:])
-            print("Get version", version_num, "for key", doc_key, "in collection", coll.name)
-            v = coll.versions(doc_key, skip=version_num-1, take=1, reverse=True)
-            if v:
-                vv = v[0]
-                res = TextCafedra.from_html(doc_key, vv.html)
-                res.reg_data = vv.reg_data
-                return res
-                
-        else:
-            raise ValueError(f"Can't get doc_data for doc_key={doc_key} target={target_version}")
+    
+        print("Get version", target_version, "for key", doc_key, "in collection", coll.name)
+        v = coll.version(doc_key, target_version)
+        if v:            
+            res = TextCafedra.from_html(doc_key, v.html)
+            res.reg_data = v.reg_data
+            return res
+        

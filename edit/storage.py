@@ -2,7 +2,7 @@ import re
 import json
 from db import get_db, orm_all_words_search_condition
 import settings
-from peewee import Model, AutoField, TextField, BooleanField, IntegerField
+from peewee import Model, AutoField, TextField, BooleanField, IntegerField, fn, Cast
 
 DbName = settings.EditDbName
 EditDb = None  # БД редактирования, инициализируется ниже
@@ -90,6 +90,19 @@ class TextCollectionDb:
                       .order_by(so(VersionOrm.num), so(VersionOrm.id)) \
                       .limit(take).offset(skip)
         return [x.to_text_version() for x in q]
+    
+    def version(self, key, when):
+        """
+        получить версию документа по дате (reg_data.when)
+        Если на эту отметку времени несколько версий - берётся самая последняя
+        """
+        r = self._version_query(key) \
+            .where(fn.json_extract(VersionOrm.doc_reg_data, '$.when') == float(when)) \
+            .order_by(VersionOrm.id.desc()) \
+            .get_or_none()
+   
+        
+        if r: return r.to_text_version()
 
     def version_count(self, key):
         return self._version_query(key).count()
@@ -99,12 +112,14 @@ class TextCollectionDb:
 class TextBase:
     def __init__(self):
         self.key = None
-        self.html = ""
+        self.html = ""  # данные документа
         self.reg_data = {}    
 
     def header(self):
+        # предполагается, что все данные лежат в self.html,
+        # а этот метод достаёт оттуда нужный кусок
         raise NotImplementedError('implement header method')
-
+    
     def __repr__(self):
         return f"Text~model({self.key}, {self.header()})"
 
@@ -250,7 +265,3 @@ def init_edit_db():
     return EditDb
 
 init_edit_db()
-
-
-if __name__ == '__main__':
-    test()
