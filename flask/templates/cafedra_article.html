@@ -35,19 +35,19 @@
                 {{')'}}
         {% endif %}
     </td>
+</tr>	
+		{% for note in ep.notes%}
+		<tr id="note_{{note.num}}" style="display: none;">
+			<td colspan="3">
+				<div class="table-note">
+					{{note.text}}
+					<br>
+					<a href="#" style="cursor: pointer;">скрыть</a>
+				</div>
+			</td>
+		</tr>
+		{% endfor %}
     {% endif %}
-</tr>
-    {% for note in ep.notes%}
-    <tr id="note_{{note.num}}" style="display: none;">
-        <td colspan="3">
-            <div class="table-note">
-                {{note.text}}
-                <br>
-                <a href="#" style="cursor: pointer;">скрыть</a>
-            </div>
-        </td>
-    </tr>
-    {% endfor %}
 
 {% endfor %}
 </table>
