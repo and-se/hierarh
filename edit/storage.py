@@ -17,7 +17,7 @@ class HierarhEditStorage:
 
 
 class TextCollectionDb:
-    def __init__(self, name, orm_model):
+    def __init__(self, name, orm_model: '_BaseEditOrm'):
         self.name = name
         self.orm = orm_model        
         self.text_model = self.orm._meta.target_text_model
@@ -71,11 +71,19 @@ class TextCollectionDb:
         return self.orm.select() \
                     .where(orm_all_words_search_condition(query, self.orm.header)) \
 
-    def portion(self, skip=0, take=20, query=None):
+    def portion(self, skip=0, take=20, query=None) -> list['TextBase']:
         q = self._portion_query(query) \
                     .order_by(self.orm.header) \
                     .limit(take).offset(skip)
         return [self._convert_orm_to_text(x) for x in q]
+    
+    def iterate(self, query=None):
+        i = 0
+        step = 20        
+        while(p:=self.portion(i, step, query)):
+            for caf in p:
+                yield caf
+            i += 20
 
     def count(self, query=None):
         return self._portion_query(query).count()
@@ -106,6 +114,11 @@ class TextCollectionDb:
 
     def version_count(self, key):
         return self._version_query(key).count()
+    
+    def find_by_name(self, name: str):
+        d = self.orm.select(self.orm.id, self.orm.header) \
+            .where(fn.LOWER_PY(self.orm.header) == name.lower()).limit(10).namedtuples()
+        return list(d)
 
 
 
@@ -113,7 +126,7 @@ class TextBase:
     def __init__(self):
         self.key = None
         self.html = ""  # данные документа
-        self.reg_data = {}    
+        self.reg_data = {}
 
     def header(self):
         # предполагается, что все данные лежат в self.html,
