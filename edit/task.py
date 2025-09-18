@@ -2,6 +2,8 @@ from peewee import AutoField, IntegerField, Model, TextField, BooleanField
 
 import logging
 tlog = logging.Logger('tasks')
+import os
+os.unlink('tasks.txt')
 tlog.addHandler(logging.FileHandler('tasks.txt'))
 
 class TaskCollection:

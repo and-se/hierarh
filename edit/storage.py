@@ -1,6 +1,7 @@
 import re
 import json
 from db import get_db, orm_all_words_search_condition
+from edit.task import TaskCollection, TaskOrm
 import settings
 from peewee import Model, AutoField, TextField, BooleanField, IntegerField, fn, Cast
 
@@ -11,6 +12,7 @@ class HierarhEditStorage:
     def __init__(self):
         self.cafedra = TextCollectionDb('cafedra', CafedraEditOrm)
         self.episkop = TextCollectionDb('episkop', EpiskopEditOrm)
+        self.task = TaskCollection()
 
     def atomic(self):
         return EditDb.atomic()
