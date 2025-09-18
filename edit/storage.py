@@ -271,12 +271,11 @@ class VersionOrm(Model):
 
 VersionOrm.add_index(VersionOrm.collection, VersionOrm.doc_key)
 
-
 def init_edit_db():
     global EditDb
     EditDb = get_db(settings.EditDbName)
-    EditDb.bind([CafedraEditOrm, EpiskopEditOrm, VersionOrm])
-    EditDb.create_tables([CafedraEditOrm, EpiskopEditOrm, VersionOrm])
+    EditDb.bind([CafedraEditOrm, EpiskopEditOrm, VersionOrm, TaskOrm])
+    EditDb.create_tables([CafedraEditOrm, EpiskopEditOrm, VersionOrm, TaskOrm])
     return EditDb
 
 init_edit_db()

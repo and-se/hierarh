@@ -10,6 +10,7 @@ import re
 
 def check_episkop_to_cafedra_links():
     db = HierarhEditStorage()
+    db.task.reset()
     
 
     Cafedra_name_map = {
@@ -21,8 +22,12 @@ def check_episkop_to_cafedra_links():
         'ЗВЕНИГОРОДСКАЯ, обновленческая' : 'ЗВЕНИГОРОДСКАЯ (Московская), обновленческая',
     }
     
-    for ep in db.episkop.iterate():  #.portion(0, 20):        
-        task = db.task.get_opened(db.episkop.name, ep.key, ep.reg_data['when'])
+    for cnt, ep in enumerate(db.episkop.iterate()):
+        if cnt and cnt % 100 == 0:
+            logging.warning("Processed %s items", cnt)   
+        task = db.task.get(db.episkop.name, ep.key, ep.reg_data['when'])
+        task.type_ = "episkop->cafedra"
+
         ep = EpiskopView(ep)
 
         for i, caf in enumerate(ep.cafedras):
