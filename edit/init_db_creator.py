@@ -59,6 +59,10 @@ def main():
 
     elif sys.argv[1] == 'db':
         load_result_html_into_db()
+    
+    else:
+        print('Непонятно. Для получения справки запустите без параметров')
+        return 1
 
 
 def load_result_html_into_db():    
