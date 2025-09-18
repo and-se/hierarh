@@ -474,14 +474,42 @@ def convert_episkop_to_html(ep: dict):
         legendary = True
         # убираем скобки
         name = name[1:]
-        cafs[-1]['dates'] = tail[:-1]        
-    
+        cafs[-1]['dates'] = tail[:-1]  
+
     html_cafs = []
     for caf in ep['appointments']:
         cafedra = caf['department']
         assert cafedra
-        start, end, inaccurate = divide_dating_start_end(caf['dates'])
-        html_cafs.append(f'''<tr><td>{cafedra}</td><td>{start}</td><td>{end}</td></tr>''')
+        dating:str = caf['dates']
+        
+        inaccurate = False
+
+        '''
+        Св. Петр Волынянин
+        ВСЕРОССИЙСКАЯ 1308–21.12.1326
+        (ВО ВЛАДИМИРЕ 1308(1309)–1321
+        В МОСКВЕ 1321–21.12.1326)
+        '''
+        if cafedra == '(ВО ВЛАДИМИРЕ':
+            cafedra, inaccurate = 'ВО ВЛАДИМИРЕ', True
+        elif cafedra == 'В МОСКВЕ' and dating == '1321–21.12.1326)':
+            cafedra, inaccurate = 'В МОСКВЕ', True
+            dating = dating[:-1]
+        elif cafedra.startswith('('):
+            if dating.endswith(')') and dating.count('(') + 1 == dating.count(')'):
+                cafedra = cafedra[1:].strip()
+                dating = dating[:-1].strip()
+                inaccurate = True
+            elif cafedra.startswith('(в/у'):
+                pass
+            else:
+                raise Exception('Bad inaccurate brackets: ' + str(caf))
+
+        start, end, _ = divide_dating_start_end(dating)
+        if inaccurate:
+            html_cafs.append(f'''<tr class="inaccurate"><td>{cafedra}</td><td>{start}</td><td>{end}</td></tr>''')
+        else:
+            html_cafs.append(f'''<tr><td>{cafedra}</td><td>{start}</td><td>{end}</td></tr>''')
     
     html_cafs = '\n'.join(html_cafs)
     
