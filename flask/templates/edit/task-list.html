@@ -1,0 +1,15 @@
+{% extends "edit/base-edit.html" %}
+{% block content %}
+<main>
+    <section>
+        <div>Всего {{task_count}} задач</div>
+
+        <ul class="items">
+            {% for task in items %}
+            <li><a href="/edit/task/{{task.id}}" >{{task.title}}</a></li>
+            {% endfor %}
+        </ul>
+        <a href="/edit/task?skip={{skip}}">Ещё</a>
+    </section>
+</main>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "edit/base-edit.html" %}
+{% block content %}
+<main>
+    <style>
+        h1 {
+            font-size: 18pt;
+        }
+    </style>    
+    <div style="display:none">
+        <p id="question-init-data">
+            {{task.raw_question()}}
+        </p>
+        <p id="answer-init-data">
+            {{task.raw_answer()}}
+        </p>
+    </div>
+    <section>
+        <h1 class="title"></h1>
+        <table class="problems">
+            <thead>
+                <tr><td>где</td><td>проблема</td><td>решение</td></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </section>
+
+    {% if next_task %}
+        <a href="/edit/task/{{next_task}}">следующая задача</a>
+    {% endif %}
+    
+    <script>
+        'use strict'
+        let Q = document.getElementById('question-init-data')
+        Q = JSON.parse(Q.innerText.trim()) || {}
+
+        document.querySelector('.title').innerText = Q.title || ''
+
+        let tb = document.querySelector('.problems tbody')
+
+        for (const pr of Q.problems) {
+            let row = createElementByHtml(`
+            <tr data-where="${pr.where}">
+                <td>${pr.item}</td>
+                <td>${pr.msg}</td>
+                <td><input-select>введите что-то</input-select></td></tr>
+            `)
+
+            tb.append(row)
+        }
+        
+
+        function createElementByHtml(html) {
+            let t = document.createElement('template');
+            t.innerHTML = html;
+            return t.content.firstElementChild;
+        }
+    </script>
+
+    <script src="/static/edit/input-select.js"></script>
+
+</main>
+{% endblock %}

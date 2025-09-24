@@ -25,7 +25,8 @@ def check_episkop_to_cafedra_links():
     for cnt, ep in enumerate(db.episkop.iterate()):
         if cnt and cnt % 100 == 0:
             logging.warning("Processed %s items", cnt)   
-        task = db.task.get(db.episkop.name, ep.key, ep.reg_data['when'])
+        task = db.task.get(coll_name=db.episkop.name, doc_key=ep.key, reg_data_when=ep.reg_data['when'])
+        task.title = ep.header() + " - непонятные ссылки на кафедры"        
         task.type_ = "episkop->cafedra"
 
         ep = EpiskopView(ep)
@@ -34,11 +35,11 @@ def check_episkop_to_cafedra_links():
             if caf.link:
                 linked = db.cafedra.get(caf.link)
                 if not linked:
-                    task.add(i, caf.name, 'сломанная ссылка - нет такой кафедры', caf.link)
+                    task.add_problem(i, caf.name, 'сломанная ссылка - нет такой кафедры', caf.link)
                 else:
                     linked = CafedraView(linked)
                     if not linked.has_name(caf.name):
-                        task.add(i, caf.name, 'Проставлена сылка на кафедру', linked.name, 'Это верно?')
+                        task.add_problem(i, caf.name, 'Проставлена сылка на кафедру', linked.name, 'Это верно?')
             else:
                 #if caf in db.cafedra.ignored_names:                
                     # не нужно проставлять ссылки на ?, NN
@@ -52,9 +53,9 @@ def check_episkop_to_cafedra_links():
                 if len(found_cafs) == 1:
                     ... # проставить ссылку на кафедру
                 elif not len(found_cafs):
-                    task.add(i, caf.name, "кафедра не найдена")
+                    task.add_problem(i, caf.name, "кафедра не найдена")
                 else: # many cafedra
-                    task.add(i, caf.name, "какая именно кафедра?", found_cafs)            
+                    task.add_problem(i, caf.name, "какая именно кафедра?", found_cafs)            
         
         if task.changed:
             task.save()

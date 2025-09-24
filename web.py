@@ -25,7 +25,7 @@ from pathlib import Path
 app = Flask(__name__, static_folder='flask/static',
             template_folder='flask/templates')
 
-app.json.ensure_ascii = False
+app.json.ensure_ascii = False # type: ignore
 
 from jinja2 import StrictUndefined
 # шаблоны должны падать при обращении к неизвестной переменной
@@ -372,6 +372,29 @@ def episkop_diff(key, new, old):
     
     return render_template('edit/doc_diff.html', diff=diff, header=header, new_reg_data=new_reg_data, old_reg_data=old_reg_data,
                             time_convert=build_editor_info, item_type='episkop')
+
+@ed.get('/task')
+@login_required
+def list_tasks():
+    try:        
+        skip = int(request.args.get('skip', 0))
+    except ValueError:
+        skip = 0
+    take = 20
+    d = db_edit.task.portion(skip=skip, take=take)
+    cnt = db_edit.task.count()
+    return render_template('edit/task-list.html', items=d, task_count=cnt, skip=skip+take)
+    
+
+@ed.get('/task/<int:id>')
+def get_task(id):
+    t = db_edit.task.get_by_id(id)
+    if not t:
+        abort(404, 'Задача не найдена')
+    
+    next_task = db_edit.task.get_next_task_id(t.id)
+
+    return render_template('edit/task.html', task=t, next_task=next_task)
 
 
 app.register_blueprint(ed, url_prefix='/edit')

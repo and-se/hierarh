@@ -3,9 +3,9 @@ from peewee import AutoField, IntegerField, Model, TextField, DoubleField
 
 import logging
 tlog = logging.Logger('tasks')
-import os
-os.unlink('tasks.txt')
-tlog.addHandler(logging.FileHandler('tasks.txt'))
+import os  # noqa: E402
+#os.unlink('tasks.txt')
+#tlog.addHandler(logging.FileHandler('tasks.txt'))
 
 class TaskCollection:
     def __init__(self):
@@ -17,21 +17,50 @@ class TaskCollection:
             orm = TaskOrm(collection=coll_name, doc_key=doc_key, reg_data_when=reg_data_when)
         return Task(orm)
     
+    def get_by_id(self, id):
+        orm = TaskOrm.get_or_none(id)
+        if orm:
+            return Task(orm)
+    
+    def portion(self, skip, take):
+        dbdata = TaskOrm.select().limit(take).offset(skip)
+        return [Task(x) for x in dbdata]
+    
+    def count(self):
+        return TaskOrm.select().count()
+    
+    def get_next_task_id(self, cur_id):
+        r = TaskOrm.select(TaskOrm.id).where(TaskOrm.id > cur_id).get_or_none()
+        if r:
+            return r.id
+    
     def remove_all(self):
         TaskOrm.delete().execute()
     
     def reset(self):
         TaskOrm.drop_table()
         TaskOrm.create_table()
-    
+
+
 class Task:
     def __init__(self, orm):        
         self.orm:TaskOrm = orm
-        self.l = []
-        if self.orm.data:
-            self.l = json.loads(self.orm.data)
-            
+        self._problems = []        
+        self.title = None
+        if self.orm.question:
+            dd = json.loads(self.orm.question)
+            self.title = dd['title']
+            self._problems = dd['problems']
+
         self.changed = False
+
+    @property
+    def id(self):
+        return self.orm.id
+    
+    @property
+    def target(self):
+        return [self.orm.collection, self.orm.doc_key, self.orm.reg_data_when]
 
     @property
     def type_(self):
@@ -49,27 +78,45 @@ class Task:
     def status(self, value):
         self.orm.status = value
 
-    @property
-    def target(self):
-        return [self.orm.collection, self.orm.doc_key, self.orm.reg_data_when]
-    
-    def add(self, num, item, *msg):        
-        self.l.append({
-            'num': num,
+    def add_problem(self, where, item, *msg):        
+        self._problems.append({
+            'where': where,
             'item': item,
             'msg': ' '.join([str(x) for x in msg])
         })
         self.changed = True
 
+    def raw_question(self):
+        dd = {
+            'title' : self.title or f"{self.orm.collection}/{self.orm.doc_key}",
+            'problems': self._problems
+        }            
+            
+        return self.something_to_json(dd) # type: ignore
+    
+    def raw_answer(self):
+        return self.orm.answer
+
+    def set_raw_answer(self, value):
+        if not isinstance(value, (dict, list)):
+            raise ValueError('answer must be json seriazible dict or list')
+        self.orm.answer = self.something_to_json(value)
+        self.changed = True
+
     def save(self):
-        if self.changed:
-            self.orm.data = json.dumps(self.l, ensure_ascii=False, indent=4)            
+        if self.changed:            
+            self.orm.question = self.raw_question()
+            #self.orm.answer =          
             self.orm.save()
             tlog.info(str(self))
 
+    def something_to_json(self, dd):
+        if dd is None: return None
+        return json.dumps(dd, ensure_ascii=False, indent=4)
+
     def __str__(self):
         from pprint import pformat
-        return f"Task({self.target}: {pformat(self.l, sort_dicts=False)})"
+        return f"Task({self.target}: {pformat(self._problems, sort_dicts=False)})"
     
     def __repr__(self):
         return str(self)
@@ -86,5 +133,6 @@ class TaskOrm(Model):
 
     type = TextField()
     status = TextField(default='new')
-    data = TextField()  # json
+    question = TextField()  # json
+    answer = TextField(null=True)
     
