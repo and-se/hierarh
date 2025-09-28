@@ -16,7 +16,7 @@
     </div>
     <section>
         <h1 class="title"></h1>
-        <table class="problems">
+        <table class="problems hhtable">
             <thead>
                 <tr><td>где</td><td>проблема</td><td>решение</td></tr>
             </thead>
@@ -42,7 +42,7 @@
             <tr data-where="${pr.where}">
                 <td>${pr.item}</td>
                 <td>${pr.msg}</td>
-                <td><input-select>введите что-то</input-select></td></tr>
+                <td><input-select suggest="suggestCafedra">введите что-то</input-select></td></tr>
             `)
 
             tb.append(row)
@@ -53,6 +53,17 @@
             let t = document.createElement('template');
             t.innerHTML = html;
             return t.content.firstElementChild;
+        }
+
+        function suggestCafedra(v, cancel) {
+            return fetch("/edit/suggest/cafedra?" + new URLSearchParams({ query: v }),
+                { signal: cancel, credentials: 'include' })
+                .then(resp => resp.json())
+
+            /*return new Promise((resolve) => {
+                console.log("suggest for", v)
+                resolve(["value1", "value2", v])
+            })*/
         }
     </script>
 

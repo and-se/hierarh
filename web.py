@@ -396,6 +396,11 @@ def get_task(id):
 
     return render_template('edit/task.html', task=t, next_task=next_task)
 
+@ed.get('/suggest/cafedra')
+def suggest_cafedra():
+    q = request.args.get("query", '')
+    return db_edit.cafedra.suggest(q)
+
 
 app.register_blueprint(ed, url_prefix='/edit')
 

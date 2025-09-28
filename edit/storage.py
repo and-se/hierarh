@@ -121,6 +121,13 @@ class TextCollectionDb:
         d = self.orm.select(self.orm.id, self.orm.header) \
             .where(fn.LOWER_PY(self.orm.header) == name.lower()).limit(10).namedtuples()
         return list(d)
+    
+    def suggest(self, query):
+        r = self.orm.select(self.orm.header) \
+            .where(orm_all_words_search_condition(query, self.orm.header)).limit(5).tuples()
+        
+        return [x[0] for x in r]
+        
 
 
 

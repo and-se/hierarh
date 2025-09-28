@@ -194,19 +194,19 @@ h2.main-header-row {
 
 
 
-table.episkops, table.cafedras {
+table.episkops, table.cafedras, .hhtable tr {
     border: 1px solid black;
     width: 100%;
     table-layout: fixed;
     word-wrap: break-word;
 }
 
-.episkops tr, .cafedras tr {
+.episkops tr, .cafedras tr, .hhtable tr {
     background-color: inherit;
 }
 
 @media (max-width: 550px) {
-    table.episkops, table.cafedras {
+    table.episkops, table.cafedras, .hhtable tr {
         font-size: 1rem;
     }
 }
