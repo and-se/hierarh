@@ -64,7 +64,7 @@ class TextCollectionDb:
 
         return doc
         
-    def get(self, key):        
+    def get(self, key) -> 'TextBase':        
         r = self.orm.get_or_none(key)
         if r:
             return self._convert_orm_to_text(r)
@@ -123,10 +123,10 @@ class TextCollectionDb:
         return list(d)
     
     def suggest(self, query):
-        r = self.orm.select(self.orm.header) \
-            .where(orm_all_words_search_condition(query, self.orm.header)).limit(5).tuples()
+        r = self.orm.select(self.orm.id, self.orm.header) \
+            .where(orm_all_words_search_condition(query, self.orm.header)).limit(5)
         
-        return [x[0] for x in r]
+        return [{'value': x.header, 'key': x.id} for x in r]
         
 
 

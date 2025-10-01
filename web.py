@@ -8,6 +8,7 @@ from flask_login import login_required
 from db import PeeweeHistHierarhStorage, PeeweeUserCommentsStorage, \
                StorageException
 
+from edit.services.snippet import SnippetService
 from edit.storage import HierarhEditStorage, TextCollectionDb
 from edit.services.diff import DiffService
 
@@ -214,6 +215,8 @@ ed = Blueprint('hierarh_edit', __name__)
 db_edit = HierarhEditStorage()
 diff_service = DiffService(db_edit)
 
+snippet_service = SnippetService(db_edit)
+
 @ed.get('/')
 @login_required
 def edit_root():
@@ -387,6 +390,7 @@ def list_tasks():
     
 
 @ed.get('/task/<int:id>')
+@login_required
 def get_task(id):
     t = db_edit.task.get_by_id(id)
     if not t:
@@ -397,9 +401,26 @@ def get_task(id):
     return render_template('edit/task.html', task=t, next_task=next_task)
 
 @ed.get('/suggest/cafedra')
+@login_required
 def suggest_cafedra():
     q = request.args.get("query", '')
     return db_edit.cafedra.suggest(q)
+
+@ed.get('/cafedra/<int:key>/snippet')
+@login_required
+def snippet_cafedra(key):
+    snippet = snippet_service.get_cafedra_snippet(key, max_length=350)
+    if not snippet:
+        return {
+            "success": False,
+            "message": f"no such cafedra {key}"
+        }, 404
+    
+    return {
+        "success": True,
+        "key": key,
+        "snippet": snippet 
+    }
 
 
 app.register_blueprint(ed, url_prefix='/edit')

@@ -3,7 +3,32 @@
 <main>
     <style>
         h1 {
-            font-size: 18pt;
+            font-size: 1.5rem;
+        }
+
+        body {
+            grid-template-columns: 1fr min(900px, 90%) 1fr;
+        }
+
+        table.problems {
+            font-size: 12pt;
+            width: 100%;
+
+            thead th {
+                text-align: center;               
+            }
+
+            tbody td:first-child {
+                width: 30%;
+            }
+
+            input-select {
+                width: 90%;
+            }
+        }
+
+        .next-task{
+            text-align:right;
         }
     </style>    
     <div style="display:none">
@@ -14,18 +39,21 @@
             {{task.raw_answer()}}
         </p>
     </div>
-    <section>
-        <h1 class="title"></h1>
-        <table class="problems hhtable">
-            <thead>
-                <tr><td>где</td><td>проблема</td><td>решение</td></tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-    </section>
+
+    <h1 class="title"></h1>
+    <table class="problems hhtable">
+        <thead>
+            <tr><th>проблема</th><th>решение</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
 
     {% if next_task %}
-        <a href="/edit/task/{{next_task}}">следующая задача</a>
+        <div class="next-task">
+            <hr>
+            <a href="/edit/task/{{next_task}}">следующая задача</a>
+        </div>
     {% endif %}
     
     <script>
@@ -40,9 +68,11 @@
         for (const pr of Q.problems) {
             let row = createElementByHtml(`
             <tr data-where="${pr.where}">
-                <td>${pr.item}</td>
-                <td>${pr.msg}</td>
-                <td><input-select suggest="suggestCafedra">введите что-то</input-select></td></tr>
+                <td>${pr.item} - ${pr.msg}</td>
+                <td><input-select suggest="suggestCafedra">введите что-то</input-select>
+                    <a class="info" target="_blank">info</a>
+                </td>
+            </tr>
             `)
 
             tb.append(row)
@@ -58,7 +88,13 @@
         function suggestCafedra(v, cancel) {
             return fetch("/edit/suggest/cafedra?" + new URLSearchParams({ query: v }),
                 { signal: cancel, credentials: 'include' })
-                .then(resp => resp.json())
+                .then(resp => resp.json()).then(js => {
+                    let r = js.concat([
+                        {value: 'ссылка не нужна (' + v + ')', nolink:"true"}
+                    ])
+                    
+                    return r;
+                })
 
             /*return new Promise((resolve) => {
                 console.log("suggest for", v)
@@ -68,6 +104,32 @@
     </script>
 
     <script src="/static/edit/input-select.js"></script>
+    <script>
+        document.addEventListener('suggestSelected', (ev) => {
+            let atag = ev.target.parentElement.querySelector('a.info')
+            if (atag) {                
+                if (ev.detail.key) {
+                    atag.setAttribute('href', "/edit/cafedra/" + ev.detail.key)
+                    fetch(`/edit/cafedra/${ev.detail.key}/snippet`, {credentials: 'include' })
+                    .then(r => r.json())
+                    .then(js => {
+                        atag.setAttribute('title', js.snippet || '')
+                    })
+                } else {
+                    atag.removeAttribute('href')
+                    atag.removeAttribute('title')
+                }
+            }
+        })
+
+        document.addEventListener('suggestOutdated', ev => {
+            let atag = ev.target.parentElement.querySelector('a.info')
+            if (atag) {
+                atag.removeAttribute('href')
+                atag.removeAttribute('title')
+            }
+        })
+    </script>
 
 </main>
 {% endblock %}
