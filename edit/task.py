@@ -61,6 +61,10 @@ class Task:
     @property
     def target(self):
         return [self.orm.collection, self.orm.doc_key, self.orm.reg_data_when]
+    
+    @property
+    def doc_key(self):
+        return self.orm.doc_key
 
     @property
     def type_(self):
@@ -81,7 +85,7 @@ class Task:
     def add_problem(self, where, item, *msg):        
         self._problems.append({
             'where': where,
-            'item': item,
+            'item': str(item),
             'msg': ' '.join([str(x) for x in msg])
         })
         self.changed = True

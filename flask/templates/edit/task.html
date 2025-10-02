@@ -30,17 +30,29 @@
         .next-task{
             text-align:right;
         }
+
+        input-select {
+            padding:0.5rem;
+        }
+
+        input-select[data-key], input-select[data-nolink] {
+            border-left: 8px solid green;
+            transition: linear 0.1s;
+        }
     </style>    
     <div style="display:none">
         <p id="question-init-data">
             {{task.raw_question()}}
         </p>
         <p id="answer-init-data">
-            {{task.raw_answer()}}
+            {{task.raw_answer() or ''}}
         </p>
     </div>
 
-    <h1 class="title"></h1>
+    <h1>
+        <a href="/edit/episkop/{{task.doc_key}}" target="_blank" class="title"></a>
+    </h1>
+    
     <table class="problems hhtable">
         <thead>
             <tr><th>проблема</th><th>решение</th></tr>
@@ -48,6 +60,10 @@
         <tbody></tbody>
     </table>
 
+    <label>Комментарий
+    <textarea class="comment"></textarea>
+    </label>
+    
 
     {% if next_task %}
         <div class="next-task">
@@ -59,33 +75,52 @@
     <script>
         'use strict'
         let Q = document.getElementById('question-init-data')
-        Q = JSON.parse(Q.innerText.trim()) || {}
+        let A = document.getElementById('answer-init-data')
+        Q = JSON.parse(Q.innerText.trim() || 'null') || {}
+        A = JSON.parse(A.innerText.trim() || 'null') || {}
 
         document.querySelector('.title').innerText = Q.title || ''
 
-        let tb = document.querySelector('.problems tbody')
+        let $problemsTable = document.querySelector('.problems tbody')
+        let $commentArea = document.querySelector('.comment')
 
         for (const pr of Q.problems) {
-            let row = createElementByHtml(`
+            let es = LIB.escapeForHtml
+            let row = LIB.createElementByHtml(`
             <tr data-where="${pr.where}">
-                <td>${pr.item} - ${pr.msg}</td>
-                <td><input-select suggest="suggestCafedra">введите что-то</input-select>
-                    <a class="info" target="_blank">info</a>
+                <td>${es(pr.item)} - ${es(pr.msg)}</td>
+                <td><input-select suggest="suggestCafedra" class="answer">введите что-то</input-select>
+                    <a class="info" target="_blank">==></a>
                 </td>
             </tr>
             `)
 
-            tb.append(row)
+            $problemsTable.append(row)
         }
-        
+    </script>
+    <script src="/static/edit/input-select.js"></script>
+    <script>
+        // После прогрузки всех input-select правим их состояние
+        document.addEventListener('DOMContentLoaded', () => {
+            for (const ans of A.answers) {
+                let t = $problemsTable.querySelector(`[data-where='${ans.where}'] .answer`)
 
-        function createElementByHtml(html) {
-            let t = document.createElement('template');
-            t.innerHTML = html;
-            return t.content.firstElementChild;
-        }
+                t.value = ans.value
+                if(ans.key) {
+                    t.dataset.key = ans.key
+                    setInfoTag(t.parentElement.querySelector('a.info'), ans.key)
+                }
+                if(ans.nolink) t.dataset.nolink = ans.nolink
+            }
+            if (A.comment) $commentArea.value = A.comment
+        })
+
+        document.addEventListener('change', saveTaskAnswer)
+        window.addEventListener('beforeunload', saveTaskAnswer)
 
         function suggestCafedra(v, cancel) {
+            if (!v.trim()) return [{value: 'ссылка не нужна', nolink:"true"}]
+
             return fetch("/edit/suggest/cafedra?" + new URLSearchParams({ query: v }),
                 { signal: cancel, credentials: 'include' })
                 .then(resp => resp.json()).then(js => {
@@ -101,26 +136,73 @@
                 resolve(["value1", "value2", v])
             })*/
         }
+
+        let oldTaskAnswer = null
+        function saveTaskAnswer() {
+            let r = buildTaskAnswer()
+            let json = JSON.stringify(r)
+            if (json === oldTaskAnswer) return;
+            oldTaskAnswer = json
+            console.log(r)
+            fetch('/edit/task/{{task.id}}/answer', {
+                credentials: "include",
+                method: "POST",
+                headers: {  
+                   'Content-Type': 'application/json'  
+                },
+                body: json
+            }).then(r => r.json()).then(js => {
+
+            })
+        }
+        
+        function buildTaskAnswer() {
+            let arr = []
+            for (let ans of $problemsTable.querySelectorAll('tr .answer')) {
+                let where = ans.closest('tr[data-where]').dataset.where
+                let it = {where, value: ans.value}
+                if (ans.dataset.key) {
+                    it.key = ans.dataset.key
+                } else if (ans.dataset.nolink) {
+                    it.nolink = true
+                }
+
+                arr.push(it)
+            }
+
+            let res = {
+                'answers': arr
+            }
+
+            if ($commentArea.value.trim()) {
+                res.comment = $commentArea.value.trim()
+            }
+
+            return res
+        }
     </script>
 
-    <script src="/static/edit/input-select.js"></script>
     <script>
         document.addEventListener('suggestSelected', (ev) => {
             let atag = ev.target.parentElement.querySelector('a.info')
             if (atag) {                
                 if (ev.detail.key) {
-                    atag.setAttribute('href', "/edit/cafedra/" + ev.detail.key)
-                    fetch(`/edit/cafedra/${ev.detail.key}/snippet`, {credentials: 'include' })
-                    .then(r => r.json())
-                    .then(js => {
-                        atag.setAttribute('title', js.snippet || '')
-                    })
+                    setInfoTag(atag, ev.detail.key)                    
                 } else {
                     atag.removeAttribute('href')
                     atag.removeAttribute('title')
                 }
             }
         })
+
+        function setInfoTag(atag, key) {
+            atag.setAttribute('href', "/edit/cafedra/" + key)
+            fetch(`/edit/cafedra/${key}/snippet`, {credentials: 'include' })
+            .then(r => r.json())
+            .then(js => {
+                atag.closest('td').setAttribute('title', js.snippet || '')
+            })
+        }
 
         document.addEventListener('suggestOutdated', ev => {
             let atag = ev.target.parentElement.querySelector('a.info')

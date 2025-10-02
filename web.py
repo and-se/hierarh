@@ -400,6 +400,22 @@ def get_task(id):
 
     return render_template('edit/task.html', task=t, next_task=next_task)
 
+@ed.post('/task/<int:id>/answer')
+def set_task_answer(id):
+    t = db_edit.task.get_by_id(id)
+    if not t:
+        return {
+            "success": False,
+            "message": f"no such task {id}"
+        }, 404
+    
+    t.set_raw_answer(request.json)
+    t.save()
+
+    return {
+        "success": True
+    }
+
 @ed.get('/suggest/cafedra')
 @login_required
 def suggest_cafedra():

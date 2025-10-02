@@ -8,10 +8,11 @@ from edit.storage import HierarhEditStorage, TextCafedra, TextEpiskop
 
 import re
 
-def check_episkop_to_cafedra_links():
+def check_episkop_to_cafedra_links(remove_old_tasks=False):
     db = HierarhEditStorage()
-    db.task.reset()
-    
+
+    if remove_old_tasks:
+        db.task.reset()
 
     Cafedra_name_map = {
         'ВСЕРОССИЙСКАЯ': 
@@ -35,11 +36,11 @@ def check_episkop_to_cafedra_links():
             if caf.link:
                 linked = db.cafedra.get(caf.link)
                 if not linked:
-                    task.add_problem(i, caf.name, 'сломанная ссылка - нет такой кафедры', caf.link)
+                    task.add_problem(i, caf, 'сломанная ссылка - нет такой кафедры', caf.link)
                 else:
                     linked = CafedraView(linked)
                     if not linked.has_name(caf.name):
-                        task.add_problem(i, caf.name, 'Проставлена сылка на кафедру', linked.name, 'Это верно?')
+                        task.add_problem(i, caf, 'Проставлена сылка на кафедру', linked.name, 'Это верно?')
             else:
                 #if caf in db.cafedra.ignored_names:                
                     # не нужно проставлять ссылки на ?, NN
@@ -53,9 +54,9 @@ def check_episkop_to_cafedra_links():
                 if len(found_cafs) == 1:
                     ... # проставить ссылку на кафедру
                 elif not len(found_cafs):
-                    task.add_problem(i, caf.name, "кафедра не найдена")
+                    task.add_problem(i, caf, "кафедра не найдена")
                 else: # many cafedra
-                    task.add_problem(i, caf.name, "какая именно кафедра?", found_cafs)            
+                    task.add_problem(i, caf, "какая именно кафедра?", found_cafs)            
         
         if task.changed:
             task.save()
@@ -101,12 +102,16 @@ class CafedraRowView:
     @property
     def link(self):
         return None  # TODO now no links
+
+    @property
+    def dating(self):
+        return self.d[1].text_content().strip()
     
     def __repr__(self):
-        return str(self)
+        return f"CafedraRow({self.name} {self.dating})"
     
     def __str__(self):
-        return f"CafedraRow({self.name})"
+        return f"{self.name} ({self.dating})"
     
     with open(CAFEDRA_MAP_FILE, encoding='utf8') as f:
         Cafedra_name_map = json.load(f)
@@ -152,4 +157,5 @@ class CafedraView:
 
     
 if __name__ == '__main__':
-    check_episkop_to_cafedra_links()
+    #check_episkop_to_cafedra_links()
+    check_episkop_to_cafedra_links(remove_old_tasks=True)

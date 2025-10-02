@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let placeholder = el.innerText.trim()
         let sid = makeUniqueId("suggest")
         el.innerHTML = `
-            <input placeholder="${sf(placeholder)}" list="${sid}" style="width:inherit">
+            <input placeholder="${sf(placeholder)}" list="${sid}" style="width:inherit; padding:inherit;">
             <datalist id="${sid}">
             </datalist>
         `
@@ -46,9 +46,6 @@ document.addEventListener('DOMContentLoaded', function() {
         let dl = document.getElementById(sid)
         let curTimer, oldInput, oldRequestStopper
         el.addEventListener('input', (ev) => {
-            if (oldInput == ev.target.value) throw new Error("why?")
-            oldInput = ev.target.value // todo delete
-            
             // Механизм подсказки запускается с задержкой - отменяем предыдущую попытку
             clearTimeout(curTimer)
 
@@ -94,6 +91,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             }, suggestDelayMs)
         })
+
+        //el.dispatchEvent(new InputEvent('input')) - сформировать начальный список подсказок.
     })
     
     function updateSuggestDataList(dl, variants) {
@@ -123,33 +122,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }    
 
     function sf(string) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#x27;',
-            "/": '&#x2F;',
-        };
-        const reg = /[&<>"'/]/ig;
-        return string.replace(reg, (match)=>(map[match]));
+        return LIB.escapeForHtml(string)
     }
 
     function makeUniqueId(prefix) {
-        if (prefix && !document.getElementById(prefix)) {
-            return prefix
-        }
-        
-        if (!prefix) prefix = "id_";
-        let i = 0
-        
-        let res = prefix + i;
-        while(document.getElementById(res)) {
-            i++
-            res = prefix+i
-        }
-        
-        return res
+        return LIB.makeUniqueId(prefix)
     }
 
     function clearDataSet(elem) {
