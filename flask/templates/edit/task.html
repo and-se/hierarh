@@ -52,6 +52,10 @@
     <h1>
         <a href="/edit/episkop/{{task.doc_key}}" target="_blank" class="title"></a>
     </h1>
+
+    <div>
+        <span>Статус: </span><span class="task-status">{{task.status}}</span>
+    </div>
     
     <table class="problems hhtable">
         <thead>
@@ -83,6 +87,7 @@
 
         let $problemsTable = document.querySelector('.problems tbody')
         let $commentArea = document.querySelector('.comment')
+        let $taskStatus = document.querySelector('.task-status')
 
         for (const pr of Q.problems) {
             let es = LIB.escapeForHtml
@@ -90,7 +95,7 @@
             <tr data-where="${pr.where}">
                 <td>${es(pr.item)} - ${es(pr.msg)}</td>
                 <td><input-select suggest="suggestCafedra" class="answer">введите что-то</input-select>
-                    <a class="info" target="_blank">==></a>
+                    <a class="info" target="_blank">info</a>
                 </td>
             </tr>
             `)
@@ -117,6 +122,8 @@
 
         document.addEventListener('change', saveTaskAnswer)
         window.addEventListener('beforeunload', saveTaskAnswer)
+        document.addEventListener('suggestSelected', saveTaskAnswer)
+        
 
         function suggestCafedra(v, cancel) {
             if (!v.trim()) return [{value: 'ссылка не нужна', nolink:"true"}]
@@ -141,9 +148,12 @@
         function saveTaskAnswer() {
             let r = buildTaskAnswer()
             let json = JSON.stringify(r)
-            if (json === oldTaskAnswer) return;
+            if (json === oldTaskAnswer) {
+                console.log("No task change for save")
+                return;
+            }
             oldTaskAnswer = json
-            console.log(r)
+            console.debug(r)
             fetch('/edit/task/{{task.id}}/answer', {
                 credentials: "include",
                 method: "POST",
@@ -152,7 +162,13 @@
                 },
                 body: json
             }).then(r => r.json()).then(js => {
-
+                if (js.success && js.status) {
+                    $taskStatus.innerText = js.status
+                } else {
+                    console.error('Error save task:', js)
+                    // TODO show message other way
+                    alert('Не удалось сохранить изменения! ' + js.message)
+                }
             })
         }
         

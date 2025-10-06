@@ -102,15 +102,33 @@ class Task:
         return self.orm.answer
 
     def set_raw_answer(self, value):
-        if not isinstance(value, (dict, list)):
-            raise ValueError('answer must be json seriazible dict or list')
+        if not isinstance(value, dict) or value.get('answers') is None:
+            raise ValueError('answer must be json seriazible dict with \'answers\' field')
         self.orm.answer = self.something_to_json(value)
         self.changed = True
+
+    def check_all_problems_resolved(self):
+        if not self.orm.answer:
+            return False
+
+        answer = json.loads(self.orm.answer)
+
+        def gather_where(source: list):
+            r = set()
+            for i in source:
+                wh = i.get('where')
+                # has 'where' and 'value' key and something else
+                if wh and len(i.keys()) > 2: r.add(str(wh))
+            return r
+
+        q_wheres = gather_where(self._problems)
+        a_wheres = gather_where(answer.get('answers') or [])
+        return q_wheres.issubset(a_wheres)
 
     def save(self):
         if self.changed:            
             self.orm.question = self.raw_question()
-            #self.orm.answer =          
+            #self.orm.answer = see set_raw_answer         
             self.orm.save()
             tlog.info(str(self))
 
@@ -136,7 +154,7 @@ class TaskOrm(Model):
     reg_data_when = DoubleField()
 
     type = TextField()
-    status = TextField(default='new')
+    status = TextField(default='новая')
     question = TextField()  # json
     answer = TextField(null=True)
     

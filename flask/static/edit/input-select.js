@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let dl = document.getElementById(sid)
         let curTimer, oldInput, oldRequestStopper
-        el.addEventListener('input', (ev) => {
+        function doSuggestOnEvent(ev) {
             // Механизм подсказки запускается с задержкой - отменяем предыдущую попытку
             clearTimeout(curTimer)
 
@@ -90,7 +90,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     oldRequestStopper = null
                 })
             }, suggestDelayMs)
-        })
+        }
+        el.addEventListener('input', (ev) => doSuggestOnEvent(ev))
+        el.addEventListener('dblclick', ev => doSuggestOnEvent(ev))
 
         //el.dispatchEvent(new InputEvent('input')) - сформировать начальный список подсказок.
     })

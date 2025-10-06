@@ -227,3 +227,11 @@ td:empty:before {
     background-color: #ddd;
 
 }
+
+.task-status {
+    background-color: rgb(244, 248, 30);
+    padding: 5px 10px;
+    border-radius: 15px;
+    color: rgb(87, 61, 61);
+    font-weight: bold;
+}

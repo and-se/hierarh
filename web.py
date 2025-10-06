@@ -9,6 +9,7 @@ from db import PeeweeHistHierarhStorage, PeeweeUserCommentsStorage, \
                StorageException
 
 from edit.services.snippet import SnippetService
+from edit.services.task_service import NoSuchTaskError, TaskService
 from edit.storage import HierarhEditStorage, TextCollectionDb
 from edit.services.diff import DiffService
 
@@ -216,6 +217,7 @@ db_edit = HierarhEditStorage()
 diff_service = DiffService(db_edit)
 
 snippet_service = SnippetService(db_edit)
+task_service = TaskService(db_edit)
 
 @ed.get('/')
 @login_required
@@ -376,6 +378,11 @@ def episkop_diff(key, new, old):
     return render_template('edit/doc_diff.html', diff=diff, header=header, new_reg_data=new_reg_data, old_reg_data=old_reg_data,
                             time_convert=build_editor_info, item_type='episkop')
 
+
+
+
+################# TASKS ########################
+
 @ed.get('/task')
 @login_required
 def list_tasks():
@@ -383,39 +390,39 @@ def list_tasks():
         skip = int(request.args.get('skip', 0))
     except ValueError:
         skip = 0
-    take = 20
-    d = db_edit.task.portion(skip=skip, take=take)
-    cnt = db_edit.task.count()
-    return render_template('edit/task-list.html', items=d, task_count=cnt, skip=skip+take)
+    
+    take = 20    
+    portion = task_service.get_task_list(skip, take)
+    tasks, cnt = portion.tasks, portion.total_count
+    return render_template('edit/task-list.html', items=tasks, task_count=cnt, skip=skip+take)
     
 
 @ed.get('/task/<int:id>')
 @login_required
 def get_task(id):
-    t = db_edit.task.get_by_id(id)
-    if not t:
-        abort(404, 'Задача не найдена')
-    
-    next_task = db_edit.task.get_next_task_id(t.id)
+    try:
+        tinfo = task_service.get_task(id)
+        t, next_task = tinfo.task, tinfo.next_task_id
+        return render_template('edit/task.html', task=t, next_task=next_task)
+    except NoSuchTaskError:
+        abort(404, "Задача не найдена")
 
-    return render_template('edit/task.html', task=t, next_task=next_task)
+    
 
 @ed.post('/task/<int:id>/answer')
 def set_task_answer(id):
-    t = db_edit.task.get_by_id(id)
-    if not t:
+    try:
+        new_status = task_service.set_task_answer(id, request.json)
+        return {
+            "success": True,
+            "status": new_status
+        }
+    except NoSuchTaskError:
         return {
             "success": False,
             "message": f"no such task {id}"
         }, 404
     
-    t.set_raw_answer(request.json)
-    t.save()
-
-    return {
-        "success": True
-    }
-
 @ed.get('/suggest/cafedra')
 @login_required
 def suggest_cafedra():

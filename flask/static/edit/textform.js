@@ -883,9 +883,7 @@ function processAllChildren(elem, f) {
 
 
 function createElementByHtml(html) {
-    let t = document.createElement('template');
-    t.innerHTML = html;
-    return t.content.firstElementChild;
+    return LIB.createElementByHtml(html)
 }
 
 
@@ -929,18 +927,5 @@ function objectName(obj) {
 }
 
 function makeUniqueId(prefix) {
-    if (prefix && !document.getElementById(prefix)) {
-        return prefix
-    }
-    
-    if (!prefix) prefix = "id_";
-    let i = 0
-    
-    let res = prefix + i;
-    while(document.getElementById(res)) {
-        i++
-        res = prefix+i
-    }
-    
-    return res
+    return LIB.makeUniqueId(prefix)
 }

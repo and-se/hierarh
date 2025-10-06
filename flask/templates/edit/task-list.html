@@ -6,7 +6,7 @@
 
         <ul class="items">
             {% for task in items %}
-            <li><a href="/edit/task/{{task.id}}" >{{task.title}}</a></li>
+            <li><span class="task-status">{{task.status}}</span> <a href="/edit/task/{{task.id}}" >{{task.title}}</a></li>
             {% endfor %}
         </ul>
         <a href="/edit/task?skip={{skip}}">Ещё</a>
