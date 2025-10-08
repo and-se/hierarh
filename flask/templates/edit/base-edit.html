@@ -29,4 +29,14 @@
     <footer>
         Вы вошли под пользователем <strong>{{current_user.title}}</strong>. <a href='/logout'>Выйти</a>
     </footer>
+
+    <script>
+        (function () {
+            let p = new URLSearchParams(window.location.search)
+            let ss = p.get('do_find')
+            if (ss) {
+                window.find(ss)
+            }
+        })()
+    </script>
 </body>

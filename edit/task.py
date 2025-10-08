@@ -3,7 +3,7 @@ from peewee import AutoField, IntegerField, Model, TextField, DoubleField
 
 import logging
 tlog = logging.Logger('tasks')
-import os  # noqa: E402
+# import os  # noqa: E402
 #os.unlink('tasks.txt')
 #tlog.addHandler(logging.FileHandler('tasks.txt'))
 
@@ -22,17 +22,32 @@ class TaskCollection:
         if orm:
             return Task(orm)
     
-    def portion(self, skip, take):
+    def portion(self, skip, take, needed_status=None):
         dbdata = TaskOrm.select().limit(take).offset(skip)
+        dbdata = self._apply_status_filter(needed_status, dbdata)
+
         return [Task(x) for x in dbdata]
+
+    def _apply_status_filter(self, needed_status, db_query):
+        if needed_status:
+            if isinstance(needed_status, str):
+                needed_status = [needed_status]
+            if not isinstance(needed_status, list):
+                raise ValueError('needed_status must be list[str] or str')
+            db_query = db_query.where(TaskOrm.status.in_(needed_status))
+        return db_query
     
-    def count(self):
-        return TaskOrm.select().count()
+    def count(self, needed_status=None) -> int:
+        db_data = self._apply_status_filter(needed_status, TaskOrm.select())
+        return db_data.count()
     
     def get_next_task_id(self, cur_id):
         r = TaskOrm.select(TaskOrm.id).where(TaskOrm.id > cur_id).get_or_none()
         if r:
             return r.id
+    
+    def get_all_statuses(self) -> list[str]:
+        return [x[0] for x in TaskOrm.select(TaskOrm.status).distinct().tuples()]
     
     def remove_all(self):
         TaskOrm.delete().execute()
@@ -65,6 +80,10 @@ class Task:
     @property
     def doc_key(self):
         return self.orm.doc_key
+    
+    @property
+    def doc_coll(self):
+        return self.orm.collection
 
     @property
     def type_(self):

@@ -9,7 +9,7 @@ let LIB = {
             "/": '&#x2F;',
         };
         const reg = /[&<>"'/]/ig;
-        return string.replace(reg, (match)=>(map[match]));
+        return string.replace(reg, (match) => (map[match]));
     },
 
     makeUniqueId(prefix) {
@@ -21,9 +21,9 @@ let LIB = {
         let i = 0
         
         let res = prefix + i;
-        while(document.getElementById(res)) {
+        while (document.getElementById(res)) {
             i++
-            res = prefix+i
+            res = prefix + i
         }
         
         return res

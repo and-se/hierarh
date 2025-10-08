@@ -63,10 +63,10 @@ login_manager.login_message = None
 db = PeeweeHistHierarhStorage()
 comments_db = PeeweeUserCommentsStorage()
 
-from datetime import datetime
+from datetime import datetime, UTC
 @app.context_processor
 def inject_now():
-    return {'time_now': datetime.utcnow()}
+    return {'time_now': datetime.now(UTC)}
 
 @app.route('/')
 def index():
@@ -391,10 +391,15 @@ def list_tasks():
     except ValueError:
         skip = 0
     
-    take = 20    
-    portion = task_service.get_task_list(skip, take)
+    take = 20
+    
+    status = request.args.getlist('status')
+    portion = task_service.get_task_list(skip, take, status)
     tasks, cnt = portion.tasks, portion.total_count
-    return render_template('edit/task-list.html', items=tasks, task_count=cnt, skip=skip+take)
+    all_st = task_service.all_statuses()
+    return render_template('edit/task-list.html', items=tasks, task_count=cnt,
+                             all_statuses=all_st, selected_statuses=status or all_st, 
+                            next_page_url=url_for('.list_tasks', skip=skip+take, status=status))
     
 
 @ed.get('/task/<int:id>')
@@ -402,8 +407,8 @@ def list_tasks():
 def get_task(id):
     try:
         tinfo = task_service.get_task(id)
-        t, next_task = tinfo.task, tinfo.next_task_id
-        return render_template('edit/task.html', task=t, next_task=next_task)
+        t, doc_header, next_task = tinfo.task, tinfo.doc_header, tinfo.next_task_id
+        return render_template('edit/task.html', task=t, next_task=next_task, doc_header=doc_header)
     except NoSuchTaskError:
         abort(404, "Задача не найдена")
 

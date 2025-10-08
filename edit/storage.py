@@ -14,6 +14,14 @@ class HierarhEditStorage:
         self.episkop = TextCollectionDb('episkop', EpiskopEditOrm)
         self.task = TaskCollection()
 
+    def get_coll(self, name) -> 'TextCollectionDb':
+        r = {
+            'cafedra': self.cafedra,
+            'episkop': self.episkop
+        }
+
+        return r.get(name)
+
     def atomic(self):
         return EditDb.atomic()
 

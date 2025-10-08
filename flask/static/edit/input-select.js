@@ -44,7 +44,9 @@ document.addEventListener('DOMContentLoaded', function() {
         })
 
         let dl = document.getElementById(sid)
-        let curTimer, oldInput, oldRequestStopper
+        el._input_select_allow_suggest_outdated=true
+        
+        let curTimer, oldRequestStopper
         function doSuggestOnEvent(ev) {
             // Механизм подсказки запускается с задержкой - отменяем предыдущую попытку
             clearTimeout(curTimer)
@@ -66,10 +68,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     bubbles: true,
                     detail: el.dataset
                 }))
+
+                el._input_select_allow_suggest_outdated=true
+
+                // подсказывать не надо - мы только что выбрали подсказку
                 return
             }
-
-            el.dispatchEvent(new CustomEvent('suggestOutdated', {bubbles:true}))
+            
+            if (el._input_select_allow_suggest_outdated) {
+                el.dispatchEvent(new CustomEvent('suggestOutdated', {bubbles:true}))
+                // событие не будет генерироваться до следущей выбранной подсказки
+                el._input_select_allow_suggest_outdated = false
+            }
             
             // В противном случае запускаем механизм подсказки с задержкой
             let suggestDelayMs = 100

@@ -8,11 +8,8 @@ class TaskService:
         self.db = db
 
     def get_task_list(self, skip, take=20, status=None) -> "TaskPortion":
-        if status:
-            raise NotImplementedError
-
-        d = self.db.task.portion(skip=skip, take=take + 1)
-        total_count = self.db.task.count()
+        d = self.db.task.portion(skip=skip, take=take + 1, needed_status=status)
+        total_count = self.db.task.count(status)
 
         if len(d) == take + 1:
             has_next = True
@@ -20,20 +17,29 @@ class TaskService:
         else:
             has_next = False
 
-        return TaskPortion(d, total_count, has_next)
+        return TaskPortion(d, total_count, has_next, status)
+    
+    def all_statuses(self):
+        return list(self.db.task.get_all_statuses())
 
     def get_task(self, id) -> 'TaskInfo':
         """
         Получить задачу по id.
-        @returns Задачу и id следующей
+        @returns Задача, заголовок связанного с ней документа, id следующей задачи
         """
         t = self.db.task.get_by_id(id)
         if not t:
             raise NoSuchTaskError(id)
 
         next_task = self.db.task.get_next_task_id(t.id)
+        
+        doc_header = None
+        coll = self.db.get_coll(t.doc_coll)
+        if coll and (d := coll.get(t.doc_key)):
+            doc_header = d.header()
+        
 
-        return TaskInfo(t, next_task)
+        return TaskInfo(t, doc_header, next_task)
     
     def set_task_answer(self, id, answer_json: dict) -> str:
         """
@@ -55,8 +61,8 @@ class TaskService:
 
         return new_status
         
-TaskPortion = namedtuple("TaskPortion", ["tasks", "total_count", "has_next"])
-TaskInfo = namedtuple("TaskInfo", ['task', 'next_task_id'])
+TaskPortion = namedtuple("TaskPortion", ["tasks", "total_count", "has_next", "selected_statuses"])
+TaskInfo = namedtuple("TaskInfo", ['task', 'doc_header', 'next_task_id'])
 
 class NoSuchTaskError(Exception):
     def __init__(self, id):

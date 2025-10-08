@@ -2,14 +2,39 @@
 {% block content %}
 <main>
     <section>
-        <div>Всего {{task_count}} задач</div>
-
+        <form class="control-panel" method="get">
+            Всего задач: {{task_count}}
+            {% for t in all_statuses %}
+                {% if (t in selected_statuses) %}
+                    <input type="checkbox" name="status" value="{{t}}" checked>{{t}}</option>
+                {% else %}
+                    <input type="checkbox" name="status" value="{{t}}">{{t}}</option>
+                {% endif %}
+            {% endfor %}
+            
+            <noscript><input type="submit" value="отфильтровать"></noscript>
+        </form>
+        <script>
+            document.querySelectorAll(".control-panel input[type='checkbox']").forEach(cb => {
+                cb.addEventListener('change', ev => cb.closest('form').submit())
+            })
+        </script>
+        
         <ul class="items">
             {% for task in items %}
             <li><span class="task-status">{{task.status}}</span> <a href="/edit/task/{{task.id}}" >{{task.title}}</a></li>
             {% endfor %}
         </ul>
-        <a href="/edit/task?skip={{skip}}">Ещё</a>
+        <a href="{{next_page_url}}">Ещё</a>
     </section>
 </main>
+<style>
+    .control-panel {
+        margin-bottom: 15px;
+    }
+
+    .items li {
+        margin-bottom: 15px;
+    }
+</style>
 {% endblock %}

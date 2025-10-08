@@ -72,7 +72,14 @@
     {% if next_task %}
         <div class="next-task">
             <hr>
-            <a href="/edit/task/{{next_task}}">следующая задача</a>
+            <kbd>Ctrl+Alt+Ю</kbd> <a href="/edit/task/{{next_task}}">следующая задача</a>
+            <script>
+                document.onkeydown = (e) => {
+                    if(e.ctrlKey && e.altKey && e.code == 'Period') {
+                        document.querySelector('.next-task a').click()
+                    }
+                }
+            </script>
         </div>
     {% endif %}
     
@@ -89,7 +96,7 @@
         let $commentArea = document.querySelector('.comment')
         let $taskStatus = document.querySelector('.task-status')
 
-        for (const pr of Q.problems) {
+        for (const pr of (Q.problems || [])) {
             let es = LIB.escapeForHtml
             let row = LIB.createElementByHtml(`
             <tr data-where="${pr.where}">
@@ -107,7 +114,7 @@
     <script>
         // После прогрузки всех input-select правим их состояние
         document.addEventListener('DOMContentLoaded', () => {
-            for (const ans of A.answers) {
+            for (const ans of (A.answers || [])) {
                 let t = $problemsTable.querySelector(`[data-where='${ans.where}'] .answer`)
 
                 t.value = ans.value
@@ -117,6 +124,7 @@
                 }
                 if(ans.nolink) t.dataset.nolink = ans.nolink
             }
+
             if (A.comment) $commentArea.value = A.comment
         })
 
@@ -160,7 +168,8 @@
                 headers: {  
                    'Content-Type': 'application/json'  
                 },
-                body: json
+                body: json,
+                keepalive: true // не прерывать запрос при закрытии страницы
             }).then(r => r.json()).then(js => {
                 if (js.success && js.status) {
                     $taskStatus.innerText = js.status
@@ -212,7 +221,9 @@
         })
 
         function setInfoTag(atag, key) {
-            atag.setAttribute('href', "/edit/cafedra/" + key)
+            let url = "/edit/cafedra/" + key + '?' + new URLSearchParams({do_find: '{{doc_header}}'})
+            
+            atag.setAttribute('href', url)
             fetch(`/edit/cafedra/${key}/snippet`, {credentials: 'include' })
             .then(r => r.json())
             .then(js => {
