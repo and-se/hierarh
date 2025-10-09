@@ -39,6 +39,11 @@
             border-left: 8px solid green;
             transition: linear 0.1s;
         }
+
+        .info {
+            margin: 0;
+            font-style: italic;
+        }
     </style>    
     <div style="display:none">
         <p id="question-init-data">
@@ -74,17 +79,18 @@
             <hr>
             <kbd>Ctrl+Alt+Ю</kbd> <a href="/edit/task/{{next_task}}">следующая задача</a>
             <script>
-                document.onkeydown = (e) => {
+                document.addEventListener('keydown', (e) => {
                     if(e.ctrlKey && e.altKey && e.code == 'Period') {
                         document.querySelector('.next-task a').click()
                     }
-                }
+                })
             </script>
         </div>
     {% endif %}
     
     <script>
         'use strict'
+        // Заполняем таблицу на основе JSON question-init-data
         let Q = document.getElementById('question-init-data')
         let A = document.getElementById('answer-init-data')
         Q = JSON.parse(Q.innerText.trim() || 'null') || {}
@@ -101,8 +107,9 @@
             let row = LIB.createElementByHtml(`
             <tr data-where="${pr.where}">
                 <td>${es(pr.item)} - ${es(pr.msg)}</td>
-                <td><input-select suggest="suggestCafedra" class="answer">введите что-то</input-select>
-                    <a class="info" target="_blank">info</a>
+                <td>
+                    <input-select suggest="suggestCafedra" class="answer">введите что-то</input-select>
+                    <p class="info"></p>
                 </td>
             </tr>
             `)
@@ -110,28 +117,71 @@
             $problemsTable.append(row)
         }
     </script>
+    <!-- Преобразуем input-select теги-->
     <script src="/static/edit/input-select.js"></script>
     <script>
         // После прогрузки всех input-select правим их состояние
         document.addEventListener('DOMContentLoaded', () => {
+            // Добавляем данные ответов из answer-init-data
             for (const ans of (A.answers || [])) {
                 let t = $problemsTable.querySelector(`[data-where='${ans.where}'] .answer`)
 
                 t.value = ans.value
                 if(ans.key) {
                     t.dataset.key = ans.key
-                    setInfoTag(t.parentElement.querySelector('a.info'), ans.key)
                 }
+                // Обновляем доп. информацию о выбранном элементе
+                setInfoTag(t.parentElement.querySelector('.info'), ans.key)
+
                 if(ans.nolink) t.dataset.nolink = ans.nolink
             }
 
             if (A.comment) $commentArea.value = A.comment
         })
 
+        // Соохранение задачи при изменениях
         document.addEventListener('change', saveTaskAnswer)
         window.addEventListener('beforeunload', saveTaskAnswer)
         document.addEventListener('suggestSelected', saveTaskAnswer)
         
+        // При выборе подсказки обновляем доп. информацию о кафедре
+        document.addEventListener('suggestSelected', (ev) => {
+            let itag = ev.target.parentElement.querySelector('.info')
+            if (itag) {                
+                setInfoTag(itag, ev.detail.key)
+            }
+        })
+
+        function setInfoTag(itag, key) {
+            if (!key) {
+                itag.innerText = "";
+                return;
+            }
+
+            let url = "/edit/cafedra/" + key + '?' + new URLSearchParams({do_find: '{{doc_header}}'})
+            
+            let atag = document.createElement('a')
+            atag.setAttribute('href', url)
+            atag.setAttribute('target', '_blank')
+            atag.innerText = "link"
+
+            itag.append(atag)
+
+            fetch(`/edit/cafedra/${key}/snippet`, {credentials: 'include' })
+            .then(r => r.json())
+            .then(js => {
+                let snippet = js.snippet || ''
+                let tx = document.createTextNode(snippet)
+                tx.textContent += ' '
+                itag.prepend(tx)
+                //itag.closest('td').setAttribute('title', snippet)
+            })
+        }
+
+        document.addEventListener('suggestOutdated', ev => {
+            let itag = ev.target.parentElement.querySelector('.info')
+            setInfoTag(itag, null)
+        })
 
         function suggestCafedra(v, cancel) {
             if (!v.trim()) return [{value: 'ссылка не нужна', nolink:"true"}]
@@ -205,39 +255,6 @@
 
             return res
         }
-    </script>
-
-    <script>
-        document.addEventListener('suggestSelected', (ev) => {
-            let atag = ev.target.parentElement.querySelector('a.info')
-            if (atag) {                
-                if (ev.detail.key) {
-                    setInfoTag(atag, ev.detail.key)                    
-                } else {
-                    atag.removeAttribute('href')
-                    atag.removeAttribute('title')
-                }
-            }
-        })
-
-        function setInfoTag(atag, key) {
-            let url = "/edit/cafedra/" + key + '?' + new URLSearchParams({do_find: '{{doc_header}}'})
-            
-            atag.setAttribute('href', url)
-            fetch(`/edit/cafedra/${key}/snippet`, {credentials: 'include' })
-            .then(r => r.json())
-            .then(js => {
-                atag.closest('td').setAttribute('title', js.snippet || '')
-            })
-        }
-
-        document.addEventListener('suggestOutdated', ev => {
-            let atag = ev.target.parentElement.querySelector('a.info')
-            if (atag) {
-                atag.removeAttribute('href')
-                atag.removeAttribute('title')
-            }
-        })
     </script>
 
 </main>
