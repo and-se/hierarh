@@ -64,7 +64,11 @@ login_manager.login_message = None
 db = PeeweeHistHierarhStorage()
 comments_db = PeeweeUserCommentsStorage()
 
-from datetime import datetime, UTC
+from datetime import datetime  #py11 only: , UTC
+from datetime import timezone
+UTC = timezone.utc
+
+
 @app.context_processor
 def inject_now():
     return {'time_now': datetime.now(UTC)}

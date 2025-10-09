@@ -24,7 +24,7 @@
     </div>
 
     <script>
-        if (window.location.pathname.endsWith('/task')) {
+        if (window.location.pathname.includes('/task')) {
             document.querySelectorAll('.menu li a').forEach(l => {
                 if (l.innerText.trim() == 'Задачи') {
                     l.classList.add('current')
