@@ -22,6 +22,16 @@
               <li><a href="/">На главную</a></li>
           </ul>
     </div>
+
+    <script>
+        if (window.location.pathname.endsWith('/task')) {
+            document.querySelectorAll('.menu li a').forEach(l => {
+                if (l.innerText.trim() == 'Задачи') {
+                    l.classList.add('current')
+                }
+            })
+        }
+    </script>
     
     {% block content required %}
     {% endblock content %}

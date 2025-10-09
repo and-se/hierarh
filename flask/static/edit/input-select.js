@@ -43,6 +43,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
 
+        el.focus = () => {
+            el.querySelector('input').focus()
+        }
+
         let dl = document.getElementById(sid)
         el._input_select_allow_suggest_outdated=true
         

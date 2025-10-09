@@ -26,12 +26,13 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
     for cnt, ep in enumerate(db.episkop.iterate()):
         if cnt and cnt % 100 == 0:
             logging.warning("Processed %s items", cnt)   
-        task = db.task.get(coll_name=db.episkop.name, doc_key=ep.key, reg_data_when=ep.reg_data['when'])
+        task = db.task.get(coll_name=db.episkop.name, doc_key=ep.key, doc_reg_data_when=ep.reg_data['when'])
         task.title = ep.header() + " - непонятные ссылки на кафедры"        
         task.type_ = "episkop->cafedra"
 
         ep = EpiskopView(ep)
-
+        
+        task.changed = False
         for i, caf in enumerate(ep.cafedras):
             if caf.link:
                 linked = db.cafedra.get(caf.link)
@@ -59,7 +60,7 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
                     task.add_problem(i, caf, "какая именно кафедра?", found_cafs)            
         
         if task.changed:
-            task.save()
+            task.save('admin')
 
 
 from lxml import html

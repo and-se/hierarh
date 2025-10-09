@@ -41,25 +41,31 @@ class TaskService:
 
         return TaskInfo(t, doc_header, next_task)
     
-    def set_task_answer(self, id, answer_json: dict) -> str:
+    def set_task_answer(self, id, answer_json: dict, who: str) -> str:
         """
         Устанавливает ответ на задачу
         @returns новый статус задачи
         """
-        t = self.db.task.get_by_id(id)
+        t: Task = self.db.task.get_by_id(id)
         if not t:
             raise NoSuchTaskError(id)
         
         t.set_raw_answer(answer_json)
-        if t.check_all_problems_resolved():
-            new_status = "обработано"
+        problem_count, resolved_count = t.check_problem_resolve_status()
+
+        if resolved_count > 0:
+            if problem_count <= resolved_count:
+                new_status = "обработано"
+            else:
+                new_status = "в процессе"
         else:
-            new_status = "в процессе"
-
+            new_status = 'новая'
+            
         t.status = new_status
-        t.save()
 
-        return new_status
+        t.save(who)
+
+        return t.status
         
 TaskPortion = namedtuple("TaskPortion", ["tasks", "total_count", "has_next", "selected_statuses"])
 TaskInfo = namedtuple("TaskInfo", ['task', 'doc_header', 'next_task_id'])

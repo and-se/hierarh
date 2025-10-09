@@ -1,5 +1,6 @@
 import json
-from peewee import AutoField, IntegerField, Model, TextField, DoubleField
+from peewee import AutoField, IntegerField, Model, TextField, DoubleField, TimestampField
+from time import time as unix_now
 
 import logging
 tlog = logging.Logger('tasks')
@@ -11,10 +12,10 @@ class TaskCollection:
     def __init__(self):
         self.db = []
 
-    def get(self, coll_name, doc_key, reg_data_when):
-        orm = TaskOrm.get_or_none(TaskOrm.collection==coll_name, TaskOrm.doc_key==doc_key, TaskOrm.reg_data_when==reg_data_when)
+    def get(self, coll_name, doc_key, doc_reg_data_when):
+        orm = TaskOrm.get_or_none(TaskOrm.collection==coll_name, TaskOrm.doc_key==doc_key, TaskOrm.doc_reg_data_when==doc_reg_data_when)
         if not orm:
-            orm = TaskOrm(collection=coll_name, doc_key=doc_key, reg_data_when=reg_data_when)
+            orm = TaskOrm(collection=coll_name, doc_key=doc_key, doc_reg_data_when=doc_reg_data_when)
         return Task(orm)
     
     def get_by_id(self, id):
@@ -75,7 +76,7 @@ class Task:
     
     @property
     def target(self):
-        return [self.orm.collection, self.orm.doc_key, self.orm.reg_data_when]
+        return [self.orm.collection, self.orm.doc_key, self.orm.doc_reg_data_when]
     
     @property
     def doc_key(self):
@@ -91,6 +92,7 @@ class Task:
     
     @type_.setter
     def type_(self, value):
+        self.changed = True
         self.orm.type = value
 
     @property
@@ -99,6 +101,7 @@ class Task:
     
     @status.setter
     def status(self, value):
+        self.changed = True
         self.orm.status = value
 
     def add_problem(self, where, item, *msg):        
@@ -126,7 +129,10 @@ class Task:
         self.orm.answer = self.something_to_json(value)
         self.changed = True
 
-    def check_all_problems_resolved(self):
+    def check_problem_resolve_status(self)-> tuple[int, int]:
+        """
+        returns total problem count and resolved by answer count
+        """
         if not self.orm.answer:
             return False
 
@@ -140,13 +146,15 @@ class Task:
                 if wh and len(i.keys()) > 2: r.add(str(wh))
             return r
 
-        q_wheres = gather_where(self._problems)
+        q_wheres = set([x['where'] for x in self._problems])
         a_wheres = gather_where(answer.get('answers') or [])
-        return q_wheres.issubset(a_wheres)
+        return (len(q_wheres), len(a_wheres))
 
-    def save(self):
+    def save(self, who: str):
         if self.changed:            
             self.orm.question = self.raw_question()
+            self.orm.who = who or '<noname>'
+            self.orm.when = unix_now()
             #self.orm.answer = see set_raw_answer         
             self.orm.save()
             tlog.info(str(self))
@@ -170,10 +178,14 @@ class TaskOrm(Model):
     id = AutoField()
     collection = TextField()
     doc_key = IntegerField()
-    reg_data_when = DoubleField()
+    doc_reg_data_when = DoubleField()
 
     type = TextField()
     status = TextField(default='новая')
     question = TextField()  # json
     answer = TextField(null=True)
+
+    who = TextField()
+    when = DoubleField() # TimestampField(3)
+    # - просто храним double из python time.time() как есть
     

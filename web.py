@@ -13,6 +13,7 @@ from edit.services.task_service import NoSuchTaskError, TaskService
 from edit.storage import HierarhEditStorage, TextCollectionDb
 from edit.services.diff import DiffService
 
+from edit.task import Task
 from models import UserComment
 
 import logging
@@ -408,16 +409,22 @@ def get_task(id):
     try:
         tinfo = task_service.get_task(id)
         t, doc_header, next_task = tinfo.task, tinfo.doc_header, tinfo.next_task_id
-        return render_template('edit/task.html', task=t, next_task=next_task, doc_header=doc_header)
+        t: Task
+
+        if t.type_ != 'episkop->cafedra':
+            abort(500, 'Неподдерживаемый тип задачи')
+        
+        return render_template('edit/task-episkop.html', task=t, next_task=next_task, doc_header=doc_header)
     except NoSuchTaskError:
         abort(404, "Задача не найдена")
 
     
 
 @ed.post('/task/<int:id>/answer')
+@login_required
 def set_task_answer(id):
     try:
-        new_status = task_service.set_task_answer(id, request.json)
+        new_status = task_service.set_task_answer(id, request.json, flask_login.current_user.title)
         return {
             "success": True,
             "status": new_status
