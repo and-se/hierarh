@@ -53,7 +53,7 @@ class TaskService:
         t.set_raw_answer(answer_json)
         problem_count, resolved_count = t.check_problem_resolve_status()
 
-        if resolved_count > 0:
+        if resolved_count > 0 or answer_json.get('comment'):
             if problem_count <= resolved_count:
                 new_status = "обработано"
             else:
