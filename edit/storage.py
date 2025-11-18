@@ -132,7 +132,7 @@ class TextCollectionDb:
     
     def suggest(self, query):
         r = self.orm.select(self.orm.id, self.orm.header) \
-            .where(orm_all_words_search_condition(query, self.orm.header)).order_by(self.orm.header).limit(5)
+            .where(orm_all_words_search_condition(query, self.orm.header)).order_by(self.orm.header).limit(10)
         
         return [{'value': x.header, 'key': x.id} for x in r]
         
