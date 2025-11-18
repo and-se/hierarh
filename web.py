@@ -411,18 +411,18 @@ def list_tasks():
 @login_required
 def get_task(id):
     try:
-        tinfo = task_service.get_task(id)
+        status = request.args.getlist('status')
+        tinfo = task_service.get_task(id, status)
         t, doc_header, next_task = tinfo.task, tinfo.doc_header, tinfo.next_task_id
         t: Task
 
         if t.type_ != 'episkop->cafedra':
             abort(500, 'Неподдерживаемый тип задачи')
         
-        return render_template('edit/task-episkop.html', task=t, next_task=next_task, doc_header=doc_header)
+        return render_template('edit/task-episkop.html', task=t, next_task=next_task, doc_header=doc_header, status=status)
     except NoSuchTaskError:
         abort(404, "Задача не найдена")
 
-    
 
 @ed.post('/task/<int:id>/answer')
 @login_required

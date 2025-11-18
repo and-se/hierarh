@@ -74,7 +74,7 @@ def get_db(db_name: str):
 
     @db.func('LOWER_PY', deterministic=True)
     def lower(s):
-        return s.lower() if s else None
+        return s.lower() if isinstance(s, str) else None
 
     return db
 

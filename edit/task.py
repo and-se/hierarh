@@ -42,8 +42,9 @@ class TaskCollection:
         db_data = self._apply_status_filter(needed_status, TaskOrm.select())
         return db_data.count()
     
-    def get_next_task_id(self, cur_id):
-        r = TaskOrm.select(TaskOrm.id).where(TaskOrm.id > cur_id).get_or_none()
+    def get_next_task_id(self, cur_id, needed_status=None):
+        r = TaskOrm.select(TaskOrm.id).where(TaskOrm.id > cur_id)
+        r = self._apply_status_filter(needed_status, r).get_or_none()
         if r:
             return r.id
     

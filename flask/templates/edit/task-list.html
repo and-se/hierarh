@@ -1,4 +1,5 @@
 {% extends "edit/base-edit.html" %}
+{%block pagetitle %}Задачи{% endblock %}
 {% block content %}
 <main>
     <section>
@@ -22,7 +23,9 @@
         
         <ul class="items">
             {% for task in items %}
-            <li><span class="task-status">{{task.status}}</span> <a href="/edit/task/{{task.id}}" >{{task.title}}</a></li>
+            <li><span class="task-status">{{task.status}}</span> 
+                <a href="{{url_for('.get_task', id=task.id, status=selected_statuses)}}">{{task.title}}</a>
+            </li>
             {% endfor %}
         </ul>
         <a href="{{next_page_url}}">Ещё</a>

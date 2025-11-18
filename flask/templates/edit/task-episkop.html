@@ -77,7 +77,8 @@
     {% if next_task %}
         <div class="next-task">
             <hr>
-            <kbd>Win+Shift+Ю</kbd> <a href="/edit/task/{{next_task}}">следующая задача</a>
+            <kbd>Win+Shift+Ю</kbd>
+            <a href="{{url_for('.get_task', id=next_task, status=status)}}">следующая задача</a>
         </div>
     {% endif %}
     
@@ -90,6 +91,7 @@
         A = JSON.parse(A.innerText.trim() || 'null') || {}
 
         document.querySelector('.title').innerText = Q.title || ''
+        if (Q.title) document.title = Q.title;
 
         let $problemsTable = document.querySelector('.problems tbody')
         let $commentArea = document.querySelector('.comment')

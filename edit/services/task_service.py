@@ -22,7 +22,7 @@ class TaskService:
     def all_statuses(self):
         return list(self.db.task.get_all_statuses())
 
-    def get_task(self, id) -> 'TaskInfo':
+    def get_task(self, id, status=None) -> 'TaskInfo':
         """
         Получить задачу по id.
         @returns Задача, заголовок связанного с ней документа, id следующей задачи
@@ -31,7 +31,7 @@ class TaskService:
         if not t:
             raise NoSuchTaskError(id)
 
-        next_task = self.db.task.get_next_task_id(t.id)
+        next_task = self.db.task.get_next_task_id(t.id, status)
         
         doc_header = None
         coll = self.db.get_coll(t.doc_coll)
