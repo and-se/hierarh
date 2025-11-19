@@ -187,7 +187,7 @@
                 { signal: cancel, credentials: 'include' })
                 .then(resp => resp.json()).then(js => {
                     let r = js.concat([
-                        {value: 'ссылка не нужна (' + v + ')', nolink:"true"}
+                        {value: 'ссылка не нужна', nolink:"true"}
                     ])
                     
                     return r;

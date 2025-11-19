@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         return
                     }
 
-                    updateSuggestDataList(dl, variants)
+                    updateSuggestDataList(dl, variants, ev.target.value)
                 }).catch(error => {
                     if (error.name == "AbortError") {
                         return
@@ -111,10 +111,11 @@ document.addEventListener('DOMContentLoaded', function() {
         //el.dispatchEvent(new InputEvent('input')) - сформировать начальный список подсказок.
     })
     
-    function updateSuggestDataList(dl, variants) {
+    function updateSuggestDataList(dl, variants, query) {
         let opts = [], i=1
         for (let v of variants) {
             let op = document.createElement('option')
+            let opVal, opLabel;
             
             if (typeof v === 'object') {
                 if (!v.hasOwnProperty('value')) {
@@ -125,12 +126,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 let val = v.value
                 delete v.value
                 Object.assign(op.dataset, v)
-                
-                // Добавим в конец невидимых пробелов - по номеру подсказки
-                op.setAttribute("value", val.trim() + TheNbsp.repeat(i))
+                opVal = val.trim()
             } else {
-                op.setAttribute("value", v.trim() + TheNbsp.repeat(i))
+                opVal = v.trim()
             }
+            
+            // если подсказка не содержит текст в input, то input+datalist её не покажет
+            // (datalist фильтруется по вхождению текущего значения input)
+            // Делаем option с атрибутом label = текст подсказки + значение input
+            // Тогда в списке подсказок будет отображаться label, а при выборе
+            // проставляться атрибут value, так что лишний текст в input не впишется.
+            // Протестировано в Chromium и Firefox.
+            if (!opVal.toLowerCase().includes(query.toLowerCase())) {
+                opLabel = opVal + ` (${query})`; 
+            }
+            
+            // Добавим в конец невидимых пробелов - по номеру подсказки,
+            // чтобы после выбора понять, какую именно подсказку выбрали
+            op.setAttribute("value", opVal + TheNbsp.repeat(i))
+            if (opLabel) {
+                op.setAttribute("label", opLabel)
+            }
+
             opts.push(op)
             i++
         }
