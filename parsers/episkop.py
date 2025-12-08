@@ -28,7 +28,7 @@ class ParsedEpiskopInCafedra:
     brackets_content: str = None
 
 
-def parse_episkop_name_in_cafedra(s) -> ParsedEpiskopInCafedra:
+def parse_episkop_name_in_cafedra(s) -> ParsedEpiskopInCafedra | ParseFail:
     try:
         d = EpiskopInCafedra.parse_string(s, parse_all=True).as_dict()
         if '?' in d.get('temp_status', ''):

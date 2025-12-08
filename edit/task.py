@@ -4,13 +4,20 @@ from time import time as unix_now
 
 import logging
 tlog = logging.Logger('tasks')
-# import os  # noqa: E402
-#os.unlink('tasks.txt')
-#tlog.addHandler(logging.FileHandler('tasks.txt'))
+
+DEBUG_TASKS = True
+if DEBUG_TASKS:
+    tlog.warning("DEBUG_TASKS=TRUE!!!! ЗАДАЧИ ЛОГИРУЮТСЯ в файл tasks.txt!")
+    import os  # noqa: E402
+    if os.path.exists('tasks.txt'):
+        os.unlink('tasks.txt')
+    tlog.addHandler(logging.FileHandler('tasks.txt'))
+
+
 
 class TaskCollection:
     def __init__(self):
-        self.db = []
+        pass
 
     def get(self, coll_name, doc_key, doc_reg_data_when):
         orm = TaskOrm.get_or_none(TaskOrm.collection==coll_name, TaskOrm.doc_key==doc_key, TaskOrm.doc_reg_data_when==doc_reg_data_when)
@@ -57,6 +64,9 @@ class TaskCollection:
     def reset(self):
         TaskOrm.drop_table()
         TaskOrm.create_table()
+
+    def remove_by_type(self, type):
+        TaskOrm.delete().where(TaskOrm.type == type).execute()
 
 
 class Task:

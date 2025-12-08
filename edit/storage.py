@@ -1,6 +1,8 @@
 import re
 import json
+from typing import Iterator
 from db import get_db, orm_all_words_search_condition
+from edit.index import EpiskopIndex, EpiskopIndexOrm
 from edit.task import TaskCollection, TaskOrm
 import settings
 from peewee import Model, AutoField, TextField, BooleanField, IntegerField, fn, Cast
@@ -13,6 +15,8 @@ class HierarhEditStorage:
         self.cafedra = TextCollectionDb('cafedra', CafedraEditOrm)
         self.episkop = TextCollectionDb('episkop', EpiskopEditOrm)
         self.task = TaskCollection()
+
+        self.episkop_index = EpiskopIndex(self)
 
     def get_coll(self, name) -> 'TextCollectionDb':
         r = {
@@ -87,7 +91,7 @@ class TextCollectionDb:
                     .limit(take).offset(skip)
         return [self._convert_orm_to_text(x) for x in q]
     
-    def iterate(self, query=None):
+    def iterate(self, query=None) -> Iterator['TextBase']:
         i = 0
         step = 20        
         while(p:=self.portion(i, step, query)):
@@ -288,9 +292,12 @@ VersionOrm.add_index(VersionOrm.collection, VersionOrm.doc_key)
 
 def init_edit_db():
     global EditDb
+
+    all_models = [CafedraEditOrm, EpiskopEditOrm, VersionOrm, TaskOrm, EpiskopIndexOrm] 
+
     EditDb = get_db(settings.EditDbName)
-    EditDb.bind([CafedraEditOrm, EpiskopEditOrm, VersionOrm, TaskOrm])
-    EditDb.create_tables([CafedraEditOrm, EpiskopEditOrm, VersionOrm, TaskOrm])
+    EditDb.bind(all_models)
+    EditDb.create_tables(all_models)
     return EditDb
 
 init_edit_db()
