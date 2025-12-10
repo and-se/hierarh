@@ -129,14 +129,14 @@ class TextCollectionDb:
     def version_count(self, key):
         return self._version_query(key).count()
     
-    def find_by_name(self, name: str):
+    def find_by_name(self, name: str, limit=10):
         d = self.orm.select(self.orm.id, self.orm.header) \
-            .where(fn.LOWER_PY(self.orm.header) == name.lower()).limit(10).namedtuples()
+            .where(fn.LOWER_PY(self.orm.header) == name.lower()).limit(limit).namedtuples()
         return list(d)
     
-    def suggest(self, query):
+    def suggest(self, query, limit=10):
         r = self.orm.select(self.orm.id, self.orm.header) \
-            .where(orm_all_words_search_condition(query, self.orm.header)).order_by(self.orm.header).limit(10)
+            .where(orm_all_words_search_condition(query, self.orm.header)).order_by(self.orm.header).limit(limit)
         
         return [{'value': x.header, 'key': x.id} for x in r]
         
