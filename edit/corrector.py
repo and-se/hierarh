@@ -1,18 +1,86 @@
-import os
+from collections import defaultdict
+
+from pathlib import Path
+from pprint import pprint
 import sys
+import logging
 
 if __name__ == '__main__':
-    sys.path.append(os.getcwd())
+    # ищем модули начиная с корня проекта (папка hierarh)
+    sys.path.append(str(Path(__file__).parent.parent.absolute()))
 
-from edit.text_view import CafedraView, EpiskopView
 
-
-import logging
-logging.basicConfig()
-
+from edit.text_view import TEXT_VIEW_LOG_NAME, CafedraView, EpiskopView
 from edit.storage import HierarhEditStorage
-
 from parsers.fail import ParseFail
+
+
+def main():
+    # В корневой лог прилетают все сообщения из дочерних (т.е. вообще всех) логов, 
+    # которые в своём логе (куда их отправили) прошли по logLevel.
+    # У новых логов logLevel=UNSET, т.е. смотри родителя.
+    # В крайнем случае цепочка докатится до корневого, у него по умолчанию WARNING
+    # Но вот если у нашего лога явно выставлен logLevel ниже,
+    # то всё подошедшее прилетит в корневой лог
+    rt = logging.getLogger()
+    fmt = logging.Formatter(logging.BASIC_FORMAT)
+    
+    # файловый обработчик все прилетевшие в него сообщения пишет в файл
+    log_file = logging.FileHandler('corrector.log', 'w')
+    log_file.setFormatter(fmt)
+    rt.addHandler(log_file)
+
+    # А обработчик консоли берёт только WARNING и выше
+    # logLevel обработчика не связан с logLevel самого лога.
+    strm = logging.StreamHandler()
+    strm.setFormatter(fmt)
+    strm.setLevel(logging.WARNING)
+    rt.addHandler(strm)
+
+    rt.warning("Ошибка в данных логируются в 'data-errors.log'")
+    data_errors = logging.getLogger(TEXT_VIEW_LOG_NAME)
+    data_errors.propagate = False
+    data_errors.setLevel(logging.DEBUG)
+    data_errors.addHandler(logging.FileHandler('data-errors.log', 'w'))
+
+    if len(sys.argv) != 2:
+        print(f"""usage: {sys.argv[0]}  CMD
+              index - rebuild episkop index
+              cafedra - process cafedra articles
+              """)
+        return
+    cmd = sys.argv[1]
+
+    # плохая идея, т.к. добавляет в корневой лог вывод на экран вообще всего
+    # прилетевшего из дочерних (если вдруг в дочернем logLevel=DEBUG, это посыпется на экран)
+    #logging.basicConfig()
+    
+    # check_episkop_to_cafedra_links(remove_old_tasks=True)
+       
+    if cmd == 'index':
+        rt.setLevel(logging.INFO)
+        strm.setLevel(logging.INFO)
+        print("Rebuild episkop index")
+        st = HierarhEditStorage()
+        st.episkop_index.rebuild()
+        return
+
+    if cmd != 'cafedra':
+        print("Bad cmd")
+        return
+    
+    DEBUG_TASKS = True
+    if DEBUG_TASKS:
+        from task import TASK_LOG_NAME
+        tlog = logging.getLogger(TASK_LOG_NAME)
+        # В корневой лог прилетят все сообщения из tlog, даже DEBUG.
+        # Но мы правильно настроили обработчики выше
+        tlog.setLevel(logging.DEBUG)            
+        tlog.warning("DEBUG_TASKS=TRUE!!!! ЗАДАЧИ ЛОГИРУЮТСЯ в файл tasks.txt!")
+        
+    totals = check_cafedra_to_episkop_links(True)
+    pprint(totals)
+
 
 def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor, task_type: str, remove_old_tasks: bool):
     """
@@ -88,16 +156,20 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
     
     db = HierarhEditStorage()
     create_tasks_for_coll(db, 'episkop', episkop_proccessor, "episkop->cafedra", remove_old_tasks)
-        
+
 def check_cafedra_to_episkop_links(remove_old_tasks):
+    totals = defaultdict(int)
+
     """Проверка ссылок на епископов в статьях кафедр"""
     def cafedra_processor(caf, task, db: HierarhEditStorage):
         task.title = caf.header() + " - непонятные ссылки на епископов"        
         caf: CafedraView = CafedraView(caf)
 
         for i, ep in enumerate(caf.episkops):
+            totals['всего строк о епископах']+=1
             if ep.link:
                 linked = db.episkop.get(ep.link)
+                totals['плохая ссылка']+=1
                 if not linked:
                     task.add_problem(i, ep, 'сломанная ссылка - нет такого епископа', ep.link)
                 else:
@@ -112,31 +184,30 @@ def check_cafedra_to_episkop_links(remove_old_tasks):
 
                 parsed_ep = ep.parsed_episkop
                 if isinstance(parsed_ep, ParseFail):
+                    totals['ошибка разбора']+=1
                     task.add_problem(i, ep, 'Ошибка разбора', parsed_ep)
                     continue
-                
+
+                min_year, max_year = ep.get_min_max_year()
                 found_ep = db.episkop_index.find_by_fields(parsed_ep.name, parsed_ep.surname, 
-                                                           begin_year=ep.begin_year, end_year=ep.end_year)
+                                                           begin_year=min_year, end_year=max_year)
+                                                           
                 #found_ep = db.episkop.find_by_name(ep.header)
 
                 if len(found_ep) == 1:
                     ... # проставить ссылку на епископа
                 elif not len(found_ep):
+                    totals['епископ не найден']+=1
                     task.add_problem(i, ep, "епископ не найден")
                 else: # many cafedra
+                    totals['какой именно епископ?']+=1
                     task.add_problem(i, ep, "какой именно епископ?", [f"{x.header} (#{x.id})" for x in found_ep])
     
     create_tasks_for_coll(HierarhEditStorage(), 'cafedra', cafedra_processor, "episkop->cafedra", remove_old_tasks)
+    return totals
 
 
 
-
-    
 if __name__ == '__main__':
-    # check_episkop_to_cafedra_links(remove_old_tasks=True)
-
-
-    '''print("Rebuild episkop index")
-    st = HierarhEditStorage()
-    st.episkop_index.rebuild()'''
-    check_cafedra_to_episkop_links(True)
+    main()
+    

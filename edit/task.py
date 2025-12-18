@@ -3,16 +3,7 @@ from peewee import AutoField, IntegerField, Model, TextField, DoubleField, Times
 from time import time as unix_now
 
 import logging
-tlog = logging.Logger('tasks')
-
-DEBUG_TASKS = True
-if DEBUG_TASKS:
-    tlog.warning("DEBUG_TASKS=TRUE!!!! ЗАДАЧИ ЛОГИРУЮТСЯ в файл tasks.txt!")
-    import os  # noqa: E402
-    if os.path.exists('tasks.txt'):
-        os.unlink('tasks.txt')
-    tlog.addHandler(logging.FileHandler('tasks.txt'))
-
+TASK_LOG_NAME = 'hierarh.task'
 
 
 class TaskCollection:
@@ -168,7 +159,7 @@ class Task:
             self.orm.when = unix_now()
             #self.orm.answer = see set_raw_answer         
             self.orm.save()
-            tlog.info(str(self))
+            logging.getLogger(TASK_LOG_NAME).debug(str(self))
 
     def something_to_json(self, dd):
         if dd is None: return None

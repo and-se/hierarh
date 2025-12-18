@@ -12,13 +12,14 @@ if TYPE_CHECKING:
 
 import logging
 
+
 class EpiskopIndex:
+    LOG_NAME = 'hierarh.EpiskopIndex'
+
     def __init__(self, db: 'HierarhEditStorage'):
         self.db = db
-        self.log = logging.Logger('EpiskopIndex')
-        self.log.addHandler(logging.StreamHandler(sys.stdout))
-
-
+        self.log = logging.getLogger(self.LOG_NAME)
+        
     def find_by_fields(self, name, surname=None, begin_year=None, end_year=None) -> list['EpiskopIndexOrm']:
         if not name and not surname:
             return []
@@ -26,11 +27,13 @@ class EpiskopIndex:
             raise ValueError('name must be not empty!')
         if name == 'NN' and not surname:
             return []  # NN is unknown man, so two NNs are different
-        #cond = fn.LOWER_PY(EpiskopIndexOrm.name) == name.lower()
-        cond = fn.INSTR(fn.LOWER_PY(EpiskopIndexOrm.name), name.lower())
+        #cond = fn.LOWER_PY(EpiskopIndexOrm.name) == name.lower()  # точное совпадение
+        cond = fn.INSTR(fn.LOWER_PY(EpiskopIndexOrm.name), name.lower())  # по подстроке
+        # cond = fn.INSTR(fn.LOWER_PY(EpiskopIndexOrm.name), name.lower()) == 1 # с начала строки
         if surname:
-            #cond = cond & (fn.LOWER_PY(EpiskopIndexOrm.surname) == surname.lower())
-            cond = cond & (fn.INSTR(fn.LOWER_PY(EpiskopIndexOrm.surname), surname.lower()))
+            #cond = cond & (fn.LOWER_PY(EpiskopIndexOrm.surname) == surname.lower())  # точное совпадение
+            cond = cond & (fn.INSTR(fn.LOWER_PY(EpiskopIndexOrm.surname), surname.lower()))  # по подстроке
+            #cond = cond & (fn.INSTR(fn.LOWER_PY(EpiskopIndexOrm.surname), surname.lower()) == 1) # с начала строки
         else:
             cond = cond & EpiskopIndexOrm.surname.is_null()
 
@@ -39,6 +42,9 @@ class EpiskopIndex:
                 begin_year = end_year
             elif not end_year:
                 end_year = begin_year
+            
+            if begin_year > end_year:
+                raise ValueError("begin_year must be <= end_year")
             # разрешаем зазор в 5 лет от означенного интервала
             # кроме приблизительного совпадения это позволяет
             # обработать интервалы в индексе, где начало=конец
@@ -56,8 +62,9 @@ class EpiskopIndex:
 
         ep_qq = EpiskopIndexOrm.select().where(cond).limit(10).namedtuples()
 
-        # print(ep_qq,
-        #       _Db.execute_sql(f'EXPLAIN QUERY PLAN {ep_qq}').fetchall())
+        #from storage import EditDb
+        #print(ep_qq, "PLAN:", EditDb.execute_sql(f'EXPLAIN QUERY PLAN {ep_qq}').fetchall(), '\n\n\n')
+        #raise ValueError()
 
         return list(ep_qq)
 
@@ -84,7 +91,7 @@ class EpiskopIndex:
 
                 years = list(x.begin_year for x in c.cafedras if x.begin_year) + \
                         list(x.end_year for x in c.cafedras if x.end_year)
-
+                
                 min_year = min(years, default=None)
                 max_year = max(years, default=None)
 
@@ -122,4 +129,8 @@ class EpiskopIndexOrm(Model):
 
     doc_key = IntegerField(null=False)
 
-EpiskopIndexOrm.add_index(EpiskopIndexOrm.name, EpiskopIndexOrm.surname)
+#EpiskopIndexOrm.add_index(EpiskopIndexOrm.name, EpiskopIndexOrm.surname, name="IDX_episkop")
+
+EpiskopIndexOrm.add_index(fn.LOWER_PY(EpiskopIndexOrm.name), fn.LOWER_PY(EpiskopIndexOrm.surname), name="IDX_episkop_name")
+EpiskopIndexOrm.add_index(EpiskopIndexOrm.max_year, name="IDX_episkop_max_year")
+EpiskopIndexOrm.add_index(EpiskopIndexOrm.min_year, name="IDX_episkop_min_year")

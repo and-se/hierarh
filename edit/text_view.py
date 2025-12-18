@@ -3,13 +3,18 @@ from lxml import html
 import re
 from functools import cached_property
 
-from parsers.dating import ParsedDating, parse_dating
+from parsers.dating import DATING_DIVIDERS, MAYBE_NOT_DATING, ParsedDating, parse_dating, parse_start_end_dating
 from parsers.episkop import ParsedEpiskopInCafedra, parse_episkop_name_in_cafedra
 from parsers.fail import ParseFail
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from edit.storage import TextCafedra, TextEpiskop
+
+import logging
+
+TEXT_VIEW_LOG_NAME = 'hierarh.text_view' 
+_L = logging.getLogger(TEXT_VIEW_LOG_NAME)
 
 
 class EpiskopView:
@@ -76,14 +81,18 @@ class CafedraRowView:
         return self.d[1].text_content().strip()
     
     @property
-    def parsed_begin_dating(self) -> ParsedDating | ParseFail:
+    def parsed_begin_dating(self) -> ParsedDating | ParseFail | None:
+        if not self.begin_dating:
+            return None
         if not self._parsed_begin:
             self._parsed_begin = parse_dating(self.begin_dating)
+            if isinstance(self._parsed_begin, ParseFail):
+                _L.warning(f"fail parse begin dating: {self.begin_dating} in {self}")
         return self._parsed_begin
     
     @property
     def begin_year(self) -> int | None:
-        if not isinstance(self.parsed_begin_dating, ParseFail):
+        if self.parsed_begin_dating and not isinstance(self.parsed_begin_dating, ParseFail):
             return self.parsed_begin_dating.year
     
     @property
@@ -91,14 +100,19 @@ class CafedraRowView:
         return self.d[2].text_content().strip()
 
     @property    
-    def parsed_end_dating(self) -> ParsedDating | ParseFail:
+    def parsed_end_dating(self) -> ParsedDating | ParseFail | None:
+        if not self.end_dating:
+            return None
         if not self._parsed_end:
             self._parsed_end = parse_dating(self.end_dating)
+            if isinstance(self._parsed_end, ParseFail):
+                _L.warning(f"fail parse end dating: {self.end_dating} in {self}")
+        
         return self._parsed_end
     
     @property
     def end_year(self) -> int | None:
-        if not isinstance(self.parsed_end_dating, ParseFail):
+        if self.parsed_end_dating and not isinstance(self.parsed_end_dating, ParseFail):
             return self.parsed_end_dating.year
         
     def __repr__(self):
@@ -199,14 +213,19 @@ class EpiskopRowView:
         return self.d[0].text_content().strip()
     
     @property
-    def parsed_begin_dating(self) -> ParsedDating | ParseFail:
+    def parsed_begin_dating(self) -> ParsedDating | ParseFail | None:
+        if not self.begin_dating:
+            return None
         if not self._parsed_begin:
             self._parsed_begin = parse_dating(self.begin_dating)
+            if isinstance(self._parsed_begin, ParseFail):
+                _L.warning(f"fail parse begin dating: {self.begin_dating} in {self}")
+        
         return self._parsed_begin
     
     @property
     def begin_year(self) -> int | None:
-        if not isinstance(self.parsed_begin_dating, ParseFail):
+        if self.parsed_begin_dating and not isinstance(self.parsed_begin_dating, ParseFail):
             return self.parsed_begin_dating.year
     
     @property
@@ -214,15 +233,61 @@ class EpiskopRowView:
         return self.d[1].text_content().strip()
 
     @property    
-    def parsed_end_dating(self) -> ParsedDating | ParseFail:
+    def parsed_end_dating(self) -> ParsedDating | ParseFail | None:
+        if not self.end_dating:
+            return None
         if not self._parsed_end:
             self._parsed_end = parse_dating(self.end_dating)
+            if isinstance(self._parsed_end, ParseFail):
+                _L.warning(f"fail parse end dating: {self.end_dating} in {self}")
         return self._parsed_end
     
     @property
     def end_year(self) -> int | None:
-        if not isinstance(self.parsed_end_dating, ParseFail):
+        if self.parsed_end_dating and not isinstance(self.parsed_end_dating, ParseFail):
             return self.parsed_end_dating.year
+        
+    @property
+    def brackets_text(self) -> str | None:
+        if not isinstance(self.parsed_episkop, ParseFail):
+            return self.parsed_episkop.brackets_content
+        
+    def get_brackets_dating(self) -> tuple[ParsedDating | None, ParsedDating | None] | ParseFail | None:
+        br = self.brackets_text
+        if br:
+            r = parse_start_end_dating(br, divider = DATING_DIVIDERS + ('/', ','))
+            if isinstance(r, ParseFail) and r.code == MAYBE_NOT_DATING:
+                return None
+            return r
+        
+    def get_min_max_year(self) -> tuple[int, int] | tuple[None, None]:
+        r = []
+
+        def add(year):
+            if year is not None:
+                r.append(year)
+        
+        add(self.begin_year)
+        add(self.end_year)
+
+        if len(r) == 2 and r[0] > r[1]:
+            _L.warning(f"begin_year > end_year for {self}")
+
+        inaccurate_dating = self.get_brackets_dating()
+        if inaccurate_dating:
+            if isinstance(inaccurate_dating, ParseFail):
+                _L.warning('Не разобрана дата в скобках %s', inaccurate_dating)
+            else:
+                d1, d2 = inaccurate_dating
+                if d1:
+                    r.append(d1.year)
+                if d2:
+                    r.append(d2.year)
+        
+        if not r:
+            return None, None
+
+        return min(r), max(r)
     
     
     @property
