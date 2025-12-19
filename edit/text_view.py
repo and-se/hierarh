@@ -44,10 +44,10 @@ class EpiskopView:
         return self._text.is_obn()
     
     @property
-    def cafedras(self) -> list['CafedraRowView']:
+    def cafedras(self) -> list['RowCafedraView']:
         # отбираем строки таблицы епископов, которые не являются заголовками
         rows = self._tree.xpath("""//table[contains(@class, 'cafedras')]/tbody/tr[not(contains(@class, 'header-row'))]""")
-        return [CafedraRowView(r) for r in rows]
+        return [RowCafedraView(r) for r in rows]
 
 
     def __repr__(self):
@@ -61,7 +61,7 @@ from edit.init_db_creator import CAFEDRA_MAP_FILE
 import json
 
 
-class CafedraRowView:    
+class RowCafedraView:    
     """
     Структурированное представление строки таблицы кафедр в html епископа
     """
@@ -154,7 +154,7 @@ class CafedraRowView:
         return min(r), max(r)
         
     def __repr__(self):
-        return f"CafedraRowView({self.name} ({self.begin_dating} - {self.end_dating})"
+        return f"RowCafedraView({self.name} ({self.begin_dating} - {self.end_dating})"
     
     def __str__(self):
         return f"{self.name} ({self.begin_dating} - {self.end_dating})"
@@ -209,10 +209,10 @@ class CafedraView:
         # TODO other names...
 
     @property
-    def episkops(self) -> list['EpiskopRowView']:
+    def episkops(self) -> list['RowEpiskopView']:
         # отбираем строки таблицы епископов, которые не являются заголовками
         rows = self._tree.xpath("""//table[contains(@class, 'episkops')]/tbody/tr[not(contains(@class, 'header-row'))]""")
-        return [EpiskopRowView(r) for r in rows]
+        return [RowEpiskopView(r) for r in rows]
     
     def __repr__(self):
         return f'CafedraView({self.__str__()})'
@@ -221,7 +221,7 @@ class CafedraView:
         return f'{self.header} #{self.key}'
     
 
-class EpiskopRowView:
+class RowEpiskopView:
     """
     Структурированное представление строки таблицы епископов в html кафедры
     """
@@ -357,7 +357,7 @@ class EpiskopRowView:
         return None  # TODO now no links
     
     def __repr__(self):
-        return f"EpiskopRowView({self.begin_dating} - {self.end_dating} {self.episkop})"
+        return f"RowEpiskopView({self.begin_dating} - {self.end_dating} {self.episkop})"
     
     def __str__(self):
         return f"{self.episkop} ({self.begin_dating} - {self.end_dating})"
