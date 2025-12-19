@@ -16,6 +16,8 @@ import logging
 TEXT_VIEW_LOG_NAME = 'hierarh.text_view' 
 _L = logging.getLogger(TEXT_VIEW_LOG_NAME)
 
+# разделители в интервале дат
+DATING_DIVIDERS_EXT = DATING_DIVIDERS + ('/', ',')
 
 class EpiskopView:
     """
@@ -48,6 +50,13 @@ class EpiskopView:
         return [CafedraRowView(r) for r in rows]
 
 
+    def __repr__(self):
+        return f'EpiskopView({self.__str__()})'
+    
+    def __str__(self):
+        return f'{self.header} #{self.key}'
+
+
 from edit.init_db_creator import CAFEDRA_MAP_FILE
 import json
 
@@ -69,7 +78,7 @@ class CafedraRowView:
     @property
     def name(self):
         if not self._name:
-            self._name = self.get_cafedra_name_in_episkop(self.caf.text_content())
+            self._name = self.build_cafedra_name(self.caf.text_content())
         return self._name
     
     @property
@@ -85,7 +94,7 @@ class CafedraRowView:
         if not self.begin_dating:
             return None
         if not self._parsed_begin:
-            self._parsed_begin = parse_dating(self.begin_dating)
+            self._parsed_begin = parse_dating(remove_brackets(self.begin_dating))
             if isinstance(self._parsed_begin, ParseFail):
                 _L.warning(f"fail parse begin dating: {self.begin_dating} in {self}")
         return self._parsed_begin
@@ -104,7 +113,7 @@ class CafedraRowView:
         if not self.end_dating:
             return None
         if not self._parsed_end:
-            self._parsed_end = parse_dating(self.end_dating)
+            self._parsed_end = parse_dating(remove_brackets(self.end_dating))
             if isinstance(self._parsed_end, ParseFail):
                 _L.warning(f"fail parse end dating: {self.end_dating} in {self}")
         
@@ -114,6 +123,35 @@ class CafedraRowView:
     def end_year(self) -> int | None:
         if self.parsed_end_dating and not isinstance(self.parsed_end_dating, ParseFail):
             return self.parsed_end_dating.year
+        
+    def get_min_max_year(self) -> tuple[int, int] | tuple[None, None]:
+        """
+        Извлекает минимальный и максимальный год из записи о кафедре.
+
+        Углбулённо изучает поля с датировкой начала и окончания (begin_dating, end_dating),
+        а именно готово к наличию двух датировок в одном поле.
+
+        @returns
+        Кортеж из двух чисел (минимальный и максимальный год - возможно равные)
+        либо два None, если данных нет совсем
+        """
+        r = []
+        for dating in (self.begin_dating, self.end_dating):
+            if not dating.strip():
+                continue            
+            dating2 = remove_brackets(dating)
+            parsed2 = parse_start_end_dating(dating2, divider=DATING_DIVIDERS_EXT)
+            if not isinstance(parsed2, ParseFail):
+                for date in parsed2:
+                    if date:
+                        r.append(date.year)
+            else:
+                _L.warning(f"fail parse dating: {dating} in {self}")
+
+
+        if not r:
+            return None, None
+        return min(r), max(r)
         
     def __repr__(self):
         return f"CafedraRowView({self.name} ({self.begin_dating} - {self.end_dating})"
@@ -125,7 +163,7 @@ class CafedraRowView:
         Cafedra_name_map = json.load(f)
 
     @classmethod
-    def get_cafedra_name_in_episkop(cls, caf_td: str):
+    def build_cafedra_name(cls, caf_td: str):
         caf_td = caf_td.replace('?', '')        
         caf_td = re.sub(r'^\s*\(?\s*в\s*/\s*у\s*\)?\s*', '', caf_td)            
         caf_td = caf_td.replace('()', '')
@@ -176,6 +214,12 @@ class CafedraView:
         rows = self._tree.xpath("""//table[contains(@class, 'episkops')]/tbody/tr[not(contains(@class, 'header-row'))]""")
         return [EpiskopRowView(r) for r in rows]
     
+    def __repr__(self):
+        return f'CafedraView({self.__str__()})'
+    
+    def __str__(self):
+        return f'{self.header} #{self.key}'
+    
 
 class EpiskopRowView:
     """
@@ -193,7 +237,7 @@ class EpiskopRowView:
         self._parsed_end = None
  
     @property
-    def episkop(self):
+    def episkop(self) -> str:
         if not self._ep:
             # берем только текстовые узлы, все теги игнорируем
             # todo игнорировать только span fnote
@@ -249,18 +293,36 @@ class EpiskopRowView:
         
     @property
     def brackets_text(self) -> str | None:
+        """
+        Содержимое скобок в конце текста,
+        например Антоний Герасимов-Зыбелин (<Забелин?>)
+        """
         if not isinstance(self.parsed_episkop, ParseFail):
             return self.parsed_episkop.brackets_content
         
     def get_brackets_dating(self) -> tuple[ParsedDating | None, ParsedDating | None] | ParseFail | None:
+        """
+        Попытка распознать скобки как одну или две датировки,
+        например Евфимий (<1447–1451>)
+        """
         br = self.brackets_text
         if br:
-            r = parse_start_end_dating(br, divider = DATING_DIVIDERS + ('/', ','))
+            r = parse_start_end_dating(br, divider = DATING_DIVIDERS_EXT)
             if isinstance(r, ParseFail) and r.code == MAYBE_NOT_DATING:
                 return None
             return r
         
     def get_min_max_year(self) -> tuple[int, int] | tuple[None, None]:
+        """
+        Извлекает минимальный и максимальный год из записи о епископе.
+
+        Просматривает поля с датировкой начала и окончания (begin_dating, end_dating),
+        а также содержимое скобок (brackets_text --> get_brackets_dating())
+
+        @returns
+        Кортеж из двух чисел (минимальный и максимальный год - возможно равные)
+        либо два None, если данных нет совсем
+        """
         r = []
 
         def add(year):
@@ -299,3 +361,32 @@ class EpiskopRowView:
     
     def __str__(self):
         return f"{self.episkop} ({self.begin_dating} - {self.end_dating})"
+    
+def remove_brackets(s):
+    """
+    Если всё содержимое строки заключено в скобки, убирает их.
+    Но учитывая вложенность скобок.
+
+    Например, '(abc (def) ek)' --> 'abc (def) ek'
+    но '(ab) c (de)' --> '(ab) c (de)'
+    'wrong )' --> 'wrong )'
+
+    @returns
+    входной текст без скобок и пробелов на концах (strip).
+    Либо исходную строку.
+    """
+    s = s.strip()
+    level, i = 0, 0
+    length = len(s)
+    for i in range(length):
+        if s[i] == '(':
+            level+=1
+        elif s[i] == ')':
+            level-=1
+        if level<=0:
+            break
+    if level==0 and i>0 and i == length-1:
+        return s[1:-1]
+    else:
+        return s
+

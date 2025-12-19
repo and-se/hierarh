@@ -88,16 +88,26 @@ class EpiskopIndex:
                 else:
                     self.log.warning(f"Can't parse {header}")
                     ...
-
-                years = list(x.begin_year for x in c.cafedras if x.begin_year) + \
-                        list(x.end_year for x in c.cafedras if x.end_year)
                 
+                years = []
+                for caf in c.cafedras:
+                    for year in caf.get_min_max_year():
+                        if year:
+                            years.append(year)
+
                 min_year = min(years, default=None)
                 max_year = max(years, default=None)
 
                 # Либо никаких лет, либо должны быть оба конца (пусть и равные)
                 assert (min_year is not None and max_year is not None) or \
                        (min_year is None and max_year is None)
+                
+                if min_year and max_year:
+                    if abs(max_year - min_year) > 100:
+                        self.log.warning(f'Слишком большой интервал лет {min_year, max_year} в статье епископа {c}', )
+                else:
+                    assert min_year is None and max_year is None, \
+                    'Должно быть либо оба года, либо ни одного'
                 
                 EpiskopIndexOrm.insert(doc_key = c.key, 
                             saint_title=saint_title,
