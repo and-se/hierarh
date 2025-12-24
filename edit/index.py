@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 import logging
 
+import threading
 
 from peewee import SqliteDatabase
 MEM_CACHE = SqliteDatabase('file:/indx?vfs=memdb', uri=True)
@@ -19,6 +20,7 @@ MEM_CACHE = SqliteDatabase('file:/indx?vfs=memdb', uri=True)
 def lower(s):
     return s.lower() if isinstance(s, str) else None
 
+MEM_LOCK = threading.Lock()
 
 class EpiskopIndex:
     LOG_NAME = 'hierarh.EpiskopIndex'
@@ -28,8 +30,9 @@ class EpiskopIndex:
         self.log = logging.getLogger(self.LOG_NAME)
         self.mem_cache = copy_to_ram
 
-        if self.mem_cache:
-            self._init_in_memory()
+        with MEM_LOCK:
+            if self.mem_cache:
+                self._init_in_memory()
 
     def _init_in_memory(self):
         #logger = logging.getLogger('peewee')

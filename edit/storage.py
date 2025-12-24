@@ -16,7 +16,13 @@ class HierarhEditStorage:
         self.episkop = TextCollectionDb('episkop', EpiskopEditOrm)
         self.task = TaskCollection()
 
-        self.episkop_index = EpiskopIndex(self)
+        self._episkop_index = None
+
+    @property
+    def episkop_index(self):
+        if not self._episkop_index:
+            self._episkop_index = EpiskopIndex(self, copy_to_ram=True)
+        return self._episkop_index
 
     def get_coll(self, name) -> 'TextCollectionDb':
         r = {
