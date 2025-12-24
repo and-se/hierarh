@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+import multiprocessing
 from pathlib import Path
 from pprint import pprint
 import sys
@@ -9,7 +10,6 @@ from typing import Any, DefaultDict
 if __name__ == '__main__':
     # ищем модули начиная с корня проекта (папка hierarh)
     sys.path.append(str(Path(__file__).parent.parent.absolute()))
-
 
 from edit.text_view import TEXT_VIEW_LOG_NAME, CafedraView, EpiskopView
 from edit.storage import HierarhEditStorage
@@ -44,10 +44,17 @@ def main():
     data_errors.setLevel(logging.DEBUG)
     data_errors.addHandler(logging.FileHandler('data-errors.log', 'w'))
 
+    from edit.index import EpiskopIndex
+    ixl = logging.getLogger(EpiskopIndex.LOG_NAME)
+    ixl.setLevel(logging.INFO)
+    ixl.addHandler(logging.StreamHandler())
+
     if len(sys.argv) != 2:
         print(f"""usage: {sys.argv[0]}  CMD
               index - rebuild episkop index
               cafedra - process cafedra articles
+              episkop - process episkop articles
+              clear - remove all tasks from db
               """)
         return
     cmd = sys.argv[1]
@@ -65,8 +72,24 @@ def main():
         st = HierarhEditStorage()
         st.episkop_index.rebuild()
         return
+    
+    if cmd == 'clear':
+        print("Remove all tasks")
+        st = HierarhEditStorage()
+        tot = st.task.count()
+        if tot:
+            print("Now", tot, "tasks. Remove?")
+            yes = input()
+            if yes.lower() not in ('1', 'yes', 'да', 'ok'):
+                print("Cancel")
+                return
+            st.task.remove_all()
+            print("Done")
+        else:
+            print("Not tasks")
+        return
 
-    if cmd != 'cafedra':
+    if cmd not in ('cafedra', 'episkop'):
         print("Bad cmd")
         return
     
@@ -78,12 +101,17 @@ def main():
         # Но мы правильно настроили обработчики выше
         tlog.setLevel(logging.DEBUG)            
         tlog.warning("DEBUG_TASKS=TRUE!!!! ЗАДАЧИ ЛОГИРУЮТСЯ в файл tasks.txt!")
-        
-    totals = check_cafedra_to_episkop_links(True)
+
+    if cmd == 'cafedra':
+        totals = check_cafedra_to_episkop_links(True)
+    else:
+        totals = check_episkop_to_cafedra_links(True)
+
     pprint(totals)
 
 
-def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor, task_type: str, remove_old_tasks: bool):
+def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor, 
+                          task_type: str, remove_old_tasks: bool, parallel=False) -> dict[Any, int]:
     """
     Перебирает документы коллекции coll_name и добавляет задачи
 
@@ -95,6 +123,9 @@ def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor,
 
     Есть проблемы в задачу не добавлены, то задача для документа не создаётся.
     """
+
+    if parallel:
+        return create_tasks_for_coll_parallel(db, coll_name, doc_processor, task_type, remove_old_tasks)
 
     coll = db.get_coll(coll_name)
     stats = defaultdict(int)
@@ -115,6 +146,72 @@ def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor,
 
         if task.changed:
             task.save('admin')
+    return stats
+
+
+def create_tasks_for_coll_parallel(db: HierarhEditStorage, coll_name: str, doc_processor, 
+                          task_type: str, remove_old_tasks: bool) -> DefaultDict[Any, int]:
+    """
+    Параллельная версия create_tasks_for_coll - не шибко быстрее...
+    """
+
+    coll = db.get_coll(coll_name)
+    
+    if remove_old_tasks:
+        # db.task.reset() - recreates table
+        db.task.remove_by_type(task_type)
+    
+    bulk=100
+    bulk_frames = ((x, bulk) for x in range(0, coll.count(), bulk))
+    global_counter = multiprocessing.Value('i', 0)
+
+    from functools import partial
+    portion_processor=partial(_portion_processor, coll_name, task_type, doc_processor)
+
+    stats = defaultdict(int)
+    with multiprocessing.Pool(initializer=_worker_init, initargs=(global_counter,)) as pool:
+        res = pool.map(portion_processor, bulk_frames)
+    for portion_stat, tasks_to_save in res:
+        for t in tasks_to_save:
+            t.save("admin")
+        for k in portion_stat:
+            stats[k] += portion_stat[k]
+        
+    return stats
+
+def _worker_init(counter):
+    global global_counter
+    global_counter = counter
+
+    global db
+    db = HierarhEditStorage()
+
+def _portion_processor(coll_name, task_type, doc_processor, bulk_frames):
+        stats = defaultdict(int)
+        tasks_to_save = []
+        skip, take = bulk_frames
+        
+        global db
+        portion = db.get_coll(coll_name).portion(skip, take)
+
+        for doc in portion:
+            task = db.task.get(coll_name=db.episkop.name, doc_key=doc.key, doc_reg_data_when=doc.reg_data['when'])
+            task.type_ = task_type        
+            task.changed = False  # сброс флага изменённости задачи
+
+            # внешняя обработка документа вызывающим
+            doc_processor(doc, task, db, stats)
+
+            if task.changed:
+                #task.save('admin')
+                tasks_to_save.append(task)
+
+        global global_counter
+        with global_counter.get_lock():
+            global_counter.value += len(portion)
+            logging.warning(f"Processed {global_counter.value} items")
+        return stats, tasks_to_save
+    
 
 def check_episkop_to_cafedra_links(remove_old_tasks=False):
     """Проверка ссылок на кафедры из статей о епископах"""
@@ -136,10 +233,12 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
                 linked = db.cafedra.get(caf.link)
                 if not linked:
                     task.add_problem(i, caf, 'сломанная ссылка - нет такой кафедры', caf.link)
+                    stats['сломанная ссылка - нет такой кафедры']+=1
                 else:
                     linked = CafedraView(linked)
                     if not linked.has_name(caf.name):
                         task.add_problem(i, caf, 'Проставлена сылка на кафедру', linked.name, 'Это верно?')
+                        stats['возможно сломанная ссылка']+=1
             else:
                 #if caf in db.cafedra.ignored_names:                
                     # не нужно проставлять ссылки на ?, NN
@@ -154,11 +253,14 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
                     ... # проставить ссылку на кафедру
                 elif not len(found_cafs):
                     task.add_problem(i, caf, "кафедра не найдена")
+                    stats['кафедра не найдена']+=1
                 else: # many cafedra
                     task.add_problem(i, caf, "какая именно кафедра?", found_cafs)
+                    stats['какая именно кафедра?']+=1
     
     db = HierarhEditStorage()
-    return create_tasks_for_coll(db, 'episkop', episkop_proccessor, "episkop->cafedra", remove_old_tasks)
+    return create_tasks_for_coll(db, 'episkop', episkop_proccessor, "episkop->cafedra", remove_old_tasks, parallel=False)
+    #fixme чтобы распараллелить, надо отказаться от вложенной функции episkop_proccessor и сделать её обычной... 
 
 
 """Проверка ссылок на епископов в статьях кафедр"""
@@ -217,7 +319,7 @@ def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
 
 def check_cafedra_to_episkop_links(remove_old_tasks):    
     return create_tasks_for_coll(HierarhEditStorage(), 'cafedra', cafedra_processor, 
-                                 "episkop->cafedra", remove_old_tasks)
+                                 "episkop->cafedra", remove_old_tasks, parallel=True)
 
 
 
