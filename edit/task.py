@@ -167,7 +167,7 @@ class Task:
 
     def __str__(self):
         from pprint import pformat
-        return f"Task({self.target}: {pformat(self._problems, sort_dicts=False)})"
+        return f"Task({self.target} {self.title}: {pformat(self._problems, sort_dicts=False)})"
     
     def __repr__(self):
         return str(self)

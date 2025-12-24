@@ -137,7 +137,7 @@ def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor,
     for cnt, doc in enumerate(coll.iterate()):
         if cnt and cnt % 100 == 0:
             logging.warning("Processed %s items", cnt)   
-        task = db.task.get(coll_name=db.episkop.name, doc_key=doc.key, doc_reg_data_when=doc.reg_data['when'])
+        task = db.task.get(coll_name=coll_name, doc_key=doc.key, doc_reg_data_when=doc.reg_data['when'])
         task.type_ = task_type        
         task.changed = False  # сброс флага изменённости задачи
 
@@ -195,7 +195,7 @@ def _portion_processor(coll_name, task_type, doc_processor, bulk_frames):
         portion = db.get_coll(coll_name).portion(skip, take)
 
         for doc in portion:
-            task = db.task.get(coll_name=db.episkop.name, doc_key=doc.key, doc_reg_data_when=doc.reg_data['when'])
+            task = db.task.get(coll_name=coll_name, doc_key=doc.key, doc_reg_data_when=doc.reg_data['when'])
             task.type_ = task_type        
             task.changed = False  # сброс флага изменённости задачи
 
@@ -286,6 +286,7 @@ def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
                 continue
 
             parsed_ep = ep.parsed_episkop
+            filters_skipped = False
             if isinstance(parsed_ep, ParseFail):                    
                 stats['ошибка разбора']+=1
                 task.add_problem(i, ep, 'Ошибка разбора', parsed_ep)
@@ -304,6 +305,7 @@ def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
                                                         cafedra=caf.header)                    
                 if not found_ep and (min_year or max_year):
                     found_ep = db.episkop_index.find_by_fields(parsed_ep.name, parsed_ep.surname)
+                    filters_skipped = True
                                                         
             #found_ep = db.episkop.find_by_name(ep.header)
 
@@ -313,7 +315,8 @@ def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
                 stats['епископ не найден']+=1
                 task.add_problem(i, ep, "епископ не найден")
             else: # many cafedra
-                stats['какой именно епископ?']+=1
+                key = 'какой именно епископ (фильтры сброшены)?' if filters_skipped else 'какой именно епископ?'
+                stats[key]+=1
                 task.add_problem(i, ep, "какой именно епископ?", [f"{x.header} (#{x.doc_key})" for x in found_ep])
 
 
