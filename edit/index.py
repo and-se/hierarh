@@ -19,8 +19,11 @@ class EpiskopIndex:
     def __init__(self, db: 'HierarhEditStorage'):
         self.db = db
         self.log = logging.getLogger(self.LOG_NAME)
-        
-    def find_by_fields(self, name, surname=None, begin_year=None, end_year=None) -> list['EpiskopIndexOrm']:
+    def find_by_fields(self, name, surname=None, 
+                       begin_year=None, end_year=None,
+                       cafedra: str | None = None) -> list['EpiskopIndexOrm']:
+        #OrmModel = MemItem if self.mem_cache else EpiskopIndexOrm
+        OrmModel = EpiskopIndexOrm
         if not name and not surname:
             return []
         if not name:
@@ -28,14 +31,14 @@ class EpiskopIndex:
         if name == 'NN' and not surname:
             return []  # NN is unknown man, so two NNs are different
         #cond = fn.LOWER_PY(EpiskopIndexOrm.name) == name.lower()  # точное совпадение
-        cond = fn.INSTR(fn.LOWER_PY(EpiskopIndexOrm.name), name.lower())  # по подстроке
+        cond = fn.INSTR(fn.LOWER_PY(OrmModel.name), name.lower())  # по подстроке
         # cond = fn.INSTR(fn.LOWER_PY(EpiskopIndexOrm.name), name.lower()) == 1 # с начала строки
         if surname:
             #cond = cond & (fn.LOWER_PY(EpiskopIndexOrm.surname) == surname.lower())  # точное совпадение
-            cond = cond & (fn.INSTR(fn.LOWER_PY(EpiskopIndexOrm.surname), surname.lower()))  # по подстроке
+            cond = cond & (fn.INSTR(fn.LOWER_PY(OrmModel.surname), surname.lower()))  # по подстроке
             #cond = cond & (fn.INSTR(fn.LOWER_PY(EpiskopIndexOrm.surname), surname.lower()) == 1) # с начала строки
         else:
-            cond = cond & EpiskopIndexOrm.surname.is_null()
+            cond = cond & OrmModel.surname.is_null()
 
         if begin_year or end_year:
             if not begin_year:
@@ -57,16 +60,21 @@ class EpiskopIndex:
 
                 # требуем пересечение между запрошенным отрезком лет и годами епископа в индексе
                 # если у епископа нету лет, он не попадёт в результат
-                ((EpiskopIndexOrm.min_year <= end_year) & (EpiskopIndexOrm.max_year >= begin_year))
+                ((OrmModel.min_year <= end_year) & (OrmModel.max_year >= begin_year))
                 )
 
-        ep_qq = EpiskopIndexOrm.select().where(cond).limit(10).namedtuples()
+        #ep_qq = EpiskopIndexOrm.select().where(cond).limit(30).namedtuples()
+        ep_qq = OrmModel.select().where(cond).limit(30).namedtuples()
 
         #from storage import EditDb
         #print(ep_qq, "PLAN:", EditDb.execute_sql(f'EXPLAIN QUERY PLAN {ep_qq}').fetchall(), '\n\n\n')
         #raise ValueError()
 
-        return list(ep_qq)
+        res = list(ep_qq)
+        if cafedra:
+            res = [c for c in res if cafedra.lower() in c.cafedras.lower()]
+
+        return res[:10]
 
     def rebuild(self):
         self.log.info("Start rebuild episkop index")
@@ -78,6 +86,7 @@ class EpiskopIndex:
                 c = EpiskopView(c)
                 header = c.header
                 parsed = parse_episkop_name_in_cafedra(header)
+                caf_names = set()
 
                 name, surname, saint_title = None, None, None
 
@@ -94,6 +103,7 @@ class EpiskopIndex:
                     for year in caf.get_min_max_year():
                         if year:
                             years.append(year)
+                    caf_names.add(caf.name.strip())
 
                 min_year = min(years, default=None)
                 max_year = max(years, default=None)
@@ -114,7 +124,8 @@ class EpiskopIndex:
                             header=header, name=name, surname=surname,
                             min_year = min_year,
                             max_year = max_year,
-                            is_obn = c.is_obn
+                            is_obn = c.is_obn,
+                            cafedras = ' | '.join(sorted(caf_names))
                 ).execute()
 
                 if i%100 == 0:
@@ -134,13 +145,12 @@ class EpiskopIndexOrm(Model):
     surname = TextField(null=True)
     saint_title = TextField(null=True, default=None)
     is_obn = BooleanField(null=False)
-    min_year = IntegerField(null=True)
-    max_year = IntegerField(null=True)
+    min_year = IntegerField(null=True, index=True)
+    max_year = IntegerField(null=True, index=True)
+    cafedras = TextField()
 
     doc_key = IntegerField(null=False)
 
 #EpiskopIndexOrm.add_index(EpiskopIndexOrm.name, EpiskopIndexOrm.surname, name="IDX_episkop")
 
 EpiskopIndexOrm.add_index(fn.LOWER_PY(EpiskopIndexOrm.name), fn.LOWER_PY(EpiskopIndexOrm.surname), name="IDX_episkop_name")
-EpiskopIndexOrm.add_index(EpiskopIndexOrm.max_year, name="IDX_episkop_max_year")
-EpiskopIndexOrm.add_index(EpiskopIndexOrm.min_year, name="IDX_episkop_min_year")

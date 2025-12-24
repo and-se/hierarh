@@ -4,6 +4,7 @@ from pathlib import Path
 from pprint import pprint
 import sys
 import logging
+from typing import Any, DefaultDict
 
 if __name__ == '__main__':
     # ищем модули начиная с корня проекта (папка hierarh)
@@ -37,7 +38,7 @@ def main():
     strm.setLevel(logging.WARNING)
     rt.addHandler(strm)
 
-    rt.warning("Ошибка в данных логируются в 'data-errors.log'")
+    rt.warning("Ошибки в данных логируются в 'data-errors.log'")
     data_errors = logging.getLogger(TEXT_VIEW_LOG_NAME)
     data_errors.propagate = False
     data_errors.setLevel(logging.DEBUG)
@@ -87,7 +88,8 @@ def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor,
     Перебирает документы коллекции coll_name и добавляет задачи
 
     Функция doc_processor(doc, task, db) получает 
-    документ коллекции, пустую задачу и соединение с БД.
+    документ коллекции, пустую задачу, соединение с БД и словарь stats для итоговой статистики
+    (в stats автоматически добавляются неизвестные ключи со значением 0).
     Должна добавить в задачу проблемы при помощи Task.add_problem, 
     а также задать заголовок задачи Task.title
 
@@ -95,6 +97,7 @@ def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor,
     """
 
     coll = db.get_coll(coll_name)
+    stats = defaultdict(int)
     
     if remove_old_tasks:
         # db.task.reset() - recreates table
@@ -108,7 +111,7 @@ def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor,
         task.changed = False  # сброс флага изменённости задачи
 
         # внешняя обработка документа вызывающим
-        doc_processor(doc, task, db)
+        doc_processor(doc, task, db, stats)
 
         if task.changed:
             task.save('admin')
@@ -124,7 +127,7 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
         'ЗВЕНИГОРОДСКАЯ, обновленческая' : 'ЗВЕНИГОРОДСКАЯ (Московская), обновленческая',
     }
 
-    def episkop_proccessor(ep, task, db: HierarhEditStorage):
+    def episkop_proccessor(ep, task, db: HierarhEditStorage, stats):
         task.title = ep.header() + " - непонятные ссылки на кафедры"        
         ep = EpiskopView(ep)
 
@@ -155,56 +158,66 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
                     task.add_problem(i, caf, "какая именно кафедра?", found_cafs)
     
     db = HierarhEditStorage()
-    create_tasks_for_coll(db, 'episkop', episkop_proccessor, "episkop->cafedra", remove_old_tasks)
+    return create_tasks_for_coll(db, 'episkop', episkop_proccessor, "episkop->cafedra", remove_old_tasks)
 
-def check_cafedra_to_episkop_links(remove_old_tasks):
-    totals = defaultdict(int)
 
-    """Проверка ссылок на епископов в статьях кафедр"""
-    def cafedra_processor(caf, task, db: HierarhEditStorage):
-        task.title = caf.header() + " - непонятные ссылки на епископов"        
-        caf: CafedraView = CafedraView(caf)
+"""Проверка ссылок на епископов в статьях кафедр"""
+def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
+    task.title = caf.header() + " - непонятные ссылки на епископов"        
+    caf: CafedraView = CafedraView(caf)
 
-        for i, ep in enumerate(caf.episkops):
-            totals['всего строк о епископах']+=1
-            if ep.link:
-                linked = db.episkop.get(ep.link)
-                totals['плохая ссылка']+=1
-                if not linked:
-                    task.add_problem(i, ep, 'сломанная ссылка - нет такого епископа', ep.link)
-                else:
-                    raise NotImplementedError
-                    #linked = EpiskopView(linked)
-                    #if not linked.has_name(ep.name):
-                    #    task.add_problem(i, ep, 'Проставлена ссылка на епископа', linked.name, 'Это верно?')
+    for i, ep in enumerate(caf.episkops):
+        stats['всего строк о епископах']+=1
+        if ep.link:
+            linked = db.episkop.get(ep.link)
+            stats['плохая ссылка']+=1
+            if not linked:
+                task.add_problem(i, ep, 'сломанная ссылка - нет такого епископа', ep.link)
             else:
-                if ep.episkop == 'NN':
-                    # не нужно проставлять ссылки на ?, NN
-                    continue
+                raise NotImplementedError
+                #linked = EpiskopView(linked)
+                #if not linked.has_name(ep.name):
+                #    task.add_problem(i, ep, 'Проставлена ссылка на епископа', linked.name, 'Это верно?')
+        else:
+            if ep.episkop == 'NN':
+                # не нужно проставлять ссылки на ?, NN
+                continue
 
-                parsed_ep = ep.parsed_episkop
-                if isinstance(parsed_ep, ParseFail):
-                    totals['ошибка разбора']+=1
-                    task.add_problem(i, ep, 'Ошибка разбора', parsed_ep)
-                    continue
+            parsed_ep = ep.parsed_episkop
+            if isinstance(parsed_ep, ParseFail):                    
+                stats['ошибка разбора']+=1
+                task.add_problem(i, ep, 'Ошибка разбора', parsed_ep)
+                continue
 
+                '''
+                found_ep = db.episkop.find_by_name(ep.episkop)
+                if not found_ep:
+                    stats['ошибка разбора']+=1
+                    continue
+                '''
+            else:
                 min_year, max_year = ep.get_min_max_year()
                 found_ep = db.episkop_index.find_by_fields(parsed_ep.name, parsed_ep.surname, 
-                                                           begin_year=min_year, end_year=max_year)
-                                                           
-                #found_ep = db.episkop.find_by_name(ep.header)
+                                                        begin_year=min_year, end_year=max_year,
+                                                        cafedra=caf.header)                    
+                if not found_ep and (min_year or max_year):
+                    found_ep = db.episkop_index.find_by_fields(parsed_ep.name, parsed_ep.surname)
+                                                        
+            #found_ep = db.episkop.find_by_name(ep.header)
 
-                if len(found_ep) == 1:
-                    ... # проставить ссылку на епископа
-                elif not len(found_ep):
-                    totals['епископ не найден']+=1
-                    task.add_problem(i, ep, "епископ не найден")
-                else: # many cafedra
-                    totals['какой именно епископ?']+=1
-                    task.add_problem(i, ep, "какой именно епископ?", [f"{x.header} (#{x.id})" for x in found_ep])
-    
-    create_tasks_for_coll(HierarhEditStorage(), 'cafedra', cafedra_processor, "episkop->cafedra", remove_old_tasks)
-    return totals
+            if len(found_ep) == 1:
+                ... # проставить ссылку на епископа
+            elif not len(found_ep):
+                stats['епископ не найден']+=1
+                task.add_problem(i, ep, "епископ не найден")
+            else: # many cafedra
+                stats['какой именно епископ?']+=1
+                task.add_problem(i, ep, "какой именно епископ?", [f"{x.header} (#{x.doc_key})" for x in found_ep])
+
+
+def check_cafedra_to_episkop_links(remove_old_tasks):    
+    return create_tasks_for_coll(HierarhEditStorage(), 'cafedra', cafedra_processor, 
+                                 "episkop->cafedra", remove_old_tasks)
 
 
 
