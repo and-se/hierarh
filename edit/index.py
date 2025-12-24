@@ -1,4 +1,3 @@
-import sys
 from peewee import Model, fn, AutoField, TextField, BooleanField, IntegerField
 
 from parsers.episkop import parse_episkop_name_in_cafedra
@@ -13,17 +12,43 @@ if TYPE_CHECKING:
 import logging
 
 
+from peewee import SqliteDatabase
+MEM_CACHE = SqliteDatabase('file:/indx?vfs=memdb', uri=True)
+
+@MEM_CACHE.func('LOWER_PY', deterministic=True)
+def lower(s):
+    return s.lower() if isinstance(s, str) else None
+
+
 class EpiskopIndex:
     LOG_NAME = 'hierarh.EpiskopIndex'
 
-    def __init__(self, db: 'HierarhEditStorage'):
+    def __init__(self, db: 'HierarhEditStorage', copy_to_ram=True):
         self.db = db
         self.log = logging.getLogger(self.LOG_NAME)
+        self.mem_cache = copy_to_ram
+
+        if self.mem_cache:
+            self._init_in_memory()
+
+    def _init_in_memory(self):
+        #logger = logging.getLogger('peewee')
+        #logger.setLevel(logging.DEBUG)
+        #logger.addHandler(logging.StreamHandler())
+            
+        if not MemItem.table_exists():
+            self.log.info("Start copy EpiskopIndex into memory")
+            MemItem.create_table()
+            with MEM_CACHE.atomic():
+                for c in EpiskopIndexOrm.select().dicts():
+                    MemItem.create(**c)
+            
+            self.log.info(f"In-memory index created. Total records {MemItem.select().count()}")
+
     def find_by_fields(self, name, surname=None, 
                        begin_year=None, end_year=None,
                        cafedra: str | None = None) -> list['EpiskopIndexOrm']:
-        #OrmModel = MemItem if self.mem_cache else EpiskopIndexOrm
-        OrmModel = EpiskopIndexOrm
+        OrmModel = MemItem if self.mem_cache else EpiskopIndexOrm
         if not name and not surname:
             return []
         if not name:
@@ -79,6 +104,8 @@ class EpiskopIndex:
     def rebuild(self):
         self.log.info("Start rebuild episkop index")
         EpiskopIndexOrm.drop_table()
+        if self.mem_cache:
+            MemItem.drop_table()
         EpiskopIndexOrm.create_table()
         self.log.info("schema recreated")
         with self.db.atomic():
@@ -150,6 +177,10 @@ class EpiskopIndexOrm(Model):
     cafedras = TextField()
 
     doc_key = IntegerField(null=False)
+
+class MemItem(EpiskopIndexOrm):
+    class Meta:
+        database = MEM_CACHE
 
 #EpiskopIndexOrm.add_index(EpiskopIndexOrm.name, EpiskopIndexOrm.surname, name="IDX_episkop")
 
