@@ -1,5 +1,7 @@
+import re
 from peewee import Model, fn, AutoField, TextField, BooleanField, IntegerField
 
+from db import orm_all_words_search_condition
 from parsers.episkop import parse_episkop_name_in_cafedra
 from parsers.fail import ParseFail
 
@@ -48,10 +50,17 @@ class EpiskopIndex:
             
             self.log.info(f"In-memory index created. Total records {MemItem.select().count()}")
 
-    def find_by_fields(self, name, surname=None, 
+    @property
+    def orm_model(self):
+        return MemItem if self.mem_cache else EpiskopIndexOrm
+    
+
+    def find_by_fields(self, name=None, surname=None, 
                        begin_year=None, end_year=None,
-                       cafedra: str | None = None) -> list['EpiskopIndexOrm']:
-        OrmModel = MemItem if self.mem_cache else EpiskopIndexOrm
+                       cafedra: str | None = None,
+                       saint_title=None,
+                       is_obn: bool | None = None) -> list['EpiskopIndexOrm']:
+        OrmModel = self.orm_model
         if not name and not surname:
             return []
         if not name:
@@ -68,6 +77,12 @@ class EpiskopIndex:
         else:
             cond = cond & OrmModel.surname.is_null()
 
+        if is_obn is not None:
+            cond = cond & (OrmModel.is_obn == is_obn)
+        
+        if saint_title:
+            cond = cond & (fn.LOWER_PY(OrmModel.saint_title) == fn.LOWER_PY(saint_title.strip()))
+
         if begin_year or end_year:
             if not begin_year:
                 begin_year = end_year
@@ -76,11 +91,13 @@ class EpiskopIndex:
             
             if begin_year > end_year:
                 raise ValueError("begin_year must be <= end_year")
+            
+            # OLD - фактически качество поиска только ухудшало
             # разрешаем зазор в 5 лет от означенного интервала
             # кроме приблизительного совпадения это позволяет
             # обработать интервалы в индексе, где начало=конец
-            begin_year -= 5
-            end_year += 5
+            #begin_year -= 5
+            #end_year += 5
 
             cond = cond & (
                 # BAD: если в индексе у епископа лет нет, просто берём его в результат
@@ -91,18 +108,43 @@ class EpiskopIndex:
                 ((OrmModel.min_year <= end_year) & (OrmModel.max_year >= begin_year))
                 )
 
-        #ep_qq = EpiskopIndexOrm.select().where(cond).limit(30).namedtuples()
-        ep_qq = OrmModel.select().where(cond).limit(30).namedtuples()
+        if cafedra:
+            cond = cond & (fn.INSTR(fn.LOWER_PY(OrmModel.cafedras), cafedra.lower()))
 
+        ep_qq = OrmModel.select().where(cond).limit(10).namedtuples()
+
+        return list(ep_qq)
+    
         #from storage import EditDb
         #print(ep_qq, "PLAN:", EditDb.execute_sql(f'EXPLAIN QUERY PLAN {ep_qq}').fetchall(), '\n\n\n')
         #raise ValueError()
 
-        res = list(ep_qq)
-        if cafedra:
-            res = [c for c in res if cafedra.lower() in c.cafedras.lower()]
+        #res = list(ep_qq)
+        #if cafedra:
+        #    res = [c for c in res if cafedra.lower() in c.cafedras.lower()]
 
-        return res[:10]
+        #return res[:10]
+    
+    def find_by_header(self, query, clear_input=True):
+        """
+        Поиск по заголовку на основе вхождения слов из запроса
+
+        query - что ищем
+        clear_input - очистить входной запрос от обычно мешающих поиску слов и знаков препинания
+        - сейчас остаются только слова с большой буквы, за исключением римским номеров и чинов святости.
+        """
+        OrmModel = self.orm_model
+        if clear_input:
+            # Оставляем только слова с большой буквы (и исключением некоторых)
+            words = [x for x in re.split('[^а-яёa-z-]+', query, flags=re.I) 
+                    if x and x[0].isupper() and x not in ('I', 'II', 'III', 'IV', 'V', 'Святой', 'Святитель')]
+            query = ' '.join(words)
+
+        r = OrmModel.select() \
+            .where(orm_all_words_search_condition(query, OrmModel.header)) \
+            .order_by(OrmModel.header).limit(10).namedtuples()
+        
+        return r
 
     def rebuild(self):
         self.log.info("Start rebuild episkop index")
@@ -188,3 +230,4 @@ class MemItem(EpiskopIndexOrm):
 #EpiskopIndexOrm.add_index(EpiskopIndexOrm.name, EpiskopIndexOrm.surname, name="IDX_episkop")
 
 EpiskopIndexOrm.add_index(fn.LOWER_PY(EpiskopIndexOrm.name), fn.LOWER_PY(EpiskopIndexOrm.surname), name="IDX_episkop_name")
+MemItem.add_index(fn.LOWER_PY(MemItem.name), fn.LOWER_PY(MemItem.surname), name="IDX_episkop_name")

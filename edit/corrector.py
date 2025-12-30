@@ -286,36 +286,35 @@ def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
                 continue
 
             parsed_ep = ep.parsed_episkop
-            filters_skipped = False
-            if isinstance(parsed_ep, ParseFail):                    
-                stats['ошибка разбора']+=1
-                task.add_problem(i, ep, 'Ошибка разбора', parsed_ep)
-                continue
+            if isinstance(parsed_ep, ParseFail):                
+                parsed_ep = None
 
-                '''
-                found_ep = db.episkop.find_by_name(ep.episkop)
-                if not found_ep:
-                    stats['ошибка разбора']+=1
-                    continue
-                '''
-            else:
-                min_year, max_year = ep.get_min_max_year()
+            search_mode = 'парсер и фильтры'
+            found_ep = []
+            #NB! Часть информации о годах поступает от парсера!
+            min_year, max_year = ep.get_min_max_year()
+            if parsed_ep:
                 found_ep = db.episkop_index.find_by_fields(parsed_ep.name, parsed_ep.surname, 
                                                         begin_year=min_year, end_year=max_year,
                                                         cafedra=caf.header)                    
-                if not found_ep and (min_year or max_year):
+                if not found_ep and (min_year or max_year) and (parsed_ep.surname):
+                    search_mode = 'парсер без фильтров'
                     found_ep = db.episkop_index.find_by_fields(parsed_ep.name, parsed_ep.surname)
-                    filters_skipped = True
-                                                        
-            #found_ep = db.episkop.find_by_name(ep.header)
-
+                    
+            if not found_ep:
+                found_ep = db.episkop_index.find_by_header(ep.episkop, True)
+                if parsed_ep:
+                    search_mode = 'заголовок и отмена парсера'
+                else:
+                    search_mode = 'заголовок и ошибка парсера'
+                
             if len(found_ep) == 1:
                 ... # проставить ссылку на епископа
             elif not len(found_ep):
                 stats['епископ не найден']+=1
                 task.add_problem(i, ep, "епископ не найден")
             else: # many cafedra
-                key = 'какой именно епископ (фильтры сброшены)?' if filters_skipped else 'какой именно епископ?'
+                key = f'какой именно епископ ({search_mode})?'
                 stats[key]+=1
                 task.add_problem(i, ep, "какой именно епископ?", [f"{x.header} (#{x.doc_key})" for x in found_ep])
 

@@ -137,11 +137,18 @@ NN (кон. XII в.)
 
 временно управляющий Кирилл II Чагадаевич
 
+Димитрий II (в схиме Лазарь) Градусов
+
     """.split('\n')
+    fail = 0
     for t in tests:
         if not t.strip():
             continue
         p = parse_episkop_name_in_cafedra(t)
 
-        warn = '!!!' if isinstance(p, ParseFail) else ''
+        warn = '>'
+        if isinstance(p, ParseFail):
+            warn = '!!!'
+            fail+=1
         print(warn, t, p)
+    print("Fail", fail)

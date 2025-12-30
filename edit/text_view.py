@@ -250,6 +250,8 @@ class RowEpiskopView:
     def parsed_episkop(self) -> ParsedEpiskopInCafedra | ParseFail:
         if not self._parsed_ep:
             self._parsed_ep = parse_episkop_name_in_cafedra(self.episkop)
+            if isinstance(self._parsed_ep, ParseFail):
+                _L.warning(f"fail parse episkop: {self.episkop} in {self}")
         return self._parsed_ep
 
     @property
