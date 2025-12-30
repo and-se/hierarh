@@ -300,13 +300,18 @@ def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
                 if not found_ep and (min_year or max_year) and (parsed_ep.surname):
                     search_mode = 'парсер без фильтров'
                     found_ep = db.episkop_index.find_by_fields(parsed_ep.name, parsed_ep.surname)
-                    
+            
+            mode_tail = 'отмена парсера' if parsed_ep else 'ошибка парсера'
             if not found_ep:
+                search_mode = 'заголовок и фильтры, ' + mode_tail
+                found_ep = list(db.episkop_index.get_builder() \
+                        .where_header(ep.episkop, True) \
+                        .where_years(min_year, max_year) \
+                        .where_cafedra(caf.header)
+                        .limit(10).run())
+            if not found_ep:
+                search_mode = 'заголовок без фильтров, ' + mode_tail
                 found_ep = db.episkop_index.find_by_header(ep.episkop, True)
-                if parsed_ep:
-                    search_mode = 'заголовок и отмена парсера'
-                else:
-                    search_mode = 'заголовок и ошибка парсера'
                 
             if len(found_ep) == 1:
                 ... # проставить ссылку на епископа
@@ -316,6 +321,7 @@ def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
             else: # many cafedra
                 key = f'какой именно епископ ({search_mode})?'
                 stats[key]+=1
+                stats['какой именно епископ (всего)']+=1
                 task.add_problem(i, ep, "какой именно епископ?", [f"{x.header} (#{x.doc_key})" for x in found_ep])
 
 

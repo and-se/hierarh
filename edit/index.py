@@ -76,9 +76,6 @@ class EpiskopIndex:
                     .limit(10)
 
         return list(query.run())
-    
-    def get_builder(self):
-        return EpiskopQueryBuilder(self.orm_model)
         
     def find_by_header(self, query, clear_input=True):
         """
@@ -94,7 +91,10 @@ class EpiskopIndex:
             .limit(10)
         
         return list(q.run())
-
+    
+    def get_builder(self):
+        return EpiskopQueryBuilder(self.orm_model)
+    
     def rebuild(self):
         self.log.info("Start rebuild episkop index")
         EpiskopIndexOrm.drop_table()
@@ -160,7 +160,7 @@ class EpiskopQueryBuilder:
         self.cond = True
         self._offset = None
         self._limit = None
-        self._sort = None
+        self._sort = (self.orm.header, )
 
     def append_cond(self, condition):
         self.cond = self.cond & condition
