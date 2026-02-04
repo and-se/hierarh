@@ -18,6 +18,10 @@ import threading
 from peewee import SqliteDatabase
 MEM_CACHE = SqliteDatabase('file:/indx?vfs=memdb', uri=True)
 
+# Держим постоянное соединение с БД в памяти, чтобы данные на памяти не исчезли
+import sqlite3
+__sqlite_mem_holder = sqlite3.connect('file:/indx?vfs=memdb', uri=True)
+
 @MEM_CACHE.func('LOWER_PY', deterministic=True)
 def lower(s):
     return s.lower() if isinstance(s, str) else None
@@ -30,6 +34,8 @@ class EpiskopIndex:
     def __init__(self, db: 'HierarhEditStorage', copy_to_ram=True):
         self.db = db
         self.log = logging.getLogger(self.LOG_NAME)
+        # self.log.setLevel(logging.INFO)
+        # self.log.addHandler(logging.StreamHandler())
         self.mem_cache = copy_to_ram
 
         with MEM_LOCK:
@@ -158,6 +164,7 @@ class EpiskopIndex:
             
         self.log.info(f"Episkop index built. Total records {i}")
 
+
 class EpiskopQueryBuilder:
     def __init__(self, orm: 'EpiskopIndexOrm'):
         self.orm = orm
@@ -283,6 +290,7 @@ class EpiskopIndexOrm(Model):
     cafedras = TextField()
 
     doc_key = IntegerField(null=False)
+
 
 class MemItem(EpiskopIndexOrm):
     class Meta:
