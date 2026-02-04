@@ -416,10 +416,16 @@ def get_task(id):
         t, doc_header, next_task = tinfo.task, tinfo.doc_header, tinfo.next_task_id
         t: Task
 
-        if t.type_ != 'episkop->cafedra':
-            abort(500, 'Неподдерживаемый тип задачи')
-        
-        return render_template('edit/task-episkop.html', task=t, next_task=next_task, doc_header=doc_header, status=status)
+        params = {
+            'episkop->cafedra': {'linked_coll': 'cafedra'},
+            'cafedra->episkop': {'linked_coll': 'episkop'}
+        }
+
+        if t.type_ not in params:
+            abort(500, f'Неподдерживаемый тип задачи: {t.type_}')
+
+        return render_template('edit/task-default.html', **params[t.type_],
+                               task=t, next_task=next_task, doc_header=doc_header, status=status)
     except NoSuchTaskError:
         abort(404, "Задача не найдена")
 
@@ -443,7 +449,7 @@ def set_task_answer(id):
 @login_required
 def suggest_cafedra():
     q = request.args.get("query", '')
-    return db_edit.cafedra.suggest(q)
+    return db_edit.cafedra.suggest(q, full_search=False)
 
 @ed.get('/cafedra/<int:key>/snippet')
 @login_required
@@ -453,6 +459,28 @@ def snippet_cafedra(key):
         return {
             "success": False,
             "message": f"no such cafedra {key}"
+        }, 404
+    
+    return {
+        "success": True,
+        "key": key,
+        "snippet": snippet 
+    }
+
+@ed.get('/suggest/episkop')
+@login_required
+def suggest_episkop():
+    q = request.args.get("query", '')
+    return db_edit.episkop.suggest(q, full_search=True)
+
+@ed.get('/episkop/<int:key>/snippet')
+@login_required
+def snippet_episkop(key):
+    snippet = snippet_service.get_episkop_snippet(key, max_length=350)
+    if not snippet:
+        return {
+            "success": False,
+            "message": f"no such episkop {key}"
         }, 404
     
     return {

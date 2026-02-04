@@ -140,9 +140,18 @@ class TextCollectionDb:
             .where(fn.LOWER_PY(self.orm.header) == name.lower()).limit(limit).namedtuples()
         return list(d)
     
-    def suggest(self, query, limit=10):
+    def suggest(self, query, limit=10, full_search=False):
+        """
+        Реализует подсказку при вводе в текстовое поле поиска.
+        full_search - искать по полному всему тексту (иначе только по заголовку)
+        """
+        if full_search:
+            filter_field= self.orm.html
+        else:
+            filter_field = self.orm.header
+
         r = self.orm.select(self.orm.id, self.orm.header) \
-            .where(orm_all_words_search_condition(query, self.orm.header)).order_by(self.orm.header).limit(limit)
+            .where(orm_all_words_search_condition(query, filter_field)).order_by(self.orm.header).limit(limit)
         
         return [{'value': x.header, 'key': x.id} for x in r]
         

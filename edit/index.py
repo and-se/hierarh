@@ -92,6 +92,10 @@ class EpiskopIndex:
         
         return list(q.run())
     
+    def get_by_dockey(self, key):
+        return self.orm_model.get_or_none(self.orm_model.doc_key == key)
+
+    
     def get_builder(self):
         return EpiskopQueryBuilder(self.orm_model)
     

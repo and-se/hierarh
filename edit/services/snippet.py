@@ -24,6 +24,14 @@ class SnippetService:
                 res = tx[:max_length-3] + '...'
             
             return res
-            
+    
+    def get_episkop_snippet(self, key, max_length=100):
+        d = self.db.episkop_index.get_by_dockey(key)
+        if not d: return None
+
+        return f"({d.min_year or '?'} - {d.max_year or '?'})\n{d.cafedras}"
+
+        
+        
 
 

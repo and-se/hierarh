@@ -54,9 +54,11 @@
         </p>
     </div>
 
+    {% block task_header %}
     <h1>
-        <a href="/edit/episkop/{{task.doc_key}}" target="_blank" class="title"></a>
+        <a href="/edit/{{task.doc_coll}}/{{task.doc_key}}" target="_blank" class="title"></a>
     </h1>
+    {% endblock %}
 
     <div>
         <span>Статус: </span><span class="task-status">{{task.status}}</span>
@@ -90,7 +92,11 @@
         Q = JSON.parse(Q.innerText.trim() || 'null') || {}
         A = JSON.parse(A.innerText.trim() || 'null') || {}
 
-        document.querySelector('.title').innerText = Q.title || ''
+        let task_header_elem = document.querySelector('.title')
+        if (task_header_elem) {
+            task_header_elem.innerText = Q.title || ''
+        }
+        
         if (Q.title) document.title = Q.title;
 
         let $problemsTable = document.querySelector('.problems tbody')
@@ -103,7 +109,7 @@
             <tr data-where="${pr.where}">
                 <td>${es(pr.item)} - ${es(pr.msg)}</td>
                 <td>
-                    <input-select suggest="suggestCafedra" class="answer">введите что-то</input-select>
+                    <input-select suggest="suggestFunc" class="answer">введите что-то</input-select>
                     <p class="info"></p>
                 </td>
             </tr>
@@ -136,7 +142,7 @@
             document.querySelector('input-select.answer').focus();
         })
 
-        // Соохранение задачи при изменениях
+        // Сохранение задачи при изменениях
         document.addEventListener('change', saveTaskAnswer)
         window.addEventListener('beforeunload', saveTaskAnswer)
         document.addEventListener('suggestSelected', saveTaskAnswer)
@@ -155,7 +161,8 @@
                 return;
             }
 
-            let url = "/edit/cafedra/" + key + '?' + new URLSearchParams({do_find: '{{doc_header}}'})
+            itag.innerText = '';
+            let url = "/edit/{{linked_coll}}/" + key + '?' + new URLSearchParams({do_find: '{{doc_header}}'})
             
             let atag = document.createElement('a')
             atag.setAttribute('href', url)
@@ -164,13 +171,14 @@
 
             itag.append(atag)
 
-            fetch(`/edit/cafedra/${key}/snippet`, {credentials: 'include' })
+            fetch(`/edit/{{linked_coll}}/${key}/snippet`, {credentials: 'include' })
             .then(r => r.json())
             .then(js => {
                 let snippet = js.snippet || ''
-                let tx = document.createTextNode(snippet)
-                tx.textContent += ' '
+                let tx = document.createElement('span')
                 itag.prepend(tx)
+                
+                tx.innerText = snippet + ' ';
                 //itag.closest('td').setAttribute('title', snippet)
             })
         }
@@ -180,12 +188,13 @@
             setInfoTag(itag, null)
         })
 
-        function suggestCafedra(v, cancel) {
+        function suggestFunc(v, cancel) {
             if (!v.trim()) return [{value: 'ссылка не нужна', nolink:"true"}]
 
-            return fetch("/edit/suggest/cafedra?" + new URLSearchParams({ query: v }),
-                { signal: cancel, credentials: 'include' })
-                .then(resp => resp.json()).then(js => {
+            return fetch("/edit/suggest/{{linked_coll}}?" + new URLSearchParams({ query: v }),
+                { signal: cancel, credentials: 'include' })                
+                .then(resp => resp.json())                
+                .then(js => {
                     let r = js.concat([
                         {value: 'ссылка не нужна', nolink:"true"}
                     ])

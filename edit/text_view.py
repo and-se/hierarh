@@ -48,8 +48,7 @@ class EpiskopView:
         # отбираем строки таблицы епископов, которые не являются заголовками
         rows = self._tree.xpath("""//table[contains(@class, 'cafedras')]/tbody/tr[not(contains(@class, 'header-row'))]""")
         return [RowCafedraView(r) for r in rows]
-
-
+    
     def __repr__(self):
         return f'EpiskopView({self.__str__()})'
     

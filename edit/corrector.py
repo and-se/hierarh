@@ -281,7 +281,7 @@ def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
                 #if not linked.has_name(ep.name):
                 #    task.add_problem(i, ep, 'Проставлена ссылка на епископа', linked.name, 'Это верно?')
         else:
-            if ep.episkop == 'NN':
+            if ep.episkop == 'NN' or ep.episkop.startswith('NN '):
                 # не нужно проставлять ссылки на ?, NN
                 continue
 
@@ -327,7 +327,7 @@ def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
 
 def check_cafedra_to_episkop_links(remove_old_tasks):    
     return create_tasks_for_coll(HierarhEditStorage(), 'cafedra', cafedra_processor, 
-                                 "episkop->cafedra", remove_old_tasks, parallel=True)
+                                 "cafedra->episkop", remove_old_tasks, parallel=True)
 
 
 
