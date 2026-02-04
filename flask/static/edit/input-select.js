@@ -88,20 +88,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // В противном случае запускаем механизм подсказки с задержкой
             let suggestDelayMs = 100
             curTimer = setTimeout(() => {
-                Promise.try(suggestFunc, ev.target.value, oldRequestStopper.signal).then(variants => {
+                Promise.try(suggestFunc, ev.target.value, oldRequestStopper.signal, el).then(variants => {
                     if (!variants || !variants[Symbol.iterator] === 'function') {                            
                         console.error(el, "Suggest func must return iterable, but got", variants)
                         return
                     }
-
-                    updateSuggestDataList(dl, variants, ev.target.value)
-                }).catch(error => {
+                    updateSuggestDataList(dl, variants, ev.target.value);
+                    oldRequestStopper = null;
+                }).catch(error => {                    
                     if (error.name == "AbortError") {
                         return
                     }
                     console.error("Error suggest", error, typeof error)
-                }).finally(() => {
-                    oldRequestStopper = null
+                    oldRequestStopper = null;
                 })
             }, suggestDelayMs)
         }
@@ -121,11 +120,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!v.hasOwnProperty('value')) {
                     console.error("Suggest item must be String or object with 'value' field")
                     return
-                }                
+                }
+                // делаем копию - вдруг пользователь передал данные которые нельзя менять
+                let v_copy = Object.assign({}, v)
                 // все поля кроме .value сохраним как data-атрибуты
-                let val = v.value
-                delete v.value
-                Object.assign(op.dataset, v)
+                let val = v_copy.value
+                delete v_copy.value
+                Object.assign(op.dataset, v_copy)
                 opVal = val.trim()
             } else {
                 opVal = v.trim()
