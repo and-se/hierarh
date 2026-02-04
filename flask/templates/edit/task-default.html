@@ -109,11 +109,15 @@
             <tr data-where="${pr.where}">
                 <td>${es(pr.item)} - ${es(pr.msg)}</td>
                 <td>
-                    <input-select suggest="suggestFunc" class="answer">введите что-то</input-select>
+                    <input-select suggest="suggestFunc" class="answer">введите что ищем - появится подсказка</input-select>
                     <p class="info"></p>
                 </td>
             </tr>
             `)
+
+            if (pr.attachment && pr.attachment.type == 'suggest') {
+                row.querySelector('input-select')._defaultSuggest = pr.attachment.suggest.map(k => Object.freeze(k))//Object.freeze(pr.attachment.suggest);
+            }
 
             $problemsTable.append(row)
         }
@@ -188,8 +192,11 @@
             setInfoTag(itag, null)
         })
 
-        function suggestFunc(v, cancel) {
-            if (!v.trim()) return [{value: 'ссылка не нужна', nolink:"true"}]
+        function suggestFunc(v, cancel, elem) {
+            if (!v.trim()) {
+                let res = elem._defaultSuggest || [];
+                return res.concat([{value: 'ссылка не нужна', nolink:"true"}])
+            }
 
             return fetch("/edit/suggest/{{linked_coll}}?" + new URLSearchParams({ query: v }),
                 { signal: cancel, credentials: 'include' })                

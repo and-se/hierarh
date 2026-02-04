@@ -106,12 +106,17 @@ class Task:
         self.changed = True
         self.orm.status = value
 
-    def add_problem(self, where, item, *msg):        
-        self._problems.append({
+    def add_problem(self, where, item, *msg, attachment=None):
+        record = {
             'where': where,
             'item': str(item),
             'msg': ' '.join([str(x) for x in msg])
-        })
+        }
+
+        if attachment is not None:
+            record['attachment']=attachment
+
+        self._problems.append(record)
         self.changed = True
 
     def raw_question(self):

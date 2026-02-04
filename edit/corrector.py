@@ -11,6 +11,7 @@ if __name__ == '__main__':
     # ищем модули начиная с корня проекта (папка hierarh)
     sys.path.append(str(Path(__file__).parent.parent.absolute()))
 
+from edit.task import Task
 from edit.text_view import TEXT_VIEW_LOG_NAME, CafedraView, EpiskopView
 from edit.storage import HierarhEditStorage
 from parsers.fail import ParseFail
@@ -224,7 +225,7 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
         'ЗВЕНИГОРОДСКАЯ, обновленческая' : 'ЗВЕНИГОРОДСКАЯ (Московская), обновленческая',
     }
 
-    def episkop_proccessor(ep, task, db: HierarhEditStorage, stats):
+    def episkop_proccessor(ep, task: Task, db: HierarhEditStorage, stats):
         task.title = ep.header() + " - непонятные ссылки на кафедры"        
         ep = EpiskopView(ep)
 
@@ -264,7 +265,7 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
 
 
 """Проверка ссылок на епископов в статьях кафедр"""
-def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
+def cafedra_processor(caf, task: Task, db: HierarhEditStorage, stats: defaultdict):
     task.title = caf.header() + " - непонятные ссылки на епископов"        
     caf: CafedraView = CafedraView(caf)
 
@@ -322,8 +323,15 @@ def cafedra_processor(caf, task, db: HierarhEditStorage, stats: defaultdict):
                 key = f'какой именно епископ ({search_mode})?'
                 stats[key]+=1
                 stats['какой именно епископ (всего)']+=1
-                task.add_problem(i, ep, "какой именно епископ?", [f"{x.header} (#{x.doc_key})" for x in found_ep])
-
+                task.add_problem(i, ep, "какой именно епископ?", attachment={
+                    'type': 'suggest',
+                    'suggest': [
+                        {
+                            'value': f'{x.header} ({x.min_year or '?'} .. {x.max_year or '?'})',
+                            'key': x.doc_key
+                        } for x in found_ep
+                    ]
+                })
 
 def check_cafedra_to_episkop_links(remove_old_tasks):    
     return create_tasks_for_coll(HierarhEditStorage(), 'cafedra', cafedra_processor, 
