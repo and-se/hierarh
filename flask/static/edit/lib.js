@@ -33,5 +33,21 @@ let LIB = {
         let t = document.createElement('template');
         t.innerHTML = html;
         return t.content.firstElementChild;
+    },
+
+    /**
+     * Обёртка для запуска функции с задержкой.
+     * @param {*} func функция
+     * @param {Number} delay величина задержки
+     * @returns функция-обёртка, которую надо использовать вместо исходной функции
+     */
+    debounce(func, delay) {
+        let timeoutId;
+        return function (...args) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => func.apply(this, args), delay);
+        };
+    },
+
     }
 }

@@ -252,6 +252,9 @@ let EDITOR_BASE = {
     bind(form, elem) {
         this.form = form        
         if (!elem) throw new Error("Empty root elem");
+        /**
+         * Редактируемый html элемент
+         */
         this.root = elem
     },
 
@@ -266,9 +269,9 @@ let EDITOR_BASE = {
         // не вставились ссылки на внешние ресурсы и неправильные теги.
         // TODO разрешить вставлять теги details со сносками
         CONTENT_EDITABLE_TOOLS.insertOnlyTextFromClipboard(editor.root);
-        
+
         // <br> между строками вместо тегов <div> для каждой строки
-        CONTENT_EDITABLE_TOOLS.insertBrOnEnterInsteadOfDiv(editor.root);        
+        CONTENT_EDITABLE_TOOLS.insertBrOnEnterInsteadOfDiv(editor.root);
     },
     
     addPlugin(plugin) {
@@ -814,7 +817,6 @@ function NotePlugin() {
     }
 }
 
-
 /*************** CONTENTEDITABLE TOOLS *****************/
 
 let CONTENT_EDITABLE_TOOLS = {
@@ -835,7 +837,7 @@ let CONTENT_EDITABLE_TOOLS = {
 
     // <br> между строками вместо тегов <div> для каждой строки
     insertBrOnEnterInsteadOfDiv(root) {
-        root.addEventListener("keydown", (ev) => {
+        root.addEventListener("keydown", (ev) => {            
             ev = ev || window.event;
             var keyCode = ev.charCode || ev.keyCode;
             if (keyCode == 13) {
@@ -863,7 +865,41 @@ let CONTENT_EDITABLE_TOOLS = {
                 // вместо этого курсор переносится на следующую строку и этого даже не видно пока не начнёшь набирать.                
             }
         });
+    },
+
+    removePreviousBrIfExists() {
+        let sel = getSelectionRange();
+        if (sel && sel.collapsed) {
+            let br;
+            if (sel.startContainer.nodeType == Node.ELEMENT_NODE && sel.startOffset > 0) {
+                // firefox
+                br = sel.startContainer.childNodes[sel.startOffset - 1];
+            } else if (sel.startContainer.nodeType == Node.TEXT_NODE) {
+                // chrome
+                br = sel.startContainer.previousSibling;
+            }
+
+            if (br && br.nodeType == Node.ELEMENT_NODE && br.nodeName == 'BR') {
+                br.remove();
+                return true;
+            }
+        }
+    }, 
+
+    /**
+     * Склеиваем все подряд идущие TextNode при редактировании root
+     */
+    normalizeEditedElement(root) {
+        root.addEventListener("keyup", (ev) => {
+            let sel = getSelectionRange();
+            if (sel) {
+                let tag = sel.commonAncestorContainer;
+                if (tag.nodeType == Node.TEXT_NODE) tag = tag.parentElement;
+                tag.normalize();
+            }
+        });
     }
+
 };
 
 /*************** UTILS *****************/

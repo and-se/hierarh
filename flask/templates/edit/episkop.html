@@ -24,8 +24,11 @@ function initForm() {
         // Текста статьи
         H_FORM.addEditor('.text', new TextEditor().withPlugin(notePlugin))
         
+        // Плагин для подсказки кафедры
+        suggestPlugin = new SuggestPlugin(new CafedraSuggestController());
+
         // Таблица кафедр
-        H_FORM.addEditor('table.cafedras', new HierarhTableEditor('кафедры').withPlugin(notePlugin));
+        H_FORM.addEditor('table.cafedras', new HierarhTableEditor('кафедры').withPlugin(notePlugin).withPlugin(suggestPlugin));
         
         H_FORM.start();
     } catch (ex) {
