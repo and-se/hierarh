@@ -403,9 +403,9 @@ function HierarhTableEditor(itemType /*кафедры или епископы*/)
     
     let TABLE_MENU_TEMPLATE = `
     <span class="he-table-menu">
-        <button class="he-delete-row-button" title="удалить строку">X</button>
-        <button class="he-up-row-button" title="переместить строку ввверх">^</button>
-        <button class="he-down-row-button" title="переместить строку вниз">v</button>
+        <button class="he-delete-row-button" title="удалить строку">❌</button>
+        <button class="he-up-row-button" title="переместить строку ввверх">▲</button>
+        <button class="he-down-row-button" title="переместить строку вниз">▼</button>
         <button class="he-add-row-buton" title="добавить строку">+</button>
         <button class="he-add-header-button" title="добавить подзаголовок таблицы">+ заголовок</button>
 
