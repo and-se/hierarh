@@ -169,6 +169,14 @@ class TextBase:
         # а этот метод достаёт оттуда нужный кусок
         raise NotImplementedError('implement header method')
     
+    def as_dict(self):
+        return {
+            'key': self.key,
+            'header': self.header(),
+            'html': self.html,
+            'reg_data': self.reg_data
+        }
+    
     def __repr__(self):
         return f"Text~model({self.key}, {self.header()})"
 

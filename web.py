@@ -467,6 +467,22 @@ def snippet_cafedra(key):
         "snippet": snippet 
     }
 
+@ed.get('/cafedra/<int:key>/json')
+@login_required
+def cafedra_json(key):
+    t = db_edit.cafedra.get(key)
+    if not t:
+        return {
+            "success": False,
+            "message": f"no such cafedra {key}"
+        }, 404
+    else:
+        return {
+            "success": True,
+            "key": key,
+            "data": t.as_dict()
+        }
+
 @ed.get('/suggest/episkop')
 @login_required
 def suggest_episkop():
@@ -492,6 +508,9 @@ def snippet_episkop(key):
 
 app.register_blueprint(ed, url_prefix='/edit')
 
+#TODO админка с возможность перестроить индекс епископов, 
+# экспортировать/импортировать задачи (и удалить сделанные), 
+# посмотреть кто что правил
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

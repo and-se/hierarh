@@ -18,8 +18,13 @@ function CafedraSuggestController() {
         }
         
         let txt = cell?.innerText || '';
+
+        // если только одно слово, то по нему и ищем
+        if (!txt.trim().includes(' ')) return txt;
+
+        // Ищем только по словам с большой буквы
         const onlyCapitalWords = /[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]+/g;
-        // Возвращаем слова с большой буквы через пробел
+        // выпишем такие слова через пробел
         return (txt.match(onlyCapitalWords) || []).join(' ')
     }
 
@@ -45,18 +50,49 @@ function CafedraSuggestController() {
     }
 
     /**
-     * Проверяет, что полученный из suggestFunc объект obj является текущей выбранной подсказкой
-     * @param {*} obj - подсказка
-     * @param {*} range - текущий редактирумый фрагмент текста
-     * @returns 
+     * Возвращает данные ранее применённой для этого места текста подсказки.
+     * Например, если при выборе подсказки проставляется ссылка, надо вернуть сведения о ссылке
+     * @param {Range} range 
+     * @returns объект с полями key и value
      */
-    this.isCurrentSelected = (obj, range) => {
-        let cell = getEditedCell(range)
+    this.getAppliedSuggestion = async (range) => {
+        const cell = getEditedCell(range);
 
-        if (cell && obj.key && cell.dataset.ref == "cafedra/" + obj.key) {
-            return true;
+        if (cell && cell.dataset.ref) {
+            const key = cell.dataset.ref.split('/')[1]
+
+            if (!key) return;
+
+            if (!cell.__tmpRefName) {
+                cell.__tmpRefName = await fetch("/edit/cafedra/" + key + '/json',
+                                    { /*signal: cancel,*/ credentials: 'include' })                
+                .then(resp => resp.json())
+                .then(d => {                    
+                    if (d.success) {
+                        return d.data.header
+                    } else {
+                        throw new Error(json.message)
+                    }
+                })
+            }
+            
+            return {key: key, value: cell.__tmpRefName}
         }
     }
+
+    /**
+     * Удаляет связь текста с ранее применённой подсказкой.
+     * Например, если выбор подсказки проставляет ссылку куда-либо - этот метод ссылку удаляет.
+     * @param {Range} range 
+     */
+    this.clearAppliedSuggestion = range => {
+        const cell = getEditedCell(range);
+
+        if (cell && cell.dataset.ref) {
+            delete cell.dataset.ref;
+        }
+    }
+    
 
 
     /**
@@ -64,42 +100,29 @@ function CafedraSuggestController() {
      * @param {*} suggestItem - выбранная подсказка (объект или строка)
      * @param {*} range - редактируемая часть текста
      */
-    this.insertSuggestion = (suggestItem, range) => {
+    this.applySuggestion = (suggestItem, range) => {
         console.debug('insert', suggestItem, range);
 
         if (!suggestItem.key || !suggestItem.value) {
             throw new Error(`Bad suggest (no key/value) ${JSON.stringify(suggestItem)}`)
         }
 
-        let sel = document.getSelection();
-        /*if (!sel.containsNode(range.startContainer, true)) {
-            console.error("Неожиданное выделение ", sel, "при вставке подсказки в", range)
-            return;
-        }*/
-
+        
         let cell = getEditedCell(range);
+        
         
 
         cell.dataset.ref="cafedra/" + suggestItem.key;
-
+        cell.__tmpRefName = suggestItem.value;
         
-        /* После добавления и удаления строки может быть несколько подряд идущих textNode
-           Посему слово может быть разорвано между несколькими textNode.
-           Чтобы с этим не возиться, лучше воспользоваться встроенными в браузер средствами
-           модификации выделения.
-        */
-        // ставим курсор в начало слова
-        // (если уже был в начале слова - будет баг что заменят предыдущее)
-        sel.modify("move", "left", "word")
-        // идём вправо на одно слово и всё выделяем
-        sel.modify("extend", "right", "word")
-        
-        let word = sel.getRangeAt(0);
-        if (word) {
+        let sel = selectCurrentWordInCell(cell)        
+        if (sel) {
+            let word = sel.getRangeAt(0);        
             word.deleteContents()
             word.insertNode(document.createTextNode(suggestItem.value))
             sel.collapseToEnd();
         }
+        
     }
 
     /**
@@ -112,6 +135,51 @@ function CafedraSuggestController() {
         if (el.nodeType == Node.TEXT_NODE) el = el.parentElement;
         return el.closest('td')
     }
+
+    function selectCurrentWordInCell(cell) {
+        /* После добавления и удаления строки может быть несколько подряд идущих textNode
+           Посему слово может быть разорвано между несколькими textNode.
+           Чтобы с этим не возиться, лучше воспользоваться встроенными в браузер средствами
+           модификации выделения.
+
+           Но надо не выйти за границы тега при перемещении курсора!
+        */
+
+        let sel = document.getSelection();
+
+        // выделение должно быть курсором и содержать интересующую ячейку
+        if (!sel.rangeCount || !sel.isCollapsed) return null;
+        if (!sel.containsNode(cell, true)) return null;
+
+        // пустая ячейка слов не содержит - оставляем пустое выделение
+        if (!cell.innerText.trim()) return sel;
+
+        if (isCursorAtStartOfElem(cell)) {
+            // если мы в начале текста - двигаемся вправо, чтбобы не выйти за границы ячейки
+            sel.modify("move", "right", "word")
+            sel.modify("extend", "left", "word");
+        } else {
+            // иначе ставим курсор в начало слова
+            // (если уже был в начале слова - будет баг что заменят предыдущее)
+            sel.modify("move", "left", "word")
+            // идём вправо на одно слово и всё выделяем
+            sel.modify("extend", "right", "word")
+        }
+        
+        return sel;
+    }
+
+    function isCursorAtStartOfElem(elem) {
+        const selection = document.getSelection();
+        if (selection.rangeCount === 0) return false;
+
+        const range = selection.getRangeAt(0);
+        const preSelectionRange = range.cloneRange();
+        preSelectionRange.selectNodeContents(elem);
+        preSelectionRange.setEnd(range.startContainer, range.startOffset);
+
+        return preSelectionRange.toString().length === 0;
+    }
 }
 
 
@@ -123,7 +191,7 @@ function SuggestPlugin(suggestController){
     if (!suggestController) {
         throw new Error(`Expected suggest controller`)
     }
-    for (const item of ['getMatchQuery', 'suggestFunc', 'insertSuggestion']) {
+    for (const item of ['getMatchQuery', 'suggestFunc', 'applySuggestion', 'getAppliedSuggestion', 'clearAppliedSuggestion']) {
         if (!suggestController[item]) {
             throw new Error(`Bad controller: not function ${item}`)
         }
@@ -178,10 +246,21 @@ function SuggestPlugin(suggestController){
             document.head.appendChild(hstyle);
         }
 
-        this.suggestBox = LIB.createElementByHtml(`
-            <div class="${PREFIX}suggest" style="display: none"></div>`);
+        this.suggestRoot = LIB.createElementByHtml(`
+            <div class="${PREFIX}suggest" style="display: none">
+                <div class="header"></div>
+                <div class="items"></div>
+            </div>
+        `)
 
-        this.suggestBox.addEventListener('click', (ev) => {
+        this.suggestHeader = this.suggestRoot.querySelector('.header');
+        this.suggestList = this.suggestRoot.querySelector('.items');
+
+        /*this.suggestBox = LIB.createElementByHtml(`
+            <div class="${PREFIX}suggest" style="display: none"></div>`);
+        */
+
+        this.suggestRoot.addEventListener('click', (ev) => {
             let item = ev.target.closest('.item');
             if (item) {
                 insertSuggestion(item)
@@ -190,7 +269,16 @@ function SuggestPlugin(suggestController){
 
         this.activeSuggestionIndex = null;
         
-        document.body.appendChild(this.suggestBox);
+        document.body.appendChild(this.suggestRoot);
+
+        document.addEventListener('click', e => {
+            for(let ed of this.editors) {
+                if (ed.root.contains(e.target)) return;
+            }
+
+            console.debug('hide suggestion on click out')
+            hideSuggestions();
+        })
     }
     
     this.registerEditor = (editor) => {
@@ -229,19 +317,21 @@ function SuggestPlugin(suggestController){
 
     // Обработчик клавиатурных событий
     const handleSuggestionKeyboard = (e) => {
-        if (this.suggestBox.style.display === 'none') return;
+        if (this.suggestRoot.style.display === 'none') return;
         switch (e.key) {
             case 'ArrowDown':
+                if (this.suggestList.childElementCount==0) return;
                 e.preventDefault();
                 if (this.activeSuggestionIndex == null) this.activeSuggestionIndex = -1;
                 this.activeSuggestionIndex = (this.activeSuggestionIndex + 1) %
-                    this.suggestBox.children.length;
+                    this.suggestList.children.length;
                 highlightActiveSuggestion();
                 break;
             case 'ArrowUp':
+                if (this.suggestList.childElementCount==0) return;
                 e.preventDefault();
                 this.activeSuggestionIndex = (this.activeSuggestionIndex - 1 +
-                    this.suggestBox.children.length) % this.suggestBox.children.length;
+                    this.suggestList.children.length) % this.suggestList.children.length;
                 highlightActiveSuggestion();
                 break;
 
@@ -254,7 +344,7 @@ function SuggestPlugin(suggestController){
                 CONTENT_EDITABLE_TOOLS.removePreviousBrIfExists();
 
                 if (this.activeSuggestionIndex >= 0) {
-                    const selectedSuggest = this.suggestBox.children[this.activeSuggestionIndex];
+                    const selectedSuggest = this.suggestList.children[this.activeSuggestionIndex];
                     if (selectedSuggest) {
                         insertSuggestion(selectedSuggest);
                     }
@@ -265,7 +355,13 @@ function SuggestPlugin(suggestController){
                 e.preventDefault();
                 hideSuggestions()
                 break;
-
+            
+            case 'Delete':
+                if (e.altKey) {
+                    e.preventDefault();
+                    this.controller.clearAppliedSuggestion(document.getSelection().getRangeAt(0));
+                }
+                
             default:
                 return 'not keyboard'
                 ;
@@ -274,7 +370,7 @@ function SuggestPlugin(suggestController){
     }
 
     // Функция показа подсказки
-    const showSuggestions = (matches) => {
+    const showSuggestions = async (matches) => {
         /*if (!matches || matches.length === 0) {
             hideSuggestions();
             return;
@@ -288,16 +384,28 @@ function SuggestPlugin(suggestController){
             d.dataset.index = i;
             d.innerText = obj.value;
             d[PREFIX+'suggest_obj'] = obj
-
-            if (this.controller.isCurrentSelected(obj, document.getSelection().getRangeAt(0))) {
-                d.classList.add('current');
-            }
             
             return d;
         })
 
-        this.suggestBox.innerHTML = "";
-        this.suggestBox.append(...tags);
+        this.suggestList.innerHTML = "";
+        this.suggestList.append(...tags);
+
+        this.suggestHeader.innerHTML = '';
+        const headObj = await this.controller.getAppliedSuggestion(document.getSelection().getRangeAt(0));
+        if(headObj) {
+            let d = LIB.createElementByHtml(`
+            <div class='current'>
+                🔗 <span class="txt"></span>
+                <span class="del" style="float:right; cursor:pointer" title="удалить связь">❌</span>
+            </div>`)
+            d.querySelector('.txt').innerText = headObj.value;
+            d.querySelector('.del').addEventListener('click', ev => {
+                this.controller.clearAppliedSuggestion(document.getSelection().getRangeAt(0));
+                this.suggestHeader.innerHTML = '';
+            })
+            this.suggestHeader.append(d)
+        }
 
         let [cursorX, cursorY] = getUnderCursorPosition();
 
@@ -308,18 +416,18 @@ function SuggestPlugin(suggestController){
         }
 
         // Позиционируем подсказку рядом с курсором
-        this.suggestBox.style.left = `${cursorX + 5}px`;
-        this.suggestBox.style.top = `${cursorY + 1}px`;
-        this.suggestBox.style.display = 'block';
+        this.suggestRoot.style.left = `${cursorX + 5}px`;
+        this.suggestRoot.style.top = `${cursorY + 1}px`;
+        this.suggestRoot.style.display = 'block';
     }
 
     const insertSuggestion = (itemElem)  => {
-        this.controller.insertSuggestion(itemElem[PREFIX + 'suggest_obj'], document.getSelection().getRangeAt(0));
+        this.controller.applySuggestion(itemElem[PREFIX + 'suggest_obj'], document.getSelection().getRangeAt(0));
         hideSuggestions();
     }
 
     const highlightActiveSuggestion = () => {
-        const items = this.suggestBox.querySelectorAll('.item');
+        const items = this.suggestList.querySelectorAll('.item');
 
         items.forEach((item, index) => {
             if (index === this.activeSuggestionIndex) {
@@ -332,7 +440,7 @@ function SuggestPlugin(suggestController){
     }
 
     const hideSuggestions = () => {
-        this.suggestBox.style.display= 'none';
+        this.suggestRoot.style.display= 'none';
         this.activeSuggestionIndex = null;
     }
 

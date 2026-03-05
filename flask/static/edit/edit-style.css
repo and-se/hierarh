@@ -7,6 +7,12 @@
     border-radius: 5px;
 }
 
+.he-table-menu {
+    .he-add-row-buton {        
+        font-weight: bold;
+    }
+}
+
 .he-table-menu-inaccurate {
 /*
  * Нужно, чтобы чекбокс был невыбираемым, иначе он снимает выделение из текста
@@ -119,7 +125,7 @@
 
 
 .he-undo-button {
-    margin-left: 50px;
+    margin-left: 10px;
     background-color: #999;
 }
 
@@ -149,7 +155,8 @@
 
 /* Не заполнена ссылка */
 .he-edit-form td:not([data-ref]):first-child {
-    border-left: 4px solid red;
+    outline: 1px solid rgb(245, 158, 158);
+    
 }
 
 
