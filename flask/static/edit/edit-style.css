@@ -1,5 +1,6 @@
 #menu {
     position: sticky;
+    z-index: 5;
     top: 0px;
     background-color: #008899;
     border-bottom: 1px solid gray;
@@ -154,11 +155,10 @@
 }
 
 /* Не заполнена ссылка */
-.he-edit-form td:not([data-ref]):first-child {
+.he-edit-form .cafedras td:not([data-ref]):first-child {
     outline: 1px solid rgb(245, 158, 158);
     
 }
-
 
 
 /*
