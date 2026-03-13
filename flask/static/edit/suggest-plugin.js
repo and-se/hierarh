@@ -9,8 +9,11 @@ function CafedraSuggestController() {
      * @param {Range} range - редактируемый фрагмент текста
      */
     this.getMatchQuery = (range) => {
+        let el = range.startContainer;
+        if (el.nodeType == Node.TEXT_NODE) el = el.parentElement;
+        if (el.closest('.fnote')) return; // внутри сноски подсказку не показываем
+        
         let cell = getEditedCell(range);
-
         if (cell) {
             let tr = cell.closest('tr');
             // подсказывать нужно только первую колонку - где названия кафедр
@@ -126,6 +129,16 @@ function CafedraSuggestController() {
     }
 
     /**
+     * Ссылка на дополнительную информацию для подсказки
+     * @param {*} suggestItem 
+     */
+    this.getAdditionalInfoLink = (suggestItem) => {
+        if (suggestItem.key) {
+            return "/edit/cafedra/" + suggestItem.key
+        }        
+    }
+
+    /**
      * Возвращает текущую редактируемую ячейку таблицы
      * @param {Range} range 
      * @returns {Element}
@@ -191,7 +204,8 @@ function SuggestPlugin(suggestController){
     if (!suggestController) {
         throw new Error(`Expected suggest controller`)
     }
-    for (const item of ['getMatchQuery', 'suggestFunc', 'applySuggestion', 'getAppliedSuggestion', 'clearAppliedSuggestion']) {
+    for (const item of ['getMatchQuery', 'suggestFunc', 'applySuggestion', 
+        'getAppliedSuggestion', 'clearAppliedSuggestion', 'getAdditionalInfoLink']) {
         if (!suggestController[item]) {
             throw new Error(`Bad controller: not function ${item}`)
         }
@@ -224,16 +238,36 @@ function SuggestPlugin(suggestController){
             padding: 0 5px;
             border-radius: 4px;
             transition: background-color 0.2s;
+
+            .add-info {
+                visibility: hidden;
+                padding-left: 15px;
+            }
+
         }
 
         .item:hover, .suggestion-active {
             background-color: #579bdf;
             color: white;
+
+            .add-info {
+                visibility: visible;
+            }
         }
 
         .current {
             border: 2px solid #cf002dff;
             border-radius: 5px;
+
+            a {
+                text-decoration: none;
+            }
+        }
+
+
+        .right-btn {
+            float:right;
+            cursor:pointer
         }
     }
     `
@@ -261,6 +295,8 @@ function SuggestPlugin(suggestController){
         */
 
         this.suggestRoot.addEventListener('click', (ev) => {
+            if (ev.target.closest('.add-info')) return;
+
             let item = ev.target.closest('.item');
             if (item) {
                 insertSuggestion(item)
@@ -318,7 +354,7 @@ function SuggestPlugin(suggestController){
     // Обработчик клавиатурных событий
     const handleSuggestionKeyboard = (e) => {
         if (this.suggestRoot.style.display === 'none') return;
-        switch (e.key) {
+        switch (e.code) {
             case 'ArrowDown':
                 if (this.suggestList.childElementCount==0) return;
                 e.preventDefault();
@@ -361,21 +397,28 @@ function SuggestPlugin(suggestController){
                     e.preventDefault();
                     this.controller.clearAppliedSuggestion(document.getSelection().getRangeAt(0));
                 }
+                break;
+            
+            case 'KeyL':
+                if (e.altKey) {
+                    e.preventDefault();
+
+                    if (this.activeSuggestionIndex == null) {
+                        this.suggestHeader.querySelector('.current a')?.click();
+                    } else {
+                        this.suggestList.children[this.activeSuggestionIndex]?.querySelector('a.add-info')?.click();
+                    }
+                }
+                break;
                 
             default:
-                return 'not keyboard'
-                ;
+                return 'not keyboard';
         }
         return 'stop';
     }
 
     // Функция показа подсказки
     const showSuggestions = async (matches) => {
-        /*if (!matches || matches.length === 0) {
-            hideSuggestions();
-            return;
-        }*/
-
         this.activeSuggestionIndex = null;
 
         const tags = matches.map((obj, i) => {
@@ -384,6 +427,15 @@ function SuggestPlugin(suggestController){
             d.dataset.index = i;
             d.innerText = obj.value;
             d[PREFIX+'suggest_obj'] = obj
+
+            let href = this.controller.getAdditionalInfoLink(obj)
+            if (href) {
+                let a = LIB.createElementByHtml(`
+                    <a class="add-info" target="_blank" title="подробнее Alt+L">ℹ️</a>
+                    `)
+                a.setAttribute('href', href)
+                d.append(a)
+            }
             
             return d;
         })
@@ -396,11 +448,15 @@ function SuggestPlugin(suggestController){
         if(headObj) {
             let d = LIB.createElementByHtml(`
             <div class='current'>
-                🔗 <span class="txt"></span>
-                <span class="del" style="float:right; cursor:pointer" title="удалить связь">❌</span>
+                🔗 <a class="txt" target="_blank"></a>
+                <span class="del right-btn" title="удалить связь Alt+Del">❌</span>
             </div>`)
-            d.querySelector('.txt').innerText = headObj.value;
+            let atxt = d.querySelector('.txt');
+            atxt.innerText = headObj.value;
+            atxt.setAttribute('href', this.controller.getAdditionalInfoLink(headObj) || '');
+
             d.querySelector('.del').addEventListener('click', ev => {
+                ev.preventDefault();
                 this.controller.clearAppliedSuggestion(document.getSelection().getRangeAt(0));
                 this.suggestHeader.innerHTML = '';
             })
