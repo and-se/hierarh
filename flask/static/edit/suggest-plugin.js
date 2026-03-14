@@ -31,24 +31,21 @@ function CafedraSuggestController() {
         return (txt.match(onlyCapitalWords) || []).join(' ')
     }
 
+    const suggestFetcher = new LIB.FetchManager("suggest");
+    const headFetcher = new LIB.FetchManager("head")
+
     /**
      * список подсказок в виде массива строк либо объектов (можно Promise)
      * Для объектов обязательно свойство value - это будет текст подсказки.
      * @param {*} query запрос (см. getMatchQuery)
      */
     this.suggestFunc = async (query) => {
-        /*return [
-            {key: 1, value: 'Иван Иванович'},
-            {key: 2, value: 'Петр Петрович'},
-            {key: 3, value: 'Семён Семёнович'}
-        ]*/
-
         if (!query.trim()) {
             return []
         }
 
-        return await fetch("/edit/suggest/cafedra?" + new URLSearchParams({ query: query }),
-            { /*signal: cancel,*/ credentials: 'include' })                
+        return await suggestFetcher.fetch("/edit/suggest/cafedra?" + new URLSearchParams({ query: query }),
+            { credentials: 'include' })                
             .then(resp => resp.json())
     }
 
@@ -67,8 +64,8 @@ function CafedraSuggestController() {
             if (!key) return;
 
             if (!cell.__tmpRefName) {
-                cell.__tmpRefName = await fetch("/edit/cafedra/" + key + '/json',
-                                    { /*signal: cancel,*/ credentials: 'include' })                
+                cell.__tmpRefName = await headFetcher.fetch("/edit/cafedra/" + key + '/json',
+                                    { credentials: 'include' })                
                 .then(resp => resp.json())
                 .then(d => {                    
                     if (d.success) {
@@ -123,6 +120,8 @@ function CafedraSuggestController() {
             let word = sel.getRangeAt(0);        
             word.deleteContents()
             word.insertNode(document.createTextNode(suggestItem.value))
+            // fixme no undo...
+            // not work... document.execCommand('insertText', suggestItem.value);
             sel.collapseToEnd();
         }
         
@@ -344,8 +343,12 @@ function SuggestPlugin(suggestController){
         const query = this.controller.getMatchQuery(document.getSelection().getRangeAt(0));
         if (query) {
             console.debug("get matches for query", query)
-            const matches = await this.controller.suggestFunc(query)
-            showSuggestions(matches);
+            try {
+                const matches = await this.controller.suggestFunc(query)
+                showSuggestions(matches);
+            } catch (err) {
+                console.debug("Fail get suggestions");
+            }
         } else {
             hideSuggestions();
         }

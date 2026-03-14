@@ -16,16 +16,16 @@ let LIB = {
         if (prefix && !document.getElementById(prefix)) {
             return prefix
         }
-        
+
         if (!prefix) prefix = "id_";
         let i = 0
-        
+
         let res = prefix + i;
         while (document.getElementById(res)) {
             i++
             res = prefix + i
         }
-        
+
         return res
     },
 
@@ -49,5 +49,55 @@ let LIB = {
         };
     },
 
-    }
+    /**
+     * Единственный запрос на объект менеджера. Старый отменяется
+     */
+    FetchManager: class FetchManager {
+        /**
+         * @param {String} name - имя для логов
+         * @param {*} cancelResponse что отвечать при отмена запроса. Если не задано - кидается исключение.
+         */
+        constructor(name, cancelResponse) {
+            this.currentFetchStopper = null;
+            this.name = name;
+            this.cancelResponse = cancelResponse;
+        }
+
+        async fetch(url, options = {}) {
+            this.cancel(); // останавливаем текущий запрос
+
+            this.currentFetchStopper = new AbortController();
+            const signal = this.currentFetchStopper.signal;
+
+            try {
+                const resp = await fetch(url, {
+                    ...options,
+                    signal
+                });
+
+                this.currentFetchStopper = null;
+                return resp;
+            } catch (error) {
+                if (error.name == 'AbortError') {
+                    console.debug(`FetchManager<${this.name}> CANCEL request ${url}`);
+                    
+                    if (this.cancelResponse !== undefined)
+                        console.debug(`FetchManager<${this.name}> return default answer ${this.cancelResponse}`);
+                        return this.cancelResponse;
+                }
+
+                throw error;
+            }
+        }
+
+        cancel() {
+            if (this.currentFetchStopper) {
+                this.currentFetchStopper.abort();
+                this.currentFetchStopper = null;
+                return true;
+            }
+
+            return false;
+        }
+    },
 }

@@ -449,7 +449,7 @@ def set_task_answer(id):
 @login_required
 def suggest_cafedra():
     q = request.args.get("query", '')
-    return db_edit.cafedra.suggest(q, full_search=False)
+    return db_edit.cafedra.suggest(q, full_search=False, limit=20)
 
 @ed.get('/cafedra/<int:key>/snippet')
 @login_required
