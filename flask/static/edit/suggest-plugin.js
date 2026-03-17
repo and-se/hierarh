@@ -59,7 +59,7 @@ function CafedraSuggestController() {
         const cell = getEditedCell(range);
 
         if (cell && cell.dataset.ref) {
-            const key = cell.dataset.ref.split('/')[1]
+            const key = cell.dataset.ref.split('#')[1]
 
             if (!key) return;
 
@@ -112,7 +112,7 @@ function CafedraSuggestController() {
         
         
 
-        cell.dataset.ref="cafedra/" + suggestItem.key;
+        cell.dataset.ref="cafedra#" + suggestItem.key;
         cell.__tmpRefName = suggestItem.value;
         
         let sel = selectCurrentWordInCell(cell)        
