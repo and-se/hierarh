@@ -26,6 +26,7 @@ class EpiskopView:
     def __init__(self, data: 'TextEpiskop'):
         self._text = data
         self._tree = html.fragment_fromstring(data.html)
+        self.changed = False
 
     @property
     def key(self):
@@ -47,13 +48,18 @@ class EpiskopView:
     def cafedras(self) -> list['RowCafedraView']:
         # отбираем строки таблицы епископов, которые не являются заголовками
         rows = self._tree.xpath("""//table[contains(@class, 'cafedras')]/tbody/tr[not(contains(@class, 'header-row'))]""")
-        return [RowCafedraView(r) for r in rows]
+        return [RowCafedraView(r, self) for r in rows]
     
     def __repr__(self):
         return f'EpiskopView({self.__str__()})'
     
     def __str__(self):
         return f'{self.header} #{self.key}'
+    
+    def make_updated_doc(self):
+        doc_data = html.tostring(self._tree, encoding='utf8').decode('utf8')
+        from edit.storage import TextEpiskop
+        return TextEpiskop.from_html(self.key, doc_data)
 
 
 from edit.init_db_creator import CAFEDRA_MAP_FILE
@@ -64,7 +70,8 @@ class RowCafedraView:
     """
     Структурированное представление строки таблицы кафедр в html епископа
     """
-    def __init__(self, tr: html.HtmlElement):
+    def __init__(self, tr: html.HtmlElement, root: EpiskopView):
+        self.root_episkop: EpiskopView = root
         self.d = tr
         self.caf = tr[0]
         assert self.caf.tag == 'td'
@@ -82,7 +89,21 @@ class RowCafedraView:
     
     @property
     def link(self):
-        return None  # TODO now no links
+        rf = self.caf.get('data-ref')
+        if rf:
+            m = re.match(r'^cafedra#(\d+)$', rf.strip())
+            if m:
+                return int(m.group(1))
+    
+    def set_link(self, value: int):
+        try:
+            value = int(value)
+        except ValueError:
+            raise ValueError('ключ должен быть целым числом')
+        else:
+            self.caf.set('data-ref', f'cafedra#{value}')
+            self.root_episkop.changed = True
+
 
     @property
     def begin_dating(self) -> str:
@@ -204,7 +225,7 @@ class CafedraView:
         return self._text.is_obn()
 
     def has_name(self, name: str):
-        return name.lower().strip() == self.header
+        return name.lower().strip() == self.header.lower().strip()
         # TODO other names...
 
     @property

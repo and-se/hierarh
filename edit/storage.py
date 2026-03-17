@@ -50,7 +50,7 @@ class TextCollectionDb:
     
     def upsert(self, doc: 'TextBase', reg_data:dict=None, fix_reg_data=True) -> 'TextBase':
         if not isinstance(doc, self.text_model):
-            raise ValueError(f'Expected doc of type {type(self.text_model)} got {type(doc)}')
+            raise ValueError(f'Expected doc of type {self.text_model} got {type(doc)}')
             
         # create new or update current item
         if reg_data is not None:

@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
 from edit.task import Task
 from edit.text_view import TEXT_VIEW_LOG_NAME, CafedraView, EpiskopView
-from edit.storage import HierarhEditStorage
+from edit.storage import HierarhEditStorage, TextBase
 from parsers.fail import ParseFail
 
 
@@ -104,15 +104,28 @@ def main():
         tlog.warning("DEBUG_TASKS=TRUE!!!! ЗАДАЧИ ЛОГИРУЮТСЯ в файл tasks.txt!")
 
     if cmd == 'cafedra':
-        totals = check_cafedra_to_episkop_links(True)
+        totals, docs = check_cafedra_to_episkop_links(True)
     else:
-        totals = check_episkop_to_cafedra_links(True)
+        totals, docs = check_episkop_to_cafedra_links(True)
 
     pprint(totals)
+    
+    if docs:
+        r = input(f"Нужно обновить {len(docs)} документов. Делаем? ")
+        if r.lower() not in ('да', 'yes', '1', 'true'): return
+
+        db = HierarhEditStorage()
+        with db.atomic():
+            for d in docs:
+                db.get_coll(cmd).upsert(d, reg_data={
+                    'who': 'admin',
+                    'comment': 'проставлены ссылки'
+                })
+            # raise Exception('cancel')
 
 
 def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor, 
-                          task_type: str, remove_old_tasks: bool, parallel=False) -> dict[Any, int]:
+                          task_type: str, remove_old_tasks: bool, parallel=False) -> tuple[dict[Any, int], list[TextBase]]:
     """
     Перебирает документы коллекции coll_name и добавляет задачи
 
@@ -121,8 +134,11 @@ def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor,
     (в stats автоматически добавляются неизвестные ключи со значением 0).
     Должна добавить в задачу проблемы при помощи Task.add_problem, 
     а также задать заголовок задачи Task.title
+    Если в документ надо внести изменения, doc_processor возвращает новую версию документа
 
     Есть проблемы в задачу не добавлены, то задача для документа не создаётся.
+
+    Возвращает словарь статистики и список изменённых документов (ещё не внесённый в БД!)
     """
 
     if parallel:
@@ -130,6 +146,8 @@ def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor,
 
     coll = db.get_coll(coll_name)
     stats = defaultdict(int)
+
+    updated_docs = []
     
     if remove_old_tasks:
         # db.task.reset() - recreates table
@@ -137,17 +155,19 @@ def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor,
     
     for cnt, doc in enumerate(coll.iterate()):
         if cnt and cnt % 100 == 0:
-            logging.warning("Processed %s items", cnt)   
+            logging.warning("Processed %s items", cnt)
         task = db.task.get(coll_name=coll_name, doc_key=doc.key, doc_reg_data_when=doc.reg_data['when'])
         task.type_ = task_type        
         task.changed = False  # сброс флага изменённости задачи
 
         # внешняя обработка документа вызывающим
-        doc_processor(doc, task, db, stats)
+        new_doc = doc_processor(doc, task, db, stats)
+        if new_doc:
+            updated_docs.append(new_doc)
 
         if task.changed:
             task.save('admin')
-    return stats
+    return stats, updated_docs
 
 
 def create_tasks_for_coll_parallel(db: HierarhEditStorage, coll_name: str, doc_processor, 
@@ -170,15 +190,19 @@ def create_tasks_for_coll_parallel(db: HierarhEditStorage, coll_name: str, doc_p
     portion_processor=partial(_portion_processor, coll_name, task_type, doc_processor)
 
     stats = defaultdict(int)
+    updated_docs = []
     with multiprocessing.Pool(initializer=_worker_init, initargs=(global_counter,)) as pool:
         res = pool.map(portion_processor, bulk_frames)
-    for portion_stat, tasks_to_save in res:
+    
+    for portion_stat, tasks_to_save, up_docs in res:
         for t in tasks_to_save:
             t.save("admin")
         for k in portion_stat:
             stats[k] += portion_stat[k]
+        if up_docs:
+            updated_docs.extend(up_docs)
         
-    return stats
+    return stats, updated_docs
 
 def _worker_init(counter):
     global global_counter
@@ -190,6 +214,7 @@ def _worker_init(counter):
 def _portion_processor(coll_name, task_type, doc_processor, bulk_frames):
         stats = defaultdict(int)
         tasks_to_save = []
+        docs_to_update = []
         skip, take = bulk_frames
         
         global db
@@ -201,7 +226,9 @@ def _portion_processor(coll_name, task_type, doc_processor, bulk_frames):
             task.changed = False  # сброс флага изменённости задачи
 
             # внешняя обработка документа вызывающим
-            doc_processor(doc, task, db, stats)
+            new_doc = doc_processor(doc, task, db, stats)
+            if new_doc:
+                docs_to_update.append(new_doc)
 
             if task.changed:
                 #task.save('admin')
@@ -211,7 +238,7 @@ def _portion_processor(coll_name, task_type, doc_processor, bulk_frames):
         with global_counter.get_lock():
             global_counter.value += len(portion)
             logging.warning(f"Processed {global_counter.value} items")
-        return stats, tasks_to_save
+        return stats, tasks_to_save, docs_to_update
     
 
 def check_episkop_to_cafedra_links(remove_old_tasks=False):
@@ -238,7 +265,7 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
                 else:
                     linked = CafedraView(linked)
                     if not linked.has_name(caf.name):
-                        task.add_problem(i, caf, 'Проставлена сылка на кафедру', linked.name, 'Это верно?')
+                        task.add_problem(i, caf, 'Проставлена сылка на кафедру', linked.header, 'Это верно?')
                         stats['возможно сломанная ссылка']+=1
             else:
                 #if caf in db.cafedra.ignored_names:                
@@ -251,13 +278,18 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
 
                 found_cafs = db.cafedra.find_by_name(search_name)
                 if len(found_cafs) == 1:
-                    ... # проставить ссылку на кафедру
+                    stats['кафедра найдена, надо проставить ссылку в документе'] +=1
+                    caf.set_link(found_cafs[0].id)
+
                 elif not len(found_cafs):
                     task.add_problem(i, caf, "кафедра не найдена")
                     stats['кафедра не найдена']+=1
                 else: # many cafedra
                     task.add_problem(i, caf, "какая именно кафедра?", found_cafs)
                     stats['какая именно кафедра?']+=1
+        
+        if ep.changed:
+            return ep.make_updated_doc()
     
     db = HierarhEditStorage()
     return create_tasks_for_coll(db, 'episkop', episkop_proccessor, "episkop->cafedra", remove_old_tasks, parallel=False)
