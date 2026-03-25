@@ -52,7 +52,7 @@ let LIB = {
     /**
      * Единственный запрос на объект менеджера. Старый отменяется
      */
-    FetchManager: class FetchManager {
+    SingleFetchManager: class SingleFetchManager {
         /**
          * @param {String} name - имя для логов
          * @param {*} cancelResponse что отвечать при отмена запроса. Если не задано - кидается исключение.
@@ -79,10 +79,10 @@ let LIB = {
                 return resp;
             } catch (error) {
                 if (error.name == 'AbortError') {
-                    console.debug(`FetchManager<${this.name}> CANCEL request ${url}`);
+                    console.debug(`SingleFetchManager<${this.name}> CANCEL request ${url}`);
                     
                     if (this.cancelResponse !== undefined)
-                        console.debug(`FetchManager<${this.name}> return default answer ${this.cancelResponse}`);
+                        console.debug(`SingleFetchManager<${this.name}> return default answer ${this.cancelResponse}`);
                         return this.cancelResponse;
                 }
 

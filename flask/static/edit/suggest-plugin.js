@@ -1,19 +1,71 @@
 'use strict';
 
-/**
- * Задаваемая пользователем логика работы подсказки
- */
-function CafedraSuggestController() {
+
+class BaseSuggestController {
     /**
-     * На основе анализа выделенной части текста возвращает запрос для getMatches
-     * @param {Range} range - редактируемый фрагмент текста
+     * На основе анализа выделенной части текста возвращает запрос для {@link suggestFunc}
+     * @param {Range} range - редактируемый фрагмент текста     * 
+     * @returns Запрос для {@link suggestFunc} или ничего, 
+     * если в данном контексте (range) подсказку показывать не надо
      */
-    this.getMatchQuery = (range) => {
+    getMatchQuery(range) {
+        throw new TypeError('Метод надо реализовать в подклассе')
+    }
+
+    /**
+     * список подсказок в виде массива строк либо объектов (можно Promise)
+     * Для объектов обязательно свойство value - это будет текст подсказки.
+     * @param {*} query запрос (см. {@link getMatchQuery})
+     */
+    suggestFunc(query) {
+        throw new TypeError('Метод надо реализовать в подклассе')
+    }
+
+    /**
+     * Вставлят подсказку в текст
+     * @param {*} suggestItem - выбранная подсказка (объект или строка)
+     * @param {*} range - редактируемая часть текста
+     */
+    applySuggestion(suggestItem, range) {
+        throw new TypeError('Метод надо реализовать в подклассе')
+    }
+
+    /**
+     * Возвращает данные ранее применённой для этого места текста подсказки.
+     * Например, если при выборе подсказки проставляется ссылка, надо вернуть сведения о ссылке
+     * @param {Range} range 
+     * @returns объект с полями key и value
+     */
+    getAppliedSuggestion(range) {}
+
+    /**
+     * Удаляет связь текста с ранее применённой подсказкой.
+     * Например, если выбор подсказки проставляет ссылку куда-либо - этот метод ссылку удаляет.
+     * @param {Range} range 
+     */
+    clearAppliedSuggestion(range) {}
+
+    /**
+     * Ссылка на дополнительную информацию для подсказки
+     * @param {*} suggestItem - подсказка, для которой ищется доп. информация
+     * @returns гиперссылка на доп. информацию
+     */
+    getAdditionalInfoLink(suggestItem) {}
+}
+
+/**
+ * Логика работы подсказки для выбора кафедры
+ */
+class CafedraSuggestController extends BaseSuggestController {
+    _suggestFetcher = new LIB.SingleFetchManager("suggest");
+    _headFetcher = new LIB.SingleFetchManager("head")
+
+    getMatchQuery(range) {
         let el = range.startContainer;
         if (el.nodeType == Node.TEXT_NODE) el = el.parentElement;
         if (el.closest('.fnote')) return; // внутри сноски подсказку не показываем
         
-        let cell = getEditedCell(range);
+        let cell = this.getEditedCell(range);
         if (cell) {
             let tr = cell.closest('tr');
             // подсказывать нужно только первую колонку - где названия кафедр
@@ -31,32 +83,40 @@ function CafedraSuggestController() {
         return (txt.match(onlyCapitalWords) || []).join(' ')
     }
 
-    const suggestFetcher = new LIB.FetchManager("suggest");
-    const headFetcher = new LIB.FetchManager("head")
-
-    /**
-     * список подсказок в виде массива строк либо объектов (можно Promise)
-     * Для объектов обязательно свойство value - это будет текст подсказки.
-     * @param {*} query запрос (см. getMatchQuery)
-     */
-    this.suggestFunc = async (query) => {
+    async suggestFunc(query) {
         if (!query.trim()) {
             return []
         }
 
-        return await suggestFetcher.fetch("/edit/suggest/cafedra?" + new URLSearchParams({ query: query }),
+        return await this._suggestFetcher.fetch("/edit/suggest/cafedra?" + new URLSearchParams({ query: query }),
             { credentials: 'include' })                
             .then(resp => resp.json())
     }
 
-    /**
-     * Возвращает данные ранее применённой для этого места текста подсказки.
-     * Например, если при выборе подсказки проставляется ссылка, надо вернуть сведения о ссылке
-     * @param {Range} range 
-     * @returns объект с полями key и value
-     */
-    this.getAppliedSuggestion = async (range) => {
-        const cell = getEditedCell(range);
+    applySuggestion(suggestItem, range) {
+        console.debug('insert', suggestItem, range);
+
+        if (!suggestItem.key || !suggestItem.value) {
+            throw new Error(`Bad suggest (no key/value) ${JSON.stringify(suggestItem)}`)
+        }
+        
+        let cell = this.getEditedCell(range);
+        cell.dataset.ref="cafedra#" + suggestItem.key;
+        cell.__tmpRefName = suggestItem.value;
+        
+        let sel = SuggestHelpers.selectCurrentWordInCell(cell)        
+        if (sel) {
+            let word = sel.getRangeAt(0);        
+            word.deleteContents()
+            word.insertNode(document.createTextNode(suggestItem.value))
+            // fixme no undo...
+            // not work... document.execCommand('insertText', suggestItem.value);
+            sel.collapseToEnd();
+        }        
+    }
+
+    async getAppliedSuggestion(range) {
+        const cell = this.getEditedCell(range);
 
         if (cell && cell.dataset.ref) {
             const key = cell.dataset.ref.split('#')[1]
@@ -64,7 +124,7 @@ function CafedraSuggestController() {
             if (!key) return;
 
             if (!cell.__tmpRefName) {
-                cell.__tmpRefName = await headFetcher.fetch("/edit/cafedra/" + key + '/json',
+                cell.__tmpRefName = await this._headFetcher.fetch("/edit/cafedra/" + key + '/json',
                                     { credentials: 'include' })                
                 .then(resp => resp.json())
                 .then(d => {                    
@@ -80,58 +140,15 @@ function CafedraSuggestController() {
         }
     }
 
-    /**
-     * Удаляет связь текста с ранее применённой подсказкой.
-     * Например, если выбор подсказки проставляет ссылку куда-либо - этот метод ссылку удаляет.
-     * @param {Range} range 
-     */
-    this.clearAppliedSuggestion = range => {
-        const cell = getEditedCell(range);
+    clearAppliedSuggestion(range) {
+        const cell = this.getEditedCell(range);
 
         if (cell && cell.dataset.ref) {
             delete cell.dataset.ref;
         }
     }
     
-
-
-    /**
-     * Вставлят подсказку в текст
-     * @param {*} suggestItem - выбранная подсказка (объект или строка)
-     * @param {*} range - редактируемая часть текста
-     */
-    this.applySuggestion = (suggestItem, range) => {
-        console.debug('insert', suggestItem, range);
-
-        if (!suggestItem.key || !suggestItem.value) {
-            throw new Error(`Bad suggest (no key/value) ${JSON.stringify(suggestItem)}`)
-        }
-
-        
-        let cell = getEditedCell(range);
-        
-        
-
-        cell.dataset.ref="cafedra#" + suggestItem.key;
-        cell.__tmpRefName = suggestItem.value;
-        
-        let sel = selectCurrentWordInCell(cell)        
-        if (sel) {
-            let word = sel.getRangeAt(0);        
-            word.deleteContents()
-            word.insertNode(document.createTextNode(suggestItem.value))
-            // fixme no undo...
-            // not work... document.execCommand('insertText', suggestItem.value);
-            sel.collapseToEnd();
-        }
-        
-    }
-
-    /**
-     * Ссылка на дополнительную информацию для подсказки
-     * @param {*} suggestItem 
-     */
-    this.getAdditionalInfoLink = (suggestItem) => {
+    getAdditionalInfoLink(suggestItem) {
         if (suggestItem.key) {
             return "/edit/cafedra/" + suggestItem.key
         }        
@@ -142,13 +159,16 @@ function CafedraSuggestController() {
      * @param {Range} range 
      * @returns {Element}
      */
-    function getEditedCell(range) {
+    getEditedCell(range) {
         let el = range.startContainer;
         if (el.nodeType == Node.TEXT_NODE) el = el.parentElement;
         return el.closest('td')
     }
 
-    function selectCurrentWordInCell(cell) {
+}
+
+class SuggestHelpers {
+     static selectCurrentWordInCell(cell) {
         /* После добавления и удаления строки может быть несколько подряд идущих textNode
            Посему слово может быть разорвано между несколькими textNode.
            Чтобы с этим не возиться, лучше воспользоваться встроенными в браузер средствами
@@ -166,7 +186,7 @@ function CafedraSuggestController() {
         // пустая ячейка слов не содержит - оставляем пустое выделение
         if (!cell.innerText.trim()) return sel;
 
-        if (isCursorAtStartOfElem(cell)) {
+        if (this.isCursorAtStartOfElem(cell)) {
             // если мы в начале текста - двигаемся вправо, чтбобы не выйти за границы ячейки
             sel.modify("move", "right", "word")
             sel.modify("extend", "left", "word");
@@ -181,7 +201,7 @@ function CafedraSuggestController() {
         return sel;
     }
 
-    function isCursorAtStartOfElem(elem) {
+    static isCursorAtStartOfElem(elem) {
         const selection = document.getSelection();
         if (selection.rangeCount === 0) return false;
 
@@ -194,20 +214,15 @@ function CafedraSuggestController() {
     }
 }
 
-
 /**
  * Плагин для вывода подсказки при вводе текста.
- * @param {SuggestController} suggestController - ползовательская логика подсказки
+ * @param {BaseSuggestController} suggestController - ползовательская логика подсказки
  */
 function SuggestPlugin(suggestController){
-    if (!suggestController) {
-        throw new Error(`Expected suggest controller`)
-    }
-    for (const item of ['getMatchQuery', 'suggestFunc', 'applySuggestion', 
-        'getAppliedSuggestion', 'clearAppliedSuggestion', 'getAdditionalInfoLink']) {
-        if (!suggestController[item]) {
-            throw new Error(`Bad controller: not function ${item}`)
-        }
+    if (! (suggestController instanceof BaseSuggestController &&
+           Object.getPrototypeOf(suggestController) != BaseSuggestController.prototype)
+     ) {
+        throw new Error(`Expected suggest controller as subclass of BaseSuggestController`)
     }
 
     this.controller = suggestController;
@@ -347,9 +362,10 @@ function SuggestPlugin(suggestController){
                 const matches = await this.controller.suggestFunc(query)
                 showSuggestions(matches);
             } catch (err) {
-                console.debug("Fail get suggestions");
+                console.debug("Fail get suggestions", err);
             }
         } else {
+            // подсказка в данном контексте не нужна
             hideSuggestions();
         }
     }
@@ -451,7 +467,7 @@ function SuggestPlugin(suggestController){
         if(headObj) {
             let d = LIB.createElementByHtml(`
             <div class='current'>
-                🔗 <a class="txt" target="_blank"></a>
+                🔗 <a class="txt" target="_blank" title="текущая связь"></a>
                 <span class="del right-btn" title="удалить связь Alt+Del">❌</span>
             </div>`)
             let atxt = d.querySelector('.txt');
