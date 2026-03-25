@@ -54,33 +54,20 @@ class BaseSuggestController {
 }
 
 /**
- * Логика работы подсказки для выбора кафедры
+ * Общая логика подсказки для кафедр и епископов
  */
-class CafedraSuggestController extends BaseSuggestController {
+class BaseHierarhSuggestController extends BaseSuggestController {
     _suggestFetcher = new LIB.SingleFetchManager("suggest");
     _headFetcher = new LIB.SingleFetchManager("head")
 
-    getMatchQuery(range) {
-        let el = range.startContainer;
-        if (el.nodeType == Node.TEXT_NODE) el = el.parentElement;
-        if (el.closest('.fnote')) return; // внутри сноски подсказку не показываем
-        
-        let cell = this.getEditedCell(range);
-        if (cell) {
-            let tr = cell.closest('tr');
-            // подсказывать нужно только первую колонку - где названия кафедр
-            if (tr.firstElementChild != cell) return;
+    constructor(collection) {
+        if (!['episkop', 'cafedra'].includes(collection)) {
+            throw new Error('Коллекция должна быть episkop или cafedra')
         }
-        
-        let txt = cell?.innerText || '';
 
-        // если только одно слово, то по нему и ищем
-        if (!txt.trim().includes(' ')) return txt;
+        super()
 
-        // Ищем только по словам с большой буквы
-        const onlyCapitalWords = /[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]+/g;
-        // выпишем такие слова через пробел
-        return (txt.match(onlyCapitalWords) || []).join(' ')
+        this.coll = collection;
     }
 
     async suggestFunc(query) {
@@ -88,7 +75,7 @@ class CafedraSuggestController extends BaseSuggestController {
             return []
         }
 
-        return await this._suggestFetcher.fetch("/edit/suggest/cafedra?" + new URLSearchParams({ query: query }),
+        return await this._suggestFetcher.fetch(`/edit/suggest/${this.coll}?` + new URLSearchParams({ query: query }),
             { credentials: 'include' })                
             .then(resp => resp.json())
     }
@@ -101,7 +88,7 @@ class CafedraSuggestController extends BaseSuggestController {
         }
         
         let cell = this.getEditedCell(range);
-        cell.dataset.ref="cafedra#" + suggestItem.key;
+        cell.dataset.ref= this.coll + "#" + suggestItem.key;
         cell.__tmpRefName = suggestItem.value;
         
         let sel = SuggestHelpers.selectCurrentWordInCell(cell)        
@@ -124,7 +111,7 @@ class CafedraSuggestController extends BaseSuggestController {
             if (!key) return;
 
             if (!cell.__tmpRefName) {
-                cell.__tmpRefName = await this._headFetcher.fetch("/edit/cafedra/" + key + '/json',
+                cell.__tmpRefName = await this._headFetcher.fetch(`/edit/${this.coll}/` + key + '/json',
                                     { credentials: 'include' })                
                 .then(resp => resp.json())
                 .then(d => {                    
@@ -133,6 +120,9 @@ class CafedraSuggestController extends BaseSuggestController {
                     } else {
                         throw new Error(json.message)
                     }
+                })
+                .catch(err => {
+                    console.error('Fail fetch info for', this.coll, key, err)
                 })
             }
             
@@ -150,7 +140,7 @@ class CafedraSuggestController extends BaseSuggestController {
     
     getAdditionalInfoLink(suggestItem) {
         if (suggestItem.key) {
-            return "/edit/cafedra/" + suggestItem.key
+            return `/edit/${this.coll}/` + suggestItem.key
         }        
     }
 
@@ -164,7 +154,64 @@ class CafedraSuggestController extends BaseSuggestController {
         if (el.nodeType == Node.TEXT_NODE) el = el.parentElement;
         return el.closest('td')
     }
+}
 
+class CafedraSuggestController extends BaseHierarhSuggestController {
+    constructor() {
+        super('cafedra')
+    }
+
+    getMatchQuery(range) {
+        let el = range.startContainer;
+        if (el.nodeType == Node.TEXT_NODE) el = el.parentElement;
+        if (el.closest('.fnote')) return; // внутри сноски подсказку не показываем
+        
+        let cell = this.getEditedCell(range);
+        if (cell) {
+            let tr = cell.closest('tr');
+            // подсказывать нужно только первую колонку - где названия кафедр
+            if (tr.firstElementChild != cell) return;
+        }
+        
+        let txt = cell?.innerText.replaceAll('[сноска]', '') || '';
+
+        // если только одно слово, то по нему и ищем
+        if (!txt.trim().includes(' ')) return txt;
+
+        // Ищем только по словам с большой буквы
+        const onlyCapitalWords = /[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]+/g;
+        // выпишем такие слова через пробел
+        return (txt.match(onlyCapitalWords) || []).join(' ')
+    }
+}
+
+class EpiskopSuggestController extends BaseHierarhSuggestController {
+    constructor() {
+        super('episkop')
+    }
+
+    getMatchQuery(range) {
+        let el = range.startContainer;
+        if (el.nodeType == Node.TEXT_NODE) el = el.parentElement;
+        if (el.closest('.fnote')) return; // внутри сноски подсказку не показываем
+        
+        let cell = this.getEditedCell(range);
+        if (cell) {
+            let tr = cell.closest('tr');
+            // подсказывать нужно только последнюю колонку - где имена епископов
+            if (tr.lastElementChild != cell) return;
+        }
+        
+        let txt = cell?.innerText.replaceAll('[сноска]', '') || '';
+
+        // если только одно слово, то по нему и ищем
+        if (!txt.trim().includes(' ')) return txt;
+
+        // Ищем только по словам с большой буквы
+        const onlyCapitalWords = /[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]+/g;
+        // выпишем такие слова через пробел
+        return (txt.match(onlyCapitalWords) || []).join(' ')
+    }
 }
 
 class SuggestHelpers {

@@ -19,11 +19,14 @@ function initForm() {
         // Плагин для вставки сносок в последующие разделы
         let notePlugin = new NotePlugin()
         
-        // Текста статьи
+        // Текст статьи
         H_FORM.addEditor('.text', new TextEditor().withPlugin(notePlugin))
+
+        // Плагин для подсказки кафедры
+        suggestPlugin = new SuggestPlugin(new EpiskopSuggestController());
         
         // Таблица кафедр
-        H_FORM.addEditor('table.episkops', new HierarhTableEditor('епископы').withPlugin(notePlugin));
+        H_FORM.addEditor('table.episkops', new HierarhTableEditor('епископы').withPlugin(notePlugin).withPlugin(suggestPlugin));
         
         H_FORM.start();
     } catch (ex) {

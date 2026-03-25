@@ -487,7 +487,7 @@ def cafedra_json(key):
 @login_required
 def suggest_episkop():
     q = request.args.get("query", '')
-    return db_edit.episkop.suggest(q, full_search=True)
+    return db_edit.episkop.suggest(q, full_search=True, limit=20)
 
 @ed.get('/episkop/<int:key>/snippet')
 @login_required
@@ -504,6 +504,23 @@ def snippet_episkop(key):
         "key": key,
         "snippet": snippet 
     }
+
+@ed.get('/episkop/<int:key>/json')
+@login_required
+def episkop_json(key):
+    t = db_edit.episkop.get(key)
+    if not t:
+        return {
+            "success": False,
+            "message": f"no such episkop {key}"
+        }, 404
+    else:
+        return {
+            "success": True,
+            "key": key,
+            "data": t.as_dict()
+        }
+
 
 
 app.register_blueprint(ed, url_prefix='/edit')
