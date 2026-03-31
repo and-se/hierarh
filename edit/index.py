@@ -279,7 +279,7 @@ class EpiskopIndexOrm(Model):
     class Meta:
         table_name = 'EpiskopIndex'
     
-    id = AutoField()
+    index_item_id = AutoField()
     header = TextField()
     name = TextField(null=True)
     surname = TextField(null=True)

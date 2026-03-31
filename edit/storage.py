@@ -11,7 +11,8 @@ DbName = settings.EditDbName
 EditDb = None  # БД редактирования, инициализируется ниже
 
 class HierarhEditStorage:
-    def __init__(self):
+    def __init__(self, enable_ram_cache=True):
+        self._enable_ram_cache = False
         self.cafedra = TextCollectionDb('cafedra', CafedraEditOrm)
         self.episkop = TextCollectionDb('episkop', EpiskopEditOrm)
         self.task = TaskCollection()
@@ -21,7 +22,7 @@ class HierarhEditStorage:
     @property
     def episkop_index(self):
         if not self._episkop_index:
-            self._episkop_index = EpiskopIndex(self, copy_to_ram=True)
+            self._episkop_index = EpiskopIndex(self, copy_to_ram=self._enable_ram_cache)
         return self._episkop_index
 
     def get_coll(self, name) -> 'TextCollectionDb':
