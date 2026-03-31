@@ -248,8 +248,10 @@ def cafedra_json_to_html_edit(filename):
     return result_file, error_file
 
 
-
-note_re = re.compile(r'<span\s+class="note"[^>]*? data-note="(?P<note_num_0>\d+)"[^>]*>\s*(?P<note_num>\d+)\s*</span>')
+_note_base_re = r'(?P<note_full><span\s+class="note"[^>]*? data-note="(?P<note_num_0>\d+)"[^>]*>\s*(?P<note_num>\d+)\s*</span>)'
+_space_re = r'(\s|\\t)*'
+note_re = re.compile(_note_base_re)
+inaccurate_tail_note_re = re.compile(rf'^{_space_re}(?P<brackets>\(.*\)){_space_re}{_note_base_re}{_space_re}$')
 
 @dataclass
 class Note:
@@ -331,7 +333,15 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
                     who = who.strip()[:-1]
                 else:
                     inexact = False
-            else:
+            else:                
+                # Сноска после неточной строки в скобках:
+                # \t\t(06.1943\t–\t09.1943\t–\tПавел Мелетьев)<span class=\"note\" data-note=\"8\">8</span>
+                tail_note_after_inaccurate = None
+                sm = inaccurate_tail_note_re.match(ep)
+                if sm:
+                    ep = sm.group('brackets')
+                    tail_note_after_inaccurate = sm.group('note_full')
+
                 r = divide_episkop_row(ep)
                 if isinstance(r, ParseFail):
                     raise Exception(f'''
@@ -344,6 +354,10 @@ f'''<sup class="{CSS_NOTE_ERROR}" data-note-num="{m.group('note_num')}" title="�
 Если исходная строка взята в скобки, например "text": "(90 – 120 – Кто-то)", то сделайте так:
 "text": ["(90", "120", "Кто-то)"]  ''')
                 start, end, who, inexact = r
+
+                if tail_note_after_inaccurate:
+                    assert inexact, 'Ошибка логики - раз сработала inaccurate_tail_note_re, то строка должна быть в скобках!'
+                    who += tail_note_after_inaccurate
 
             start, end, who = map(convert_notes, (start, end, who))
 
