@@ -12,7 +12,7 @@ EditDb = None  # БД редактирования, инициализирует
 
 class HierarhEditStorage:
     def __init__(self, enable_ram_cache=True):
-        self._enable_ram_cache = False
+        self._enable_ram_cache = enable_ram_cache
         self.cafedra = TextCollectionDb('cafedra', CafedraEditOrm)
         self.episkop = TextCollectionDb('episkop', EpiskopEditOrm)
         self.task = TaskCollection()
