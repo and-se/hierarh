@@ -198,7 +198,7 @@
                 return res.concat([{value: 'ссылка не нужна', nolink:"true"}])
             }
 
-            return fetch("/edit/suggest/{{linked_coll}}?" + new URLSearchParams({ query: v }),
+            return fetch("/edit/suggest/{{linked_coll}}?" + new URLSearchParams({ query: v, full: true }),
                 { signal: cancel, credentials: 'include' })                
                 .then(resp => resp.json())                
                 .then(js => {

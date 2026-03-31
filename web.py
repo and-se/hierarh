@@ -449,7 +449,8 @@ def set_task_answer(id):
 @login_required
 def suggest_cafedra():
     q = request.args.get("query", '')
-    return db_edit.cafedra.suggest(q, full_search=False, limit=20)
+    full = request.args.get('full', False)
+    return db_edit.cafedra.suggest(q, full_search=full, limit=20)
 
 @ed.get('/cafedra/<int:key>/snippet')
 @login_required
@@ -487,7 +488,8 @@ def cafedra_json(key):
 @login_required
 def suggest_episkop():
     q = request.args.get("query", '')
-    return db_edit.episkop.suggest(q, full_search=True, limit=20)
+    full = request.args.get('full', False)
+    return db_edit.episkop.suggest(q, full_search=full, limit=20)
 
 @ed.get('/episkop/<int:key>/snippet')
 @login_required
