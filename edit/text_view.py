@@ -44,6 +44,11 @@ class EpiskopView:
     def is_obn(self):
         return self._text.is_obn()
     
+    def has_name(self, name: str):
+        return name.lower().strip() == self.header.lower().strip()
+        # TODO other names...
+
+    
     @property
     def cafedras(self) -> list['RowCafedraView']:
         # отбираем строки таблицы епископов, которые не являются заголовками
@@ -56,7 +61,7 @@ class EpiskopView:
     def __str__(self):
         return f'{self.header} #{self.key}'
     
-    def make_updated_doc(self):
+    def make_updated_doc(self) -> 'TextEpiskop':
         doc_data = html.tostring(self._tree, encoding='utf8').decode('utf8')
         from edit.storage import TextEpiskop
         return TextEpiskop.from_html(self.key, doc_data)
@@ -207,6 +212,7 @@ class CafedraView:
     def __init__(self, data: 'TextCafedra'):
         self._text = data
         self._tree = html.fragment_fromstring(data.html)
+        self.changed = False
 
     @property
     def key(self):
@@ -232,7 +238,7 @@ class CafedraView:
     def episkops(self) -> list['RowEpiskopView']:
         # отбираем строки таблицы епископов, которые не являются заголовками
         rows = self._tree.xpath("""//table[contains(@class, 'episkops')]/tbody/tr[not(contains(@class, 'header-row'))]""")
-        return [RowEpiskopView(r) for r in rows]
+        return [RowEpiskopView(r, self) for r in rows]
     
     def __repr__(self):
         return f'CafedraView({self.__str__()})'
@@ -240,12 +246,19 @@ class CafedraView:
     def __str__(self):
         return f'{self.header} #{self.key}'
     
+    def make_updated_doc(self) -> 'TextCafedra':
+        doc_data = html.tostring(self._tree, encoding='utf8').decode('utf8')
+        from edit.storage import TextCafedra
+        return TextCafedra.from_html(self.key, doc_data)
+
+    
 
 class RowEpiskopView:
     """
     Структурированное представление строки таблицы епископов в html кафедры
     """
-    def __init__(self, tr: html.HtmlElement):
+    def __init__(self, tr: html.HtmlElement, root: CafedraView):
+        self.root_cafedra: CafedraView = root
         self.d = tr
         self.ep = tr[-1]
         assert self.ep.tag == 'td'
@@ -376,7 +389,21 @@ class RowEpiskopView:
     
     @property
     def link(self):
-        return None  # TODO now no links
+        rf = self.ep.get('data-ref')
+        if rf:
+            m = re.match(r'^episkop#(\d+)$', rf.strip())
+            if m:
+                return int(m.group(1))
+    
+    def set_link(self, value: int):
+        try:
+            value = int(value)
+        except ValueError:
+            raise ValueError('ключ должен быть целым числом')
+        else:
+            self.ep.set('data-ref', f'episkop#{value}')
+            self.root_cafedra.changed = True
+
     
     def __repr__(self):
         return f"RowEpiskopView({self.begin_dating} - {self.end_dating} {self.episkop})"

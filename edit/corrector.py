@@ -12,7 +12,7 @@ if __name__ == '__main__':
     sys.path.append(str(Path(__file__).parent.parent.absolute()))
 
 from edit.task import Task
-from edit.text_view import TEXT_VIEW_LOG_NAME, CafedraView, EpiskopView
+from edit.text_view import TEXT_VIEW_LOG_NAME, CafedraView, EpiskopView, RowCafedraView, RowEpiskopView
 from edit.storage import HierarhEditStorage, TextBase
 from parsers.fail import ParseFail
 
@@ -70,7 +70,9 @@ def main():
         rt.setLevel(logging.INFO)
         strm.setLevel(logging.INFO)
         print("Rebuild episkop index")
-        st = HierarhEditStorage()
+        # Не копируем индекс в память - мы же его перестраиваем
+        # За одно избегаем проблемы при изменении схемы
+        st = HierarhEditStorage(enable_ram_cache=False)
         st.episkop_index.rebuild()
         return
     
@@ -112,7 +114,9 @@ def main():
     
     if docs:
         r = input(f"Нужно обновить {len(docs)} документов. Делаем? ")
-        if r.lower() not in ('да', 'yes', '1', 'true'): return
+        if r.lower() not in ('y', 'да', 'yes', '1', 'true'):
+            print("Документы не обновляем")
+            return
 
         db = HierarhEditStorage()
         with db.atomic():
@@ -122,6 +126,7 @@ def main():
                     'comment': 'проставлены ссылки'
                 })
             # raise Exception('cancel')
+        print("Готово!")
 
 
 def create_tasks_for_coll(db: HierarhEditStorage, coll_name: str, doc_processor, 
@@ -257,6 +262,7 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
         ep = EpiskopView(ep)
 
         for i, caf in enumerate(ep.cafedras):
+            caf: RowCafedraView
             if caf.link:
                 linked = db.cafedra.get(caf.link)
                 if not linked:
@@ -265,7 +271,7 @@ def check_episkop_to_cafedra_links(remove_old_tasks=False):
                 else:
                     linked = CafedraView(linked)
                     if not linked.has_name(caf.name):
-                        task.add_problem(i, caf, 'Проставлена сылка на кафедру', linked.header, 'Это верно?')
+                        task.add_problem(i, caf, 'Проставлена ссылка на кафедру', linked.header, 'Это верно?')
                         stats['возможно сломанная ссылка']+=1
             else:
                 #if caf in db.cafedra.ignored_names:                
@@ -302,17 +308,17 @@ def cafedra_processor(caf, task: Task, db: HierarhEditStorage, stats: defaultdic
     caf: CafedraView = CafedraView(caf)
 
     for i, ep in enumerate(caf.episkops):
+        ep: RowEpiskopView
         stats['всего строк о епископах']+=1
         if ep.link:
             linked = db.episkop.get(ep.link)
-            stats['плохая ссылка']+=1
             if not linked:
                 task.add_problem(i, ep, 'сломанная ссылка - нет такого епископа', ep.link)
             else:
-                raise NotImplementedError
-                #linked = EpiskopView(linked)
-                #if not linked.has_name(ep.name):
-                #    task.add_problem(i, ep, 'Проставлена ссылка на епископа', linked.name, 'Это верно?')
+                linked = EpiskopView(linked)
+                if not linked.has_name(ep.episkop):
+                    task.add_problem(i, ep, 'Проставлена ссылка на епископа', linked.header, 'Это верно?')
+                    stats['возможно сломанная ссылка']+=1
         else:
             if ep.episkop == 'NN' or ep.episkop.startswith('NN '):
                 # не нужно проставлять ссылки на ?, NN
@@ -347,7 +353,8 @@ def cafedra_processor(caf, task: Task, db: HierarhEditStorage, stats: defaultdic
                 found_ep = db.episkop_index.find_by_header(ep.episkop, True)
                 
             if len(found_ep) == 1:
-                ... # проставить ссылку на епископа
+                stats['епископ найден, надо проставить ссылку в документе'] += 1
+                ep.set_link(found_ep[0].doc_key)
             elif not len(found_ep):
                 stats['епископ не найден']+=1
                 task.add_problem(i, ep, "епископ не найден")
@@ -364,6 +371,9 @@ def cafedra_processor(caf, task: Task, db: HierarhEditStorage, stats: defaultdic
                         } for x in found_ep
                     ]
                 })
+            
+    if caf.changed:
+        return caf.make_updated_doc()
 
 def check_cafedra_to_episkop_links(remove_old_tasks):    
     return create_tasks_for_coll(HierarhEditStorage(), 'cafedra', cafedra_processor, 

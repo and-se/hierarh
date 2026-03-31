@@ -207,8 +207,8 @@ class EpiskopSuggestController extends BaseHierarhSuggestController {
         // если только одно слово, то по нему и ищем
         if (!txt.trim().includes(' ')) return txt;
 
-        // Ищем только по словам с большой буквы
-        const onlyCapitalWords = /[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]+/g;
+        // Ищем только по русским словам с большой буквы
+        const onlyCapitalWords = /[А-ЯЁ][А-ЯЁа-яё]+/g;
         // выпишем такие слова через пробел
         return (txt.match(onlyCapitalWords) || []).join(' ')
     }
