@@ -105,7 +105,7 @@ window.onbeforeunload = function(ev) {
         }
     </script>
     
-    <button onclick="saveData('{{key}}', '{{post_url}}')">Сохранить</button>
+    <button onclick="saveData('{{key if key is defined}}', '{{post_url}}')">Сохранить</button>
     <span class="download-buttons">
         <button onclick="downloadData(H_FORM.root.querySelector('.header').innerText)">Скачать</button>
         <button onclick="document.getElementById('dupl').click()">Загрузить из файла</button>
@@ -115,7 +115,7 @@ window.onbeforeunload = function(ev) {
     <br>
     <input id="commit-message" class="edit-comment" placeholder="При желании кратко опишите здесь изменения">
 
-    {% if last_edit%}
+    {% if last_edit is defined and last_edit %}
     <div>последняя правка <em>{{last_edit}}</em>.
         {%if comment %}
         <q>{{comment}}</q>
