@@ -35,6 +35,10 @@ class HierarhEditStorage:
 
     def atomic(self):
         return EditDb.atomic()
+    
+    def backup_into(self, filename):
+        EditDb.execute_sql("vacuum into ?", (filename,))
+
 
 
 class TextCollectionDb:

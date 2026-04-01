@@ -59,6 +59,21 @@ class TaskCollection:
     def remove_by_type(self, type):
         TaskOrm.delete().where(TaskOrm.type == type).execute()
 
+    def backup_into(self, path):
+        with open(path, 'w', encoding='utf8') as f:
+            f.write('[\n\n')
+            first = True
+            for task in TaskOrm.select().dicts():
+                if not first:
+                    f.write(',\n\n')
+                else:
+                    first=False
+                # question и answer содержат json. Парсим их
+                task['question'] = json.loads(task['question'])
+                if task.get('answer'):
+                    task['answer'] = json.loads(task['answer'])
+                json.dump(task, f, ensure_ascii=False, indent=2)
+            f.write('\n\n]')
 
 class Task:
     def __init__(self, orm):        
@@ -190,7 +205,7 @@ class TaskOrm(Model):
     type = TextField()
     status = TextField(default='новая')
     question = TextField()  # json
-    answer = TextField(null=True)
+    answer = TextField(null=True)  # json
 
     who = TextField()
     when = DoubleField() # TimestampField(3)

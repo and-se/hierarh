@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>{% block pagetitle %}Панель администратора{% endblock %}</title>
+
+
+<link rel="stylesheet" type="text/css" href="/static/simple.css" >
+<link rel="stylesheet" type="text/css" href="/static/style.css" >
+</head>
+
+<body>
+    <div class="menu">        
+          <ul class="menu">
+            <li><a href="/">На главную</a></li>  
+            <li><a href="/edit/task">Задачи</a></li>  
+          </ul>
+    </div>
+    {% block content %}
+        <main>
+            <a class="button" href="{{url_for('.rebuild_episkop_index')}}" onclick="rebuild_episkop_index(event)">Перестроить индекс епископов</a>
+            <br><br>
+            <textarea id="rebuild_log" rows="5" readonly></textarea>
+            
+            <br><br>
+            <a class="button" href="{{url_for('.backup_db_edit')}}">скачать бэкап БД редактирования</a>
+            <br><br>
+
+            <a class="button" href="{{url_for('.download_tasks')}}">Скачать задачи</a>
+
+            <button onclick="alert('TODO')">Загрузить задачи</button>
+        </main>        
+    {% endblock content %}
+<div class="footer"> 
+    <div class="copyright">
+    © {{time_now.year}} ПСТГУ. При использовании материалов данного сайта активные ссылки на источник обязательны
+    </div>
+</div>
+
+<script>
+    'use strict';
+
+    const log_area = document.getElementById('rebuild_log');
+
+    function log(msg) {
+        log_area.textContent += msg + '\n';
+        const l = log_area.value.length;
+        log_area.setSelectionRange(l, l);
+    }
+
+    let Events = null;
+
+    function rebuild_episkop_index(event) {
+        event.preventDefault()
+        const url = event.target.getAttribute('href')
+
+        if (Events && Events.readyState != EventSource.CLOSED) {
+            log("Уже запущено перестроение индекса")
+            return;
+        }
+
+        try {
+            Events = new EventSource(url,{
+                withCredentials: true
+            });
+        } catch (er) {
+            log('Ошибка... ' + er)
+            return;
+        }
+
+        log_area.textContent = '';
+
+        Events.onmessage = function(ev) {
+            if (ev.data != '$CLOSE')
+                log(ev.data)
+            else 
+                Events.close()
+        }
+
+        Events.onerror = function(err) {
+            // сервер закрыл соединение (или оно упало) - завершаемся
+            // иначе браузер попробует заново соединение открыть - и индекс будет строиться заново
+            Events.close();
+            console.error(err);
+            log('Работа прервана...')
+        }
+        
+    }
+</script>
+
+</body>

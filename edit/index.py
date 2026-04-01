@@ -105,8 +105,10 @@ class EpiskopIndex:
     def get_builder(self):
         return EpiskopQueryBuilder(self.orm_model)
     
-    def rebuild(self):
+    def rebuild(self, progress_sender = lambda x: None):
         self.log.info("Start rebuild episkop index")
+        progress_sender('Start rebuild episkop index')
+
         EpiskopIndexOrm.drop_table()
         if self.mem_cache:
             MemItem.drop_table()
@@ -161,8 +163,20 @@ class EpiskopIndex:
 
                 if i%100 == 0:
                     self.log.info(f"Processed {i} items") 
-            
-        self.log.info(f"Episkop index built. Total records {i}")
+                    progress_sender(f"Processed {i} items")
+        
+        total = i
+
+        if self.mem_cache:
+            with MEM_LOCK:
+                progress_sender("Update in-memory index")
+                self._init_in_memory()
+                progress_sender("in-memory index updated")
+
+        progress_sender(f"Episkop index built. Total records {total}")
+        self.log.info(f"Episkop index built. Total records {total}")
+        
+
 
 
 class EpiskopQueryBuilder:

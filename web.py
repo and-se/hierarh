@@ -148,6 +148,7 @@ def add_comment():
 
 
 @app.get('/comments')
+@login_required
 def get_comments():
     c = comments_db.get_all()
     return render_template('comments.html', items=c)
@@ -177,6 +178,10 @@ class SiteUser(flask_login.UserMixin):
 
     @property
     def title(self):
+        return self.id
+    
+    @property
+    def name(self):
         return self.id
 
 
@@ -527,9 +532,10 @@ def episkop_json(key):
 
 app.register_blueprint(ed, url_prefix='/edit')
 
-#TODO админка с возможность перестроить индекс епископов, 
-# экспортировать/импортировать задачи (и удалить сделанные), 
-# посмотреть кто что правил
+# Панель администратора
+import admin
+app.register_blueprint(admin.adm, url_prefix='/admin')
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
