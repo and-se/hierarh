@@ -172,7 +172,7 @@ def upload_tasks():
         The_long_task.start()
         return {
             'success': True,
-            'message': 'Импорт задач запущен',
+            'message': f'Импорт из файла {file.name} задач запущен',
             'see-progress': url_for('.sse')
         }
     except Exception as ex:
