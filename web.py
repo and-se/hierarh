@@ -29,6 +29,7 @@ app = Flask(__name__, static_folder='flask/static',
             template_folder='flask/templates')
 
 app.json.ensure_ascii = False # type: ignore
+app.json.sort_keys = False
 
 from jinja2 import StrictUndefined
 # шаблоны должны падать при обращении к неизвестной переменной

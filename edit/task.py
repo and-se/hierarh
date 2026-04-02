@@ -68,12 +68,43 @@ class TaskCollection:
                     f.write(',\n\n')
                 else:
                     first=False
+                # Поле id техническое, в бэкап не помещаем
+                del task['id']
                 # question и answer содержат json. Парсим их
                 task['question'] = json.loads(task['question'])
                 if task.get('answer'):
                     task['answer'] = json.loads(task['answer'])
                 json.dump(task, f, ensure_ascii=False, indent=2)
             f.write('\n\n]')
+    
+    def import_from(self, path, progress_sender = lambda x: None):
+        with open(path, 'r', encoding='utf8') as f:
+            progress_sender('Загружаем файл задач...')
+            tasks_data = json.load(f)
+        
+        if not isinstance(tasks_data, list):
+            raise ValueError('В файле должен быть массив задач!')
+        
+        def patch_question_answer(arr):
+            for t in arr:
+                # Превращаем вложенные словари в json строки для хранения в БД
+                t['question'] = Task.something_to_json(t['question'])
+                if t.get('answer'):
+                    t['answer'] = Task.something_to_json(t['answer'])
+
+        with TaskOrm._meta.database.atomic():
+            for i in range(0, len(tasks_data), 100):
+                rows = tasks_data[i:i+100]
+                patch_question_answer(rows)
+                TaskOrm.insert_many(rows).execute()
+                progress_sender(f'Импортировано {i+100} задач')
+
+        progress_sender(f"Импорт задач завершён. Всего {len(tasks_data)} задач")
+            
+
+
+
+
 
 class Task:
     def __init__(self, orm):        
@@ -181,7 +212,8 @@ class Task:
             self.orm.save()
             logging.getLogger(TASK_LOG_NAME).debug(str(self))
 
-    def something_to_json(self, dd):
+    @staticmethod
+    def something_to_json(dd):
         if dd is None: return None
         return json.dumps(dd, ensure_ascii=False, indent=4)
 

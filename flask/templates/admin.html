@@ -19,17 +19,22 @@
     </div>
     {% block content %}
         <main>
-            <a class="button" href="{{url_for('.rebuild_episkop_index')}}" onclick="rebuild_episkop_index(event)">Перестроить индекс епископов</a>
-            <br><br>
-            <textarea id="rebuild_log" rows="5" readonly></textarea>
+            <a class="button" href="{{url_for('.backup_db_edit')}}">скачать бэкап БД редактирования</a>
+            
+            <a class="button" href="{{url_for('.rebuild_episkop_index')}}" onclick="rebuildEpiskopIndex(event)">Перестроить индекс епископов</a>
             
             <br><br>
-            <a class="button" href="{{url_for('.backup_db_edit')}}">скачать бэкап БД редактирования</a>
-            <br><br>
-
+            
             <a class="button" href="{{url_for('.download_tasks')}}">Скачать задачи</a>
 
-            <button onclick="alert('TODO')">Загрузить задачи</button>
+            <button onclick="uploadTasks(event)">Загрузить задачи</button>
+
+            <button onclick="removeTasks(event)">Удалить все задачи</button>
+            
+            <textarea id="journal" rows="5" placeholder="Здесь будет лог действий" readonly></textarea>
+            
+            <span id="status"></span>
+            <span title="Обновить статистику" href="#" onclick="updateStat()" style="cursor: pointer;">🔁</span>
         </main>        
     {% endblock content %}
 <div class="footer"> 
@@ -41,7 +46,7 @@
 <script>
     'use strict';
 
-    const log_area = document.getElementById('rebuild_log');
+    const log_area = document.getElementById('journal');
 
     function log(msg) {
         log_area.textContent += msg + '\n';
@@ -49,43 +54,104 @@
         log_area.setSelectionRange(l, l);
     }
 
-    let Events = null;
+    function logError(msg) {
+        log("!!! " + msg)
+    }
 
-    function rebuild_episkop_index(event) {
+    window.addEventListener('load', () => {
+        try {
+            const events = new EventSource("{{url_for('.sse')}}", {
+                withCredentials: true
+            });
+
+            events.onmessage = function(ev) {
+                log(ev.data)
+            }
+
+            events.onerror = function(err) {
+                console.error("Ошибка получения логов с сервера");
+            }
+        } catch (er) {
+            logError('Ошибка запуска журнала событий ' + er)
+            console.error(er)
+            return;
+        }
+
+        updateStat();
+    })
+
+    function rebuildEpiskopIndex(event) {
         event.preventDefault()
         const url = event.target.getAttribute('href')
 
-        if (Events && Events.readyState != EventSource.CLOSED) {
-            log("Уже запущено перестроение индекса")
-            return;
+        fetch(url).then(r => r.json()).then(data => {
+            if (data.success) {
+                log(data.message)
+            } else {
+                logError(data.message)
+            }
+        }).catch(e => {
+            logError('Не удалось запустить перестроение индекса: ' + e)
+        });        
+    }
+
+    function uploadTasks(event) {
+        let u = document.createElement('input');
+        u.setAttribute('type', 'file')
+        u.setAttribute('accept', '.json')
+
+        u.onchange = (ev) => {
+            const file = u.files[0];
+            const form = new FormData()
+            form.append('task_file', file)
+
+            fetch("{{url_for('.upload_tasks')}}", {
+                method: 'POST',
+                credentials: "include",
+                body: form
+            }).then(u => u.json()).then(
+                data => {
+                if (data.success) {
+                    log(data.message)
+                } else {
+                    logError(data.message)
+                }
+            }).catch(e => {
+                logError('Не удалось импортировать задачи: ' + e)
+            }).finally(() => {
+                updateStat();
+            })
         }
 
-        try {
-            Events = new EventSource(url,{
-                withCredentials: true
-            });
-        } catch (er) {
-            log('Ошибка... ' + er)
-            return;
-        }
+        u.click();
+    }
 
-        log_area.textContent = '';
-
-        Events.onmessage = function(ev) {
-            if (ev.data != '$CLOSE')
-                log(ev.data)
-            else 
-                Events.close()
+    function removeTasks() {
+        if (confirm("Все задачи из БД будут удалены! Продолжить?")) {
+            fetch("{{url_for('.remove_all_tasks')}}").then(r => r.json()).then(
+                data => {
+                    if (data.success) {
+                       log(data.message)
+                    } else {
+                        logError(data.message)
+                    }
+                }
+            ).catch(e => {
+                logError('Не удалось удалить задачи: ' + e)
+            }).finally(() => {
+                updateStat();
+            })
         }
+    }
 
-        Events.onerror = function(err) {
-            // сервер закрыл соединение (или оно упало) - завершаемся
-            // иначе браузер попробует заново соединение открыть - и индекс будет строиться заново
-            Events.close();
-            console.error(err);
-            log('Работа прервана...')
-        }
-        
+    function updateStat() {
+        fetch("{{url_for('.get_stat')}}").then(r=>r.json()).then(
+            data => {
+                if (data.success) {
+                    document.getElementById('status').textContent = `Кафедр: ${data.cafedra}. Епископов: ${data.episkop}. Задач: ${data.task}`
+                }
+            }
+        )
     }
 </script>
 
