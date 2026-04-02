@@ -52,7 +52,8 @@ SSE_Queue = Queue()
 
 def send_sse_message(x):
     #print("sse", x)
-    SSE_Queue.put(f"data: {x.replace('\n', '\\n')}\n\n")
+    x2 = x.replace('\n', '\\n')
+    SSE_Queue.put(f"data: {x2}\n\n")
 
 
 @adm.route('/rebuild_episkop_index')
