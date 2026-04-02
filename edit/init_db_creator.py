@@ -475,6 +475,10 @@ def convert_episkop_to_html(ep: dict):
 <article class="episkop_article" data-is-obn="{b(ep['isRenovator'])}" data-is-dubious="false" data-is-link="true">
 <div class="header">{name}</div>
 <div class="text"><br></div>
+<table class="cafedras">
+    <thead><tr><th>кафедра</th><th>начало</th><th>окончание</th></tr></thead>
+    <tbody></tbody>
+</table>
 </article>
 '''
     
