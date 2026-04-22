@@ -10,7 +10,7 @@ import json
 from flask import Blueprint, Response, abort, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 
-from edit.storage import HierarhEditStorage
+from edit.storage import HierarhEditStorage, LastUpdatedQuery
 import logging
 
 adm_log = logging.getLogger('admin')
@@ -204,12 +204,29 @@ def remove_all_tasks():
 @adm.route('dbstat')
 @admin_required
 def get_stat():
-    return {
+    res =  {
         'success': True,
         'cafedra': db_edit.cafedra.count(),
         'episkop': db_edit.episkop.count(),
         'task': db_edit.task.count()
     }
+
+    tt = []
+    for col in [db_edit.cafedra, db_edit.episkop]:
+        for x in col.portion(take=3, query=LastUpdatedQuery()):
+            tt.append({
+                'when': x.reg_data.get('when'), #time.strftime(' %d-%m-%y %H:%M', time.localtime(when))            
+                'header': x.header(),
+                'who': x.reg_data.get('who'),
+                'href': f'/edit/{col.name}/{x.key}'
+            })
     
+    tt = sorted(tt, key=lambda x: x['when'], reverse=True)
+    for t in tt:
+        t['when'] = time.strftime('%d-%m-%y %H:%M', time.localtime(t['when']))
+
+    res['lastEdited'] = tt
+
+    return res
 
 

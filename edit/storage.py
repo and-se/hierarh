@@ -40,6 +40,9 @@ class HierarhEditStorage:
         EditDb.execute_sql("vacuum into ?", (filename,))
 
 
+class HierarhEditStorageQuery: pass
+
+class LastUpdatedQuery(HierarhEditStorageQuery): pass
 
 class TextCollectionDb:
     def __init__(self, name, orm_model: '_BaseEditOrm'):
@@ -93,8 +96,14 @@ class TextCollectionDb:
             return self._convert_orm_to_text(r)
     
     def _portion_query(self, query):
-        return self.orm.select() \
-                    .where(orm_all_words_search_condition(query, self.orm.header)) \
+        if query is None or isinstance(query, str):
+            return self.orm.select() \
+                        .where(orm_all_words_search_condition(query, self.orm.header))                      
+        elif isinstance(query, LastUpdatedQuery):
+            return self.orm.select() \
+                .order_by(fn.json_extract(self.orm.reg_data, '$.when').desc())
+        else:
+            raise ValueError('Неизвестный тип запроса: ' + str(query))
 
     def portion(self, skip=0, take=20, query=None) -> list['TextBase']:
         q = self._portion_query(query) \

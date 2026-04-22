@@ -8,6 +8,18 @@
 
 <link rel="stylesheet" type="text/css" href="/static/simple.css" >
 <link rel="stylesheet" type="text/css" href="/static/style.css" >
+<style>
+    .last-edited {
+        a {
+            text-decoration: none;
+        }
+
+        h1 {
+            font-size: 1.5em;
+        }
+    } 
+
+</style>
 </head>
 
 <body>
@@ -35,6 +47,11 @@
             
             <span id="status"></span>
             <span title="Обновить статистику" href="#" onclick="updateStat()" style="cursor: pointer;">🔁</span>
+
+            <div class="last-edited">
+                <h1>Последние обновления</h1>
+                <div class="docs"></div>
+            </div>
         </main>        
     {% endblock content %}
 <div class="footer"> 
@@ -43,6 +60,7 @@
     </div>
 </div>
 
+<script src="/static/edit/lib.js"></script>
 <script>
     'use strict';
 
@@ -149,6 +167,22 @@
             data => {
                 if (data.success) {
                     document.getElementById('status').textContent = `Кафедр: ${data.cafedra}. Епископов: ${data.episkop}. Задач: ${data.task}`
+
+                    let f = document.querySelector('.last-edited .docs')
+                    f.innerText = '';
+                    for (let doc of data.lastEdited) {
+                        let item = LIB.createElementByHtml(`
+                        <div>
+                            <a class='hdr' target="_blank"></a>
+                        </div>
+                        `);
+
+                        let a = item.querySelector('.hdr')
+                        a.setAttribute('href', doc.href)
+                        a.innerText = doc.when +' ' + doc.who + ' ' + doc.header;
+                        
+                        f.append(item)
+                    }
                 }
             }
         )
