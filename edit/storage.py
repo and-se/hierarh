@@ -4,6 +4,7 @@ from typing import Iterator
 from db import get_db, orm_all_words_search_condition
 from edit.index import EpiskopIndex, EpiskopIndexOrm
 from edit.task import TaskCollection, TaskOrm
+from parsers.episkop import SaintTitleRegex
 import settings
 from peewee import Model, AutoField, TextField, BooleanField, IntegerField, fn, Cast
 
@@ -107,7 +108,7 @@ class TextCollectionDb:
 
     def portion(self, skip=0, take=20, query=None) -> list['TextBase']:
         q = self._portion_query(query) \
-                    .order_by(self.orm.header) \
+                    .order_by(self.orm.default_sort_expr()) \
                     .limit(take).offset(skip)
         return [self._convert_orm_to_text(x) for x in q]
     
@@ -247,6 +248,38 @@ class TextEpiskop(BaseCafEp):
             <table class="cafedras"></table>
         </article>
         '''
+
+    @property
+    def fio(self):
+        return self.extract_fio(self.header())
+    
+    fio_pre_regex = re.compile(rf'''
+    ^\s* # в начале строки
+    (
+        ({SaintTitleRegex}) # чин святости
+        | 
+        ( #чин святости в скобках
+            \(
+                ({SaintTitleRegex})
+            \s*
+            [?]? # необязательный знак вопроса
+            \s*
+            \)
+        )
+    )
+    \s* # дальше пробелы
+    ''', flags=re.X | re.I)
+
+    @classmethod
+    def extract_fio(cls, s: str):
+        if s is None:
+            return None
+        if not isinstance(s, str):
+            raise ValueError(f'Expected str got {type(s)}: {s}')
+        
+        res = cls.fio_pre_regex.sub('', s, count=1)
+        # print(f"'{s}' -> '{res}'")
+        return res
     
 class TextVersion:
     def __init__(self, coll, key, html, reg_data: dict):
@@ -283,6 +316,13 @@ class _BaseEditOrm(Model):
                           doc_reg_data = self.reg_data,
                           num = num)
     
+    @classmethod
+    def default_sort_expr(cls):
+        '''
+        Колонка или выражение для сортировки по умолчанию
+        '''
+        return cls.header
+    
 
 class CafedraEditOrm(_BaseEditOrm):
     class Meta:
@@ -306,6 +346,11 @@ class EpiskopEditOrm(_BaseEditOrm):
         r.reg_data = json.loads(self.reg_data)
         assert isinstance(r.reg_data, dict)
         return r
+    
+    @classmethod
+    def default_sort_expr(cls):        
+        # Сортировка по ФИО (без чина святости в начале)        
+        return fn.EXTRACT_FIO_PY(cls.header)
         
 
 class VersionOrm(Model):
@@ -333,6 +378,11 @@ def init_edit_db():
     all_models = [CafedraEditOrm, EpiskopEditOrm, VersionOrm, TaskOrm, EpiskopIndexOrm] 
 
     EditDb = get_db(settings.EditDbName)
+    
+    @EditDb.func('EXTRACT_FIO_PY', deterministic=True)
+    def extract_fio(s):
+        return TextEpiskop.extract_fio(s)
+
     EditDb.bind(all_models)
     EditDb.create_tables(all_models)
     return EditDb

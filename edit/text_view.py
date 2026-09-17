@@ -39,6 +39,10 @@ class EpiskopView:
     @cached_property
     def header(self):
         return self._text.header()
+    
+    @cached_property
+    def fio(self):
+        return self._text.fio()
 
     @cached_property
     def is_obn(self):

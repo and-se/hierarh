@@ -51,13 +51,15 @@ Name = original_text_for(Name | 'NN')('name')
 Surname = Combine(CapitalizedWord + Opt('-' + CapitalizedWord))
 Surname = original_text_for(Surname + Opt(CapitalizedWord))("surname")
 
-SaintTitle = Regex(r'''(Св\.(\s+муч\.)?)|(Сщмч\.)|(Блаж\.)|
+SaintTitleRegex = r'''(Св\.(\s+муч\.)?)|(Сщмч\.)|(Блаж\.)|
                        ( Святой(\s+мученик)? ) |
                        священномученик |
                        святитель |
                        блаженный
-                       ''',
-                   flags=re.I | re.X)('saint_title')
+                       '''
+
+SaintTitle = Regex(SaintTitleRegex, flags=re.I | re.X)('saint_title')
+
 Temp = ((Char('в') + '/' + 'у') | Regex(r"временно\s+управляющий")|"заместитель временно управляющего") + Opt(Question)
 Temp |= Char('(') + Temp + ')'
 Temp = original_text_for(Temp)('temp_status')

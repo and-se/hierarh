@@ -14,8 +14,8 @@ import settings
 settings.EditDbName = TestDbName
 
 # Теперь подключаем модуль storage - при этом он настроится на тестовую БД
-import storage
-from storage import TextCafedra, TextEpiskop, TextVersion
+from edit import storage
+from edit.storage import TextCafedra, TextEpiskop, TextVersion
 
 
 def load_file(text_model, test_file, key):
