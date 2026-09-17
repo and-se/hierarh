@@ -220,6 +220,13 @@ class BaseCafEp(TextBase):
             if v.strip().lower() in ['true', '1', 'yes', 'да']:
                 return True
         return False
+    
+    def is_excluded(self):
+        #<article class="episkop_article" data-exclude="true">
+        m = re.search(r'<article [^>]*data-exclude[=/ > \n\t]', self.html)
+        if m: # если атрибут есть - считаем исключённой невзирая на значение
+            return True
+        return False
 
     @classmethod
     def from_html(cls, key, html):

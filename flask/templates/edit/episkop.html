@@ -14,6 +14,9 @@ function initForm() {
             new CheckBoxProperty('is-obn', 'раскольничий', 'обновленец или иной раскол'))
         H_FORM.addEditor('$FORM_ROOT', 
             new CheckBoxProperty('is-dubious', '"легендарный"', 'есть сомнения, что это реальное лицо'))
+
+        H_FORM.addEditor('$FORM_ROOT', 
+            new CheckBoxProperty('exclude', 'исключён', 'статья исключена из списка', true))
         
         // Заголовок
         H_FORM.addEditor('.header', new TextEditor())        

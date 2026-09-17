@@ -294,12 +294,11 @@ function TextEditor() {
     }
 }
 
-function CheckBoxProperty(dataAttrName, title, description) {
+function CheckBoxProperty(dataAttrName, title, description, removeAttrOnFalse=false) {
     
     /*if (!dataAttrName || dataAttrName.search('-') != -1) {
         throw new Error('attr must be JS identifier, got ' + dataAttrName)
     }*/
-    
     this.attr = dataAttrName
     this.title = title
     this.description = description
@@ -348,6 +347,9 @@ function CheckBoxProperty(dataAttrName, title, description) {
             this.root.setAttribute('data-' + this.attr, cb.checked)
             // требует this.attr как JS идентификатор, например '-' недопустим
             //this.root.dataset[this.attr] = cb.checked
+            if(removeAttrOnFalse && !cb.checked) {
+                this.root.removeAttribute('data-'+this.attr);
+            }
             
         }, {signal: this.form.eventController.signal})
     }

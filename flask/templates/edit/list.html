@@ -9,7 +9,7 @@
 
     <ul class="items">
     {% for doc in items %}
-        <li><a href="/edit/{{item_type}}/{{doc.key}}" class="{{'obnovl' if doc.is_obn()}}">{{doc.header()}}</a></li>
+        <li><a href="/edit/{{item_type}}/{{doc.key}}" class="{{'obnovl' if doc.is_obn()}} {{'exclude' if doc.is_excluded()}}">{{doc.header()}}</a></li>
     {% endfor %}
     </ul>
 

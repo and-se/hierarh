@@ -59,6 +59,15 @@
     text-decoration-line: underline;
 }
 
+/* заголовок для исключённых из списка */
+.he-edit-form[data-exclude='true'] .header {
+    text-decoration: line-through;
+}
+
+.items li a.exclude {
+	text-decoration: line-through;
+}
+
 /* заголовок для "легендарных" епископов */
 .he-edit-form[data-is-dubious='true'] .header {
     font-style: italic;    
